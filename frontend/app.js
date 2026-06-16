@@ -4541,9 +4541,151 @@ function switchPage(id) {
   }
 }
 
+let onboardingLanguageDraft = "id";
+
+function getSuggestedCommanderName() {
+  const p = state?.player || {};
+
+  return (
+    p.commander_name ||
+    p.username ||
+    telegramUser?.username ||
+    telegramUser?.first_name ||
+    "Commander"
+  );
+}
+
+function maybeShowOnboarding() {
+  if (!state?.player) return;
+
+  if (state.player.onboarding_complete) {
+    return;
+  }
+
+  showOnboardingGate();
+}
+
+function showOnboardingGate() {
+  const old = document.getElementById("onboardingGate");
+  if (old) old.remove();
+
+  onboardingLanguageDraft = state?.player?.language || telegramUser?.language_code || "id";
+
+  if (!["id", "en"].includes(onboardingLanguageDraft)) {
+    onboardingLanguageDraft = "id";
+  }
+
+  const suggestedName = getSuggestedCommanderName();
+
+  const gate = document.createElement("div");
+  gate.id = "onboardingGate";
+  gate.className = "onboarding-gate";
+
+  gate.innerHTML = `
+    <div class="onboarding-card">
+      <div class="onboarding-logo">CC</div>
+
+      <small>CYBERCORE LAB NETWORK</small>
+      <h1>Commander Registration</h1>
+
+      <p>
+        Identitas Telegram kamu sudah terhubung. Sekarang buat nama Commander
+        untuk masuk ke jaringan CyberCore.
+      </p>
+
+      <label>Language</label>
+      <div class="onboarding-language-row">
+        <button id="onboardLangId" onclick="selectOnboardingLanguage('id')">Indonesia</button>
+        <button id="onboardLangEn" onclick="selectOnboardingLanguage('en')">English</button>
+      </div>
+
+      <label>Commander Name</label>
+      <input
+        id="onboardingCommanderName"
+        maxlength="24"
+        value="${escapeHtml(String(suggestedName)).replace(/"/g, "&quot;")}"
+        placeholder="Commander name"
+      />
+
+      <small class="onboarding-note">
+        Nama ini akan tampil di profile, radar PvP, dan scout report.
+      </small>
+
+      <button class="onboarding-start-btn" onclick="completeOnboarding()">
+        Enter CyberCore
+      </button>
+    </div>
+  `;
+
+  document.body.appendChild(gate);
+  selectOnboardingLanguage(onboardingLanguageDraft);
+}
+
+function selectOnboardingLanguage(lang) {
+  onboardingLanguageDraft = lang;
+
+  const idBtn = document.getElementById("onboardLangId");
+  const enBtn = document.getElementById("onboardLangEn");
+
+  if (idBtn) idBtn.classList.toggle("active", lang === "id");
+  if (enBtn) enBtn.classList.toggle("active", lang === "en");
+}
+
+async function completeOnboarding() {
+  const input = document.getElementById("onboardingCommanderName");
+  const commanderName = String(input?.value || "").trim();
+
+  if (commanderName.length < 3) {
+    alert("Commander name minimal 3 karakter.");
+    return;
+  }
+
+  try {
+    const result = await api("/api/onboarding/complete", {
+      method: "POST",
+      body: JSON.stringify({
+        language: onboardingLanguageDraft,
+        commander_name: commanderName
+      })
+    });
+
+    const gate = document.getElementById("onboardingGate");
+    if (gate) gate.remove();
+
+    await loadState();
+    await loadBuildings();
+
+    showBuildingSheet(
+      "Registration Complete",
+      `
+        <div class="profile-card">
+          <h3>${escapeHtml(result.profile.commander_name)}</h3>
+          <p class="muted">Commander registered in CyberCore Lab.</p>
+
+          ${row("Player ID", result.player_id)}
+          ${row("Language", result.profile.language)}
+          ${row("Referral Code", result.profile.referral_code)}
+
+          <p class="muted" style="margin-top:12px;">
+            Base awal sudah aktif. Tutorial belum dibuka dulu; kamu bisa mulai dari Base,
+            Radar Tower, Unit Factory, dan Research Lab.
+          </p>
+
+          <div class="sheet-actions">
+            <button onclick="closeBuildingSheet()">Enter Base</button>
+          </div>
+        </div>
+      `
+    );
+  } catch (err) {
+    alert("Registration failed: " + err.message);
+  }
+}
+
 async function initApp() {
   await initTelegramMiniApp();
   await loadState();
+  maybeShowOnboarding();
   document.querySelectorAll(".tab").forEach(btn => {
     btn.addEventListener("click", () => {
       switchPage(btn.dataset.page);

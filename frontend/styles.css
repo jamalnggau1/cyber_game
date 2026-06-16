@@ -3914,3 +3914,106 @@ input[type=number] {
 .intel-meta-strip b {
   color: var(--accent);
 }
+.onboarding-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background:
+    radial-gradient(circle at 50% 15%, rgba(57, 243, 255, .16), rgba(2, 5, 14, .96) 55%),
+    rgba(2, 5, 14, .96);
+  backdrop-filter: blur(10px);
+}
+
+.onboarding-card {
+  width: min(100%, 380px);
+  border-radius: 26px;
+  padding: 22px;
+  background: rgba(7, 13, 30, .96);
+  border: 1px solid rgba(57, 243, 255, .22);
+  box-shadow: 0 0 34px rgba(57, 243, 255, .14);
+}
+
+.onboarding-logo {
+  width: 64px;
+  height: 64px;
+  border-radius: 22px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 14px;
+  color: var(--accent);
+  font-weight: 900;
+  letter-spacing: 1px;
+  background: radial-gradient(circle, rgba(57, 243, 255, .22), rgba(7, 13, 30, .92));
+  border: 1px solid rgba(57, 243, 255, .28);
+}
+
+.onboarding-card small {
+  color: var(--accent);
+  font-weight: 800;
+  font-size: 10px;
+  letter-spacing: .7px;
+}
+
+.onboarding-card h1 {
+  margin: 6px 0 8px;
+  font-size: 24px;
+}
+
+.onboarding-card p,
+.onboarding-note {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.onboarding-card label {
+  display: block;
+  margin-top: 14px;
+  margin-bottom: 7px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.onboarding-language-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.onboarding-language-row button,
+.onboarding-start-btn {
+  border: 1px solid rgba(57, 243, 255, .20);
+  background: rgba(16, 28, 58, .9);
+  color: white;
+  border-radius: 14px;
+  padding: 11px;
+  font-weight: 800;
+}
+
+.onboarding-language-row button.active {
+  border-color: rgba(57, 243, 255, .9);
+  color: var(--accent);
+  box-shadow: 0 0 16px rgba(57, 243, 255, .12);
+}
+
+#onboardingCommanderName {
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: 15px;
+  padding: 13px;
+  color: white;
+  background: rgba(3, 8, 18, .94);
+  border: 1px solid rgba(57, 243, 255, .20);
+  outline: none;
+}
+
+.onboarding-start-btn {
+  width: 100%;
+  margin-top: 16px;
+  color: #06101b;
+  background: linear-gradient(135deg, #39f3ff, #8b5cf6);
+}

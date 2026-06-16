@@ -70,6 +70,15 @@ def make_reset_player_profile(player_id: str, old_profile: dict | None = None):
     )
 
     profile = {
+                "language": old_profile.get("language", "id"),
+        "commander_name": old_profile.get(
+            "commander_name",
+            old_profile.get("name", username)
+        ),
+        "onboarding_complete": old_profile.get("onboarding_complete", False),
+        "registered_at": old_profile.get("registered_at", int(time.time())),
+        "referral_by": old_profile.get("referral_by", None),
+        "referral_code": old_profile.get("referral_code", f"CC{str(old_profile.get('telegram_id') or player_id)[-6:]}"),
         "player_id": player_id,
         "telegram_id": old_profile.get("telegram_id", ""),
         "name": username,
@@ -1162,6 +1171,21 @@ def ensure_player_profile_schema(profile: dict):
     for unit_id, level in default_research["unit_tech"].items():
         profile["research"]["unit_tech"].setdefault(unit_id, level)
 
+        profile.setdefault("language", "id")
+
+    profile.setdefault(
+        "commander_name",
+        profile.get("name")
+        or profile.get("username")
+        or profile.get("first_name")
+        or "Commander"
+    )
+
+    profile.setdefault("onboarding_complete", False)
+    profile.setdefault("registered_at", int(time.time()))
+    profile.setdefault("referral_by", None)
+    profile.setdefault("referral_code", f"CC{str(profile.get('telegram_id') or profile.get('player_id') or '000000')[-6:]}")
+
     return profile
 
 def get_profile_research_level(profile: dict, research_id: str) -> int:
@@ -1855,6 +1879,12 @@ async def state(request: Request):
     player_view["name"] = profile.get("name", player_id)
     player_view["username"] = profile.get("username", "")
     player_view["first_name"] = profile.get("first_name", "")
+    player_view["language"] = profile.get("language", "id")
+    player_view["commander_name"] = profile.get("commander_name", player_view["name"])
+    player_view["onboarding_complete"] = profile.get("onboarding_complete", False)
+    player_view["registered_at"] = profile.get("registered_at")
+    player_view["referral_code"] = profile.get("referral_code")
+    player_view["referral_by"] = profile.get("referral_by")
 
     # Core levels
     player_view["x"] = profile.get("x", 120)
@@ -2653,6 +2683,11 @@ def attack(req: AttackRequest):
     }
 
     return GAME_STATE["active_attacks"][attack_id]
+
+class OnboardingCompleteRequest(BaseModel):
+    language: Literal["id", "en"] = "id"
+    commander_name: str = Field(min_length=3, max_length=24)
+    referral_code: Optional[str] = None
 
 class PromoteUnitRequest(BaseModel):
     unit_id: str
@@ -3633,6 +3668,53 @@ async def upgrade_building(building_id: str, request: Request):
             "scout_level": profile.get("scout_level", 1),
             "ai_core_level": profile.get("ai_core_level", 1),
         },
+    }
+
+@app.post("/api/onboarding/complete")
+async def complete_onboarding(req: OnboardingCompleteRequest, request: Request):
+    await sync_state_from_db()
+
+    player_id, profile = get_or_create_active_player_profile(request)
+    profile = ensure_player_profile_schema(profile)
+
+    commander_name = req.commander_name.strip()
+
+    if len(commander_name) < 3:
+        raise HTTPException(status_code=400, detail="Commander name minimal 3 karakter")
+
+    blocked_words = ["admin", "owner", "system", "moderator"]
+
+    if commander_name.lower() in blocked_words:
+        raise HTTPException(status_code=400, detail="Nama ini tidak bisa dipakai")
+
+    profile["language"] = req.language
+    profile["commander_name"] = commander_name
+    profile["name"] = commander_name
+    profile["onboarding_complete"] = True
+    profile["registered_at"] = profile.get("registered_at") or int(time.time())
+
+    if req.referral_code:
+        profile["referral_by"] = req.referral_code.strip()
+
+    if not profile.get("referral_code"):
+        profile["referral_code"] = f"CC{str(profile.get('telegram_id') or player_id)[-6:]}"
+
+    GAME_STATE["players"][player_id] = profile
+
+    await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
+
+    return {
+        "success": True,
+        "message": f"Welcome Commander {commander_name}",
+        "player_id": player_id,
+        "profile": {
+            "player_id": player_id,
+            "commander_name": profile["commander_name"],
+            "language": profile["language"],
+            "referral_code": profile["referral_code"],
+            "registered_at": profile["registered_at"],
+            "onboarding_complete": profile["onboarding_complete"],
+        }
     }
 
 # WAJIB PALING BAWAH
