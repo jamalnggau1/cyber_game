@@ -5,6 +5,7 @@ import copy
 import threading
 import math
 import random
+import os
 import time
 import copy
 import requests
@@ -44,10 +45,77 @@ BASE_DIR = Path(__file__).resolve().parent
 FRONTEND_DIR = BASE_DIR.parent / "frontend"
 
 
-@app.get("/health")
-async def health():
-    return {"ok": True, "message": "CyberCore backend running"}
+ADMIN_KEY = os.getenv("ADMIN_KEY", "")
 
+
+def require_admin(request: Request):
+    key = request.headers.get("X-Admin-Key", "")
+
+    if not ADMIN_KEY:
+        raise HTTPException(status_code=500, detail="ADMIN_KEY belum diset")
+
+    if key != ADMIN_KEY:
+        raise HTTPException(status_code=403, detail="Admin key salah")
+
+    return True
+
+def make_reset_player_profile(player_id: str, old_profile: dict | None = None):
+    old_profile = old_profile or {}
+
+    username = (
+        old_profile.get("username")
+        or old_profile.get("first_name")
+        or old_profile.get("name")
+        or player_id
+    )
+
+    return {
+        "player_id": player_id,
+        "telegram_id": old_profile.get("telegram_id", ""),
+        "name": username,
+        "username": old_profile.get("username", ""),
+        "first_name": old_profile.get("first_name", ""),
+
+        "x": old_profile.get("x", 120),
+        "y": old_profile.get("y", 450),
+
+        "lab_level": 1,
+        "scanner_level": 1,
+        "scout_level": 1,
+
+        "jammer_level": 1,
+        "defense_ai_level": 1,
+        "trace_monitor_level": 1,
+
+        "defense_style": "Starter Defense",
+        "defense_build": {
+            "name": "Starter Defense Grid",
+            "modules": ["Firewall Core", "Trace Monitor", "Sentinel"],
+        },
+
+        "defense_units": [
+            {
+                "id": "breaker",
+                "name": "Breaker",
+                "role": "Frontline",
+                "level": 1,
+                "count": 30,
+                "hp": 120,
+                "attack": 35,
+                "defense": 18,
+                "speed": 7,
+                "cargo": 3,
+                "power": 1950,
+            }
+        ],
+
+        "resources": {
+            "credits": 5000,
+            "data_shard": 0,
+            "nano_parts": 0,
+            "nexus_core": 0,
+        },
+    }
 # ==========================================================
 # Game constants
 # ==========================================================
@@ -2848,6 +2916,51 @@ async def seed_test_player(request: Request):
         "attacker_id": attacker_id,
         "seeded_player": GAME_STATE["players"][test_player_id],
         "players_count": len(GAME_STATE["players"]),
+    }
+
+@app.post("/api/admin/reset-player")
+async def admin_reset_player(request: Request, payload: dict = Body(...)):
+    require_admin(request)
+
+    await sync_state_from_db()
+    ensure_multiplayer_system()
+
+    target_player_id = str(payload.get("player_id", "")).strip()
+    telegram_id = str(payload.get("telegram_id", "")).strip()
+
+    if not target_player_id and telegram_id:
+        target_player_id = f"tg_{telegram_id}"
+
+    if not target_player_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Isi player_id atau telegram_id"
+        )
+
+    old_profile = GAME_STATE["players"].get(target_player_id)
+
+    if not old_profile:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Player tidak ditemukan: {target_player_id}"
+        )
+
+    GAME_STATE["players"][target_player_id] = make_reset_player_profile(
+        target_player_id,
+        old_profile,
+    )
+
+    # Bersihkan target scan lama supaya radar tidak memakai data basi
+    GAME_STATE["targets"] = {}
+    GAME_STATE["scan_counter"] = GAME_STATE.get("scan_counter", 0) + 1
+
+    await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
+
+    return {
+        "success": True,
+        "message": f"Player {target_player_id} berhasil direset",
+        "player_id": target_player_id,
+        "profile": GAME_STATE["players"][target_player_id],
     }
 
 # WAJIB PALING BAWAH
