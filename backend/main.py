@@ -1506,13 +1506,20 @@ def state():
 def make_player_scan_targets(attacker_player_id: str):
     ensure_multiplayer_system()
 
-    attacker = GAME_STATE["players"].get(attacker_player_id)
+    players = GAME_STATE.get("players", {})
+
+    attacker = players.get(attacker_player_id)
+
+    # Fallback supaya Vercel tidak return [] kalau attacker belum kebaca di memory
     if not attacker:
-        return []
+        attacker = {
+            "x": GAME_STATE.get("player", {}).get("x", 120),
+            "y": GAME_STATE.get("player", {}).get("y", 450),
+        }
 
     targets = []
 
-    for player_id, defender in GAME_STATE["players"].items():
+    for player_id, defender in players.items():
         if player_id == attacker_player_id:
             continue
 
@@ -1542,6 +1549,7 @@ def make_player_scan_targets(attacker_player_id: str):
             "lab_level": defender.get("lab_level", 1),
             "lab_tier": "Player",
             "signal_strength": "Player",
+            "vault_signal": "Player Vault",
 
             "enemy_army": defense_units,
             "enemy_army_power": army_power,
@@ -1578,19 +1586,13 @@ async def scan(request: Request):
 
     GAME_STATE["scan_counter"] = GAME_STATE.get("scan_counter", 0) + 1
 
-    # 1. Target NPC lama
     fresh_targets = generate_targets()
-
-    # 2. Target player Telegram / player lain
     player_targets = make_player_scan_targets(attacker_player_id)
 
-    # 3. Gabungkan NPC + player
     all_targets = fresh_targets + player_targets
 
-    # Mining tetap dibuat dari NPC dulu, jangan dari player target
     fresh_mining_nodes = generate_mining_nodes(fresh_targets)
 
-    # Simpan target full ke GAME_STATE supaya scout bisa membaca data lengkap
     GAME_STATE["targets"] = {
         t["id"]: t for t in all_targets
     }
@@ -1619,7 +1621,6 @@ async def scan(request: Request):
                 "signal_strength": t.get("signal_strength", "Unknown"),
                 "lab_tier": t.get("lab_tier", "Unknown"),
                 "vault_signal": t.get("vault_signal", "Unknown"),
-
                 "firewall": t.get("firewall", "Basic Firewall"),
                 "asset": t.get("asset"),
                 "player_id": t.get("player_id"),
@@ -1641,6 +1642,11 @@ async def scan(request: Request):
         "enemy_count": len([t for t in visible if t.get("kind") != "player"]),
         "player_count": len([t for t in visible if t.get("kind") == "player"]),
         "mining_count": len(visible_mining),
+        "debug": {
+            "attacker_player_id": attacker_player_id,
+            "players_count": len(GAME_STATE.get("players", {})),
+            "player_target_count_before_radius": len(player_targets),
+        }
     }
 
 def build_scout_report(target_id: str):
