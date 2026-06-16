@@ -2654,7 +2654,7 @@ async def auth_telegram(payload: dict = Body(...)):
     }
 
 def get_player_target_asset():
-    return "base.png"
+    return "assets/base.png"
 
 
 def ensure_multiplayer_system():
