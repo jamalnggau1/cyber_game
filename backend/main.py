@@ -2552,7 +2552,7 @@ def build_scout_report(target_id: str, attacker_profile: dict):
         "trap": target.get("trap", "Unknown") if level >= 4 else "??? Unlock Scout Lv.4",
         "trace_scanner": target.get("trace_scanner", "Unknown") if level >= 5 else "??? Unlock Scout Lv.5",
         "defense_style": target.get("defense_style", "Unknown") if level >= 3 else "??? Unlock Scout Lv.3",
-        "estimated_power": target.get("estimated_power", target.get("defense_power", "Unknown")) if level >= 2 else "??? Unlock Scout Lv.2",
+        "estimated_power": target.get("estimated_power", target.get("defense_power", "Unknown")),
         "weakness_hint": target.get("weakness_hint", "Unknown") if level >= 4 else "??? Unlock Scout Lv.4",
         "counter_risk": target.get("counter_risk", "Unknown") if level >= 4 else "??? Unlock Scout Lv.4",
         "build_clue": target.get("build_clue", "Unknown") if level >= 10 else "??? Unlock Scout Lv.10",
