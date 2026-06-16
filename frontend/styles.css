@@ -4102,3 +4102,144 @@ input[type=number] {
 .defense-stat-row b {
   color: var(--accent);
 }
+.compact-defense-desc {
+  margin: 10px 0 12px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.defense-overview-grid {
+  display: grid;
+  grid-template-columns: 1.25fr .95fr;
+  gap: 9px;
+  margin-top: 10px;
+}
+
+.defense-overview-card {
+  min-height: 78px;
+  padding: 13px;
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 20% 0%, rgba(57, 243, 255, .13), transparent 55%),
+    rgba(255, 255, 255, .035);
+  border: 1px solid rgba(57, 243, 255, .14);
+}
+
+.defense-overview-card.main {
+  border-color: rgba(57, 243, 255, .24);
+  box-shadow: inset 0 0 20px rgba(57, 243, 255, .035);
+}
+
+.defense-overview-card small,
+.defense-breakdown-grid small {
+  display: block;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .2px;
+}
+
+.defense-overview-card b {
+  display: block;
+  margin-top: 4px;
+  color: var(--accent);
+  font-size: 25px;
+  line-height: 1;
+}
+
+.defense-overview-card span {
+  display: block;
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.defense-breakdown-card,
+.defense-compact-info {
+  margin-top: 10px;
+  padding: 12px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, .03);
+  border: 1px solid rgba(57, 243, 255, .11);
+}
+
+.defense-breakdown-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.defense-breakdown-title h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.defense-breakdown-title span {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.defense-breakdown-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 7px;
+}
+
+.defense-breakdown-grid div {
+  padding: 9px;
+  border-radius: 14px;
+  background: rgba(15, 27, 54, .72);
+  border: 1px solid rgba(57, 243, 255, .08);
+}
+
+.defense-breakdown-grid b {
+  display: block;
+  margin-top: 4px;
+  color: var(--accent);
+  font-size: 16px;
+  line-height: 1.1;
+}
+
+.defense-mini-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, .055);
+}
+
+.defense-mini-row:last-child {
+  border-bottom: none;
+}
+
+.defense-mini-row span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.defense-mini-row b {
+  color: var(--accent);
+  font-size: 12px;
+}
+
+.compact-muted {
+  margin: 0;
+  font-size: 12px;
+}
+
+@media (max-width: 380px) {
+  .defense-overview-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .defense-breakdown-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .defense-overview-card b {
+    font-size: 22px;
+  }
+}

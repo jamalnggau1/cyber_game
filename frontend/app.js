@@ -2119,70 +2119,84 @@ function renderDefenseStatsTab(d) {
 
   const buffRows = Object.keys(buffs).length
     ? Object.entries(buffs).map(([key, value]) => `
-        <div class="defense-stat-row">
+        <div class="defense-mini-row">
           <span>${escapeHtml(key)}</span>
           <b>${Number(value) > 0 ? "+" : ""}${escapeHtml(String(value))}%</b>
         </div>
       `).join("")
-    : `<p class="muted">Tidak ada active AI buff.</p>`;
+    : `<p class="muted compact-muted">Tidak ada active AI buff.</p>`;
 
   return `
-    <p class="muted">
+    <p class="muted compact-defense-desc">
       Stats ini dihitung dari unit, bangunan, research, AI aktif, dan defense build.
-      Angka Anti Scout dipakai saat musuh melakukan Scout ke base kamu.
+      Anti Scout Score dipakai saat musuh melakukan Scout ke base kamu.
     </p>
 
-    <div class="defense-stats-grid">
-      <div class="defense-stat-card primary-stat">
+    <div class="defense-overview-grid">
+      <div class="defense-overview-card main">
         <small>Defense Power</small>
         <b>${formatPower(stats.defense_power)}</b>
+        <span>Total kekuatan pertahanan</span>
       </div>
 
-      <div class="defense-stat-card primary-stat">
-        <small>Anti Scout Score</small>
+      <div class="defense-overview-card">
+        <small>Anti Scout</small>
         <b>${formatPower(stats.anti_scout_score)}</b>
-      </div>
-
-      <div class="defense-stat-card">
-        <small>Army Power</small>
-        <b>${formatPower(stats.army_power)}</b>
-      </div>
-
-      <div class="defense-stat-card">
-        <small>Base Power</small>
-        <b>${formatPower(stats.base_power)}</b>
-      </div>
-
-      <div class="defense-stat-card">
-        <small>Research Power</small>
-        <b>${formatPower(stats.research_power)}</b>
-      </div>
-
-      <div class="defense-stat-card">
-        <small>AI Power</small>
-        <b>${formatPower(stats.ai_power)}</b>
-      </div>
-
-      <div class="defense-stat-card">
-        <small>Module Score</small>
-        <b>${formatPower(stats.module_score)}</b>
-      </div>
-
-      <div class="defense-stat-card">
-        <small>AI Defense Bonus</small>
-        <b>${aiDefenseBonus > 0 ? "+" : ""}${aiDefenseBonus}%</b>
+        <span>Melawan Scout Drone</span>
       </div>
     </div>
 
-    <div class="defense-setup-card">
+    <div class="defense-breakdown-card">
+      <div class="defense-breakdown-title">
+        <h3>Power Breakdown</h3>
+        <span>Formula aktif</span>
+      </div>
+
+      <div class="defense-breakdown-grid">
+        <div>
+          <small>Army</small>
+          <b>${formatPower(stats.army_power)}</b>
+        </div>
+
+        <div>
+          <small>Base</small>
+          <b>${formatPower(stats.base_power)}</b>
+        </div>
+
+        <div>
+          <small>Research</small>
+          <b>${formatPower(stats.research_power)}</b>
+        </div>
+
+        <div>
+          <small>AI</small>
+          <b>${formatPower(stats.ai_power)}</b>
+        </div>
+
+        <div>
+          <small>Module</small>
+          <b>${formatPower(stats.module_score)}</b>
+        </div>
+
+        <div>
+          <small>AI DEF Bonus</small>
+          <b>${aiDefenseBonus > 0 ? "+" : ""}${aiDefenseBonus}%</b>
+        </div>
+      </div>
+    </div>
+
+    <div class="defense-compact-info">
       ${row("Jammer Level", stats.jammer_level || 1)}
+      ${row("AI Multiplier", `×${stats.ai_multiplier || 1}`)}
       ${row("Defense Style", d.defense_style || "Balanced Defense")}
       ${row("Modules", modules.length ? modules.join(", ") : "None")}
-      ${row("AI Multiplier", `×${stats.ai_multiplier || 1}`)}
     </div>
 
-    <div class="defense-setup-card">
-      <h3>Active AI Buff</h3>
+    <div class="defense-compact-info">
+      <div class="defense-breakdown-title">
+        <h3>Active AI Buff</h3>
+        <span>${Object.keys(buffs).length} buff</span>
+      </div>
       ${buffRows}
     </div>
 
@@ -3406,7 +3420,7 @@ async function openProfileSheet() {
     const data = await api("/api/profile");
     const p = data.profile;
     const army = calculateProfileArmyStats();
-    const commander = calculateCommanderStats(army, p);
+    // Power breakdown dipindahkan ke Defense Stats.
 
     showBuildingSheet(
       "Commander Profile",
@@ -3437,27 +3451,7 @@ async function openProfileSheet() {
           </div>
         </div>
 
-        <div class="profile-power-grid">
-          <div>
-            <small>Army Power</small>
-            <b>${compactNumber(commander.armyPower)}</b>
-          </div>
-
-          <div>
-            <small>Base Power</small>
-            <b>${compactNumber(commander.buildingPower)}</b>
-          </div>
-
-          <div>
-            <small>Research Power</small>
-            <b>${compactNumber(commander.researchPower)}</b>
-          </div>
-
-          <div>
-            <small>AI Power</small>
-            <b>${compactNumber(commander.aiPower)}</b>
-          </div>
-        </div>
+        
         ${renderProfileUnitRoster()}
         ${renderProfileEnergyBar(p)}
 
