@@ -639,15 +639,15 @@ GAME_STATE: Dict[str, Any] = {
             "description": "Meningkatkan efektivitas buff dan analisis AI Agent.",
             "effect": "AI buff effect +3% per level",
         },
-        "attack_routing": {
-            "id": "attack_routing",
-            "name": "Attack Routing",
-            "level": 0,
+        "scout_drone": {
+            "id": "scout_drone",
+            "name": "Scout Drone",
+            "level": 1,
             "max_level": 10,
-            "base_credits": 1600,
-            "base_energy": 7,
-            "description": "Membuat rute serangan lebih stabil, terutama jarak jauh.",
-            "effect": "Long distance penalty -5% per level",
+            "base_credits": 900,
+            "base_energy": 4,
+            "description": "Meningkatkan level Scout Drone untuk membuka detail intel target.",
+            "effect": "Unlock deeper scout intel per level",
         },
     },
 }
@@ -1321,6 +1321,14 @@ def threat_multiplier(target_type: str) -> float:
 
     return 1.0
 
+def get_effective_scout_level(profile: dict) -> int:
+    profile = ensure_player_profile_schema(profile)
+
+    base_scout = int(profile.get("scout_level", 1))
+    drone_research = int(get_profile_research_level(profile, "scout_drone"))
+
+    return max(1, base_scout, drone_research)
+
 def make_enemy_resources(target_level: int, signal_strength: str):
     mult = threat_multiplier(signal_strength)
 
@@ -1450,6 +1458,8 @@ def ensure_player_profile_schema(profile: dict):
 
     for research_id, level in default_research["core"].items():
         profile["research"]["core"].setdefault(research_id, level)
+        # Migration: Attack Routing diganti menjadi Scout Drone.
+        profile["research"]["core"].pop("attack_routing", None)
 
     for unit_id, level in default_research["unit_tech"].items():
         profile["research"]["unit_tech"].setdefault(unit_id, level)
@@ -1958,10 +1968,11 @@ def make_default_player_research():
         "core": {
             "energy_generation": 0,
             "network_speed": 0,
+            "scout_drone": 1,
             "scout_signal": 1,
             "unit_capacity": 0,
             "ai_sync": 0,
-            "attack_routing": 0,
+            
         },
         "unit_tech": {
             unit_id: 1
@@ -2495,7 +2506,7 @@ def build_scout_report(target_id: str, attacker_profile: dict):
             detail="Mining node belum memakai Scout enemy."
         )
 
-    level = int(p.get("scout_level", 1))
+    level = get_effective_scout_level(p)
     enemy_army = target.get("enemy_army", [])
     enemy_build = target.get("enemy_build", {})
     defense_modules = target.get("defense_modules", [])
@@ -2667,7 +2678,7 @@ async def start_scout(payload: dict = Body(...), request: Request = None):
         )
 
     distance_value = float(target.get("distance", 0))
-    scout_level = int(profile.get("scout_level", 1))
+    scout_level = get_effective_scout_level(profile)
 
     energy_cost = scout_energy_cost(distance_value)
 

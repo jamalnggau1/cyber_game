@@ -766,9 +766,9 @@ function renderScoutContestBlock(r) {
 
         <div class="contest-detail-grid">
           ${row("Noise", noise)}
-          ${row("Scout Lv", contest.attacker_scout_level ?? "?")}
+          ${row("Scout Drone Lv", contest.attacker_scout_level ?? "?")}
           ${row("Scanner Lv", contest.attacker_scanner_level ?? "?")}
-          ${row("Scout Signal", contest.attacker_scout_signal ?? "?")}
+          ${row("Signal Research", contest.attacker_scout_signal ?? "?")}
           ${row("Defender Jammer", contest.defender_jammer_level ?? "?")}
           ${row("DEF AI Bonus", `${contest.defender_ai_defense_bonus_percent || 0}%`)}
         </div>
@@ -2938,10 +2938,10 @@ function renderResearchTab(data) {
   const researchOrder = [
     "energy_generation",
     "network_speed",
+    "scout_drone",
     "scout_signal",
     "unit_capacity",
-    "ai_sync",
-    "attack_routing"
+    "ai_sync"
   ];
 
   const researchList = researchOrder
