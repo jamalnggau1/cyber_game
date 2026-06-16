@@ -6,6 +6,7 @@ import threading
 import math
 import random
 import time
+import copy
 import requests
 from backend.database import init_db, load_game_state, save_game_state, PLAYER_ID
 from typing import Dict, List, Optional, Literal, Any
@@ -13,6 +14,12 @@ from fastapi import FastAPI, HTTPException, Body, Request
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+async def sync_state_from_db():
+    saved_state = await load_game_state(PLAYER_ID)
+
+    if saved_state:
+        GAME_STATE.clear()
+        GAME_STATE.update(saved_state)
 
 app = FastAPI(title="CyberCore Lab MVP")
 @app.on_event("startup")
@@ -1557,7 +1564,8 @@ def make_player_scan_targets(attacker_player_id: str):
     return targets
 
 @app.get("/api/scan")
-def scan(request: Request):
+async def scan(request: Request):
+    await sync_state_from_db()
     apply_energy_regen()
 
     p = GAME_STATE["player"]
@@ -1623,7 +1631,7 @@ def scan(request: Request):
         if node["distance"] <= radius:
             visible_mining.append(node)
 
-    persist_state()
+    await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
 
     return {
         "scan_id": GAME_STATE["scan_counter"],
@@ -2659,7 +2667,9 @@ def upgrade_unit(req: UpgradeUnitRequest):
     }
 
 @app.post("/api/auth/telegram")
-def auth_telegram(payload: dict = Body(...)):
+async def auth_telegram(payload: dict = Body(...)):
+    await sync_state_from_db()
+
     user = payload.get("user") or {}
 
     telegram_id = str(user.get("id", "")).strip()
@@ -2683,7 +2693,7 @@ def auth_telegram(payload: dict = Body(...)):
 
     profile = register_or_update_telegram_player(user)
 
-    persist_state()
+    await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
 
     return {
         "success": True,
