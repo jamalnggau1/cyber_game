@@ -1185,6 +1185,7 @@ def ensure_player_profile_schema(profile: dict):
     profile.setdefault("registered_at", int(time.time()))
     profile.setdefault("referral_by", None)
     profile.setdefault("referral_code", f"CC{str(profile.get('telegram_id') or profile.get('player_id') or '000000')[-6:]}")
+    profile = ensure_profile_ai_system(profile)
 
     return profile
 
@@ -1567,6 +1568,9 @@ generate_targets()
 # ==========================================================
 # API models
 # ==========================================================
+class SetActiveAiRequest(BaseModel):
+    active_ai: List[str] = Field(default_factory=list, max_length=6)
+
 class TrainUnitRequest(BaseModel):
     unit_id: str
     level: int = Field(ge=1, le=5)
@@ -1591,6 +1595,53 @@ class AttackRequest(BaseModel):
     module_ids: List[str] = Field(min_length=1, max_length=6)
     ai_ids: List[str] = Field(default_factory=list, max_length=6)
     units: Dict[str, Any]
+
+def ensure_profile_ai_system(profile: dict):
+    if "owned_ai" not in profile or not isinstance(profile["owned_ai"], list):
+        profile["owned_ai"] = ["nova_lite"]
+
+    if "nova_lite" not in profile["owned_ai"]:
+        profile["owned_ai"].insert(0, "nova_lite")
+
+    profile["owned_ai"] = [
+        ai_id for ai_id in profile["owned_ai"]
+        if ai_id in AI_AGENTS
+    ]
+
+    if "active_ai" not in profile or not isinstance(profile["active_ai"], list):
+        profile["active_ai"] = []
+
+    profile["active_ai"] = [
+        ai_id for ai_id in profile["active_ai"]
+        if ai_id in profile["owned_ai"] and ai_id in AI_AGENTS
+    ]
+
+    profile.setdefault("ai_core_level", 1)
+
+    return profile
+
+
+def get_ai_slot_limit_for_profile(profile: dict):
+    profile = ensure_profile_ai_system(profile)
+
+    buildings = profile.get("buildings", {})
+    ai_core = buildings.get("ai_core", {})
+
+    return max(
+        1,
+        int(profile.get("ai_core_level", 1)),
+        int(ai_core.get("level", 1)),
+    )
+
+
+def get_ai_agents_for_profile(profile: dict):
+    profile = ensure_profile_ai_system(profile)
+
+    return {
+        ai_id: AI_AGENTS[ai_id]
+        for ai_id in profile["owned_ai"]
+        if ai_id in AI_AGENTS
+    }
 
 def get_unit_config(unit_id: str) -> Dict[str, Any]:
     return UNITS.get(unit_id)
@@ -1867,6 +1918,7 @@ async def state(request: Request):
     player_id, profile = get_or_create_active_player_profile(request)
     profile = ensure_player_profile_schema(profile)
     profile = ensure_profile_unit_system(profile)
+    profile = ensure_profile_ai_system(profile)
 
     resources = profile.get("resources", {})
 
@@ -1912,6 +1964,7 @@ async def state(request: Request):
     # Player owned systems
     player_view["owned_ai"] = profile.get("owned_ai", ["nova_lite"])
     player_view["active_ai"] = profile.get("active_ai", [])
+    player_view["ai_core_level"] = get_ai_slot_limit_for_profile(profile)
     player_view["unit_inventory"] = profile.get("unit_inventory", {})
     player_view["unit_tech"] = profile.get("unit_tech", {})
 
@@ -1921,16 +1974,12 @@ async def state(request: Request):
         "player": player_view,
         "resources": player_view["resources"],
 
-        "ai_agents": {
-            ai_id: AI_AGENTS[ai_id]
-            for ai_id in player_view["owned_ai"]
-            if ai_id in AI_AGENTS
-        },
+        "ai_agents": get_ai_agents_for_profile(profile),
         "all_ai_catalog": AI_AGENTS,
         "attack_modules": ATTACK_MODULES,
         "units": get_units_for_profile(profile),
         "scout_unlocks": SCOUT_UNLOCKS,
-        "active_ai_buffs": get_effective_ai_buffs(player_view["active_ai"]),
+        "active_ai_buffs": get_effective_ai_buffs(profile["active_ai"]),
         "max_deploy_units": get_max_deploy_units_for_profile(profile),
         "research": get_research_with_costs_for_profile(profile),
         "energy_regen_per_minute": get_energy_regen_per_minute_for_profile(profile),
@@ -2706,12 +2755,19 @@ async def get_buildings(request: Request):
     player_id, profile = get_or_create_active_player_profile(request)
     profile = ensure_player_profile_schema(profile)
     profile = ensure_profile_unit_system(profile)
+    profile = ensure_profile_ai_system(profile)
 
     GAME_STATE["players"][player_id] = profile
 
     await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
 
     return {
+        "ai": {
+            "owned_ai": profile["owned_ai"],
+            "active_ai": profile["active_ai"],
+            "ai_core_level": get_ai_slot_limit_for_profile(profile),
+            "active_ai_buffs": get_effective_ai_buffs(profile["active_ai"]),
+        },
         "player_id": player_id,
         "buildings": profile["buildings"],
         "main_lab_level": profile.get("lab_level", 1),
@@ -3715,6 +3771,78 @@ async def complete_onboarding(req: OnboardingCompleteRequest, request: Request):
             "registered_at": profile["registered_at"],
             "onboarding_complete": profile["onboarding_complete"],
         }
+    }
+
+@app.get("/api/ai-core")
+async def get_ai_core(request: Request):
+    await sync_state_from_db()
+
+    player_id, profile = get_or_create_active_player_profile(request)
+    profile = ensure_player_profile_schema(profile)
+    profile = ensure_profile_ai_system(profile)
+
+    slot_limit = get_ai_slot_limit_for_profile(profile)
+
+    # kalau active_ai kebanyakan karena downgrade/reset, potong
+    profile["active_ai"] = profile["active_ai"][:slot_limit]
+
+    GAME_STATE["players"][player_id] = profile
+
+    await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
+
+    return {
+        "player_id": player_id,
+        "ai_core_level": slot_limit,
+        "owned_ai": profile["owned_ai"],
+        "active_ai": profile["active_ai"],
+        "ai_agents": get_ai_agents_for_profile(profile),
+        "active_ai_buffs": get_effective_ai_buffs(profile["active_ai"]),
+        "max_slot": slot_limit,
+    }
+
+
+@app.post("/api/ai-core/active")
+async def set_active_ai(req: SetActiveAiRequest, request: Request):
+    await sync_state_from_db()
+
+    player_id, profile = get_or_create_active_player_profile(request)
+    profile = ensure_player_profile_schema(profile)
+    profile = ensure_profile_ai_system(profile)
+
+    slot_limit = get_ai_slot_limit_for_profile(profile)
+
+    clean_active = []
+    for ai_id in req.active_ai:
+        ai_id = str(ai_id).strip()
+
+        if ai_id not in AI_AGENTS:
+            raise HTTPException(status_code=404, detail=f"AI tidak ditemukan: {ai_id}")
+
+        if ai_id not in profile["owned_ai"]:
+            raise HTTPException(status_code=400, detail=f"AI belum dimiliki: {ai_id}")
+
+        if ai_id not in clean_active:
+            clean_active.append(ai_id)
+
+    if len(clean_active) > slot_limit:
+        raise HTTPException(
+            status_code=400,
+            detail=f"AI Core hanya punya {slot_limit} slot aktif"
+        )
+
+    profile["active_ai"] = clean_active
+
+    GAME_STATE["players"][player_id] = profile
+
+    await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
+
+    return {
+        "success": True,
+        "player_id": player_id,
+        "active_ai": profile["active_ai"],
+        "active_ai_buffs": get_effective_ai_buffs(profile["active_ai"]),
+        "max_slot": slot_limit,
+        "ai_agents": get_ai_agents_for_profile(profile),
     }
 
 # WAJIB PALING BAWAH

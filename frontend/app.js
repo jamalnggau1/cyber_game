@@ -1540,6 +1540,7 @@ function renderPlayerStatusHtml(p) {
 
 async function loadState() {
   state = await api("/api/state");
+  selectedAi = new Set(state?.player?.active_ai || []);
 
   const p = state.player;
 
@@ -1738,6 +1739,39 @@ function renderAiCoreSheet(tab = "agents") {
   );
 }
 
+async function toggleAiFromCore(id) {
+  const maxSlot = Number(state?.player?.ai_core_level || 1);
+  const nextActive = new Set(selectedAi);
+
+  if (nextActive.has(id)) {
+    nextActive.delete(id);
+  } else {
+    if (nextActive.size >= maxSlot) {
+      alert(`AI Core kamu hanya punya ${maxSlot} slot aktif.`);
+      return;
+    }
+
+    nextActive.add(id);
+  }
+
+  try {
+    const result = await api("/api/ai-core/active", {
+      method: "POST",
+      body: JSON.stringify({
+        active_ai: [...nextActive]
+      })
+    });
+
+    selectedAi = new Set(result.active_ai || []);
+
+    await loadState();
+
+    renderAiCoreSheet(currentAiCoreTab || "agents");
+  } catch (err) {
+    alert("Gagal mengubah active AI: " + err.message);
+  }
+}
+
 function renderAiCoreAgentsTab(maxSlot) {
   const agents = Object.entries(state.ai_agents || {});
 
@@ -1903,7 +1937,7 @@ function openBuilding(buildingId) {
     actionHtml = `
       <div class="sheet-actions">
         <button onclick="closeBuildingSheet(); switchPage('aiPage')">Open AI Core</button>
-        <button disabled>Upgrade AI Core Soon</button>
+        <button onclick="upgradeBuilding('ai_core')">Upgrade AI Core</button>
       </div>
     `;
   } else if (buildingId === "guild_gate" && b.locked) {
