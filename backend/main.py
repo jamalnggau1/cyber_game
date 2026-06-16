@@ -470,7 +470,7 @@ GAME_STATE: Dict[str, Any] = {
         "scanner_level": 3,
         "scout_level": 4,
         "ai_core_level": 2,
-        "credits": 50000,
+        "credits": 50000000,
         "energy": 100,
         "resources": {
             "data_shard": 0,
@@ -2701,222 +2701,249 @@ async def start_scout(payload: dict = Body(...), request: Request = None):
     }
 
 @app.post("/api/ai/analyze")
-def ai_analyze(payload: dict = Body(...)):
+async def ai_analyze(request: Request, payload: dict = Body(...)):
+    await sync_state_from_db()
+
+    player_id, profile = get_or_create_active_player_profile(request)
+    profile = ensure_player_profile_schema(profile)
+    profile = ensure_profile_ai_system(profile)
+    profile = ensure_profile_unit_system(profile)
+
     target_id = str(payload.get("target_id", "")).strip()
     ai_id = str(payload.get("ai_id", "nova_lite")).strip()
-    scout_report = str(payload.get("scout_report", "")).strip()
-    target_name_from_log = str(payload.get("target_name", "")).strip()
+    scout_report_text = str(payload.get("scout_report", "")).strip()
+    scout_report_data = payload.get("scout_report_data") or {}
 
     if not target_id:
         raise HTTPException(status_code=400, detail="target_id kosong.")
 
-    p = GAME_STATE["player"]
+    if ai_id not in AI_AGENTS:
+        raise HTTPException(status_code=404, detail=f"AI tidak ditemukan: {ai_id}")
 
-    target = GAME_STATE.get("targets", {}).get(target_id, {})
+    if ai_id not in profile.get("owned_ai", []):
+        raise HTTPException(status_code=403, detail=f"AI belum dimiliki player: {ai_id}")
 
-    ai_agents = GAME_STATE.get("ai_agents", {})
-    ai = ai_agents.get(ai_id) or ai_agents.get("nova_lite") or {
-        "id": "nova_lite",
-        "name": "NOVA-Lite",
-        "level": 1,
-        "rarity": "Common",
-        "buffs": {}
-    }
+    target = GAME_STATE.get("targets", {}).get(target_id)
 
-    def read_report_value(label: str, default: str = "Unknown"):
-        if not scout_report:
-            return default
+    if not target:
+        raise HTTPException(
+            status_code=404,
+            detail="Target tidak ditemukan. Lakukan Scan Area dan Scout ulang."
+        )
 
-        prefix = f"{label}:"
+    target = refresh_player_target_from_profile(target)
 
-        for line in scout_report.splitlines():
-            line = line.strip()
-            if line.lower().startswith(prefix.lower()):
-                value = line.split(":", 1)[1].strip()
-                return value if value else default
+    ai = AI_AGENTS[ai_id]
+    ai_buffs = ai.get("buffs", {})
+    active_buffs_preview = get_active_ai_buffs(profile.get("active_ai", []))
 
-        return default
+    def from_report(key: str, fallback="Unknown"):
+        if isinstance(scout_report_data, dict):
+            value = scout_report_data.get(key)
+            if value is not None and value != "":
+                return value
+        return fallback
 
-    target_name = (
-        target.get("name")
-        or target_name_from_log
-        or read_report_value("Target")
-        or "Unknown Target"
-    )
+    target_name = from_report("name", target.get("name", "Unknown Target"))
+    distance = from_report("distance", target.get("distance", "?"))
+    lab_level = from_report("lab_level", target.get("lab_level", "Unknown"))
+    base_tier = from_report("base_tier", target.get("lab_tier", "Unknown"))
+    noise = from_report("noise", "Unknown")
+    report_quality = from_report("report_quality", "Unknown")
 
-    distance = target.get("distance", read_report_value("Distance", "?"))
-
-    lab_level = target.get(
-        "lab_level",
-        target.get("level", read_report_value("Lab Level", "Unknown"))
-    )
-
-    base_tier = target.get(
-        "lab_tier",
-        target.get("type", read_report_value("Base Tier", "Unknown"))
-    )
-
-    firewall = target.get(
-        "firewall",
-        read_report_value("Firewall", "Unknown")
-    )
-
-    trap = target.get(
-        "trap",
-        read_report_value("Trap", "Unknown")
-    )
-
-    defense_style = target.get(
+    defense_style = from_report(
         "defense_style",
-        read_report_value("Defense Style", "Unknown")
+        target.get("defense_style", "Unknown")
     )
 
-    estimated_power = target.get(
+    estimated_power = from_report(
         "estimated_power",
-        target.get("defense_power", read_report_value("Estimated Power", "Unknown"))
+        target.get("estimated_power", target.get("defense_power", "Unknown"))
     )
 
-    weakness_hint = target.get(
-        "weakness_hint",
-        read_report_value("Weakness Hint", "Unknown")
+    enemy_build = from_report(
+        "enemy_build",
+        target.get("enemy_build", "Unknown")
     )
 
-    counter_risk = target.get(
-        "counter_risk",
-        read_report_value("Counter Risk", "Unknown")
+    defense_modules = from_report(
+        "defense_modules",
+        target.get("defense_modules", [])
     )
+
+    resources = from_report(
+        "resources",
+        target.get("resources", {})
+    )
+
+    scout_contest = from_report("scout_contest", {})
 
     missing_data = []
 
-    for label, value in [
-        ("firewall", firewall),
-        ("trap", trap),
-        ("defense_style", defense_style),
-        ("estimated_power", estimated_power),
-        ("weakness_hint", weakness_hint),
-        ("counter_risk", counter_risk),
-    ]:
-        value_text = str(value)
-        if (
-            not value_text
-            or value_text == "Unknown"
-            or value_text.startswith("???")
-        ):
-            missing_data.append(label)
+    def is_unknown(value):
+        text = str(value)
+        return (
+            value is None
+            or value == ""
+            or text.startswith("???")
+            or text.lower() in ["unknown", "none", "null"]
+        )
 
-    confidence = 55
+    if is_unknown(defense_style):
+        missing_data.append("defense_style")
 
-    if scout_report:
-        confidence += 15
+    if is_unknown(estimated_power):
+        missing_data.append("estimated_power")
 
-    if not missing_data:
-        confidence += 20
+    if not isinstance(defense_modules, list) or not defense_modules or any(str(m).startswith("???") for m in defense_modules):
+        missing_data.append("defense_modules")
+
+    if isinstance(resources, dict):
+        if any(str(v).startswith("???") for v in resources.values()):
+            missing_data.append("resources")
     else:
-        confidence -= min(20, len(missing_data) * 4)
+        missing_data.append("resources")
 
-    ai_level = int(ai.get("level", 1))
-    confidence += min(15, ai_level * 3)
-    confidence = max(25, min(95, confidence))
+    noise_penalty = 0
+    if noise == "Medium":
+        noise_penalty = 15
+    elif noise == "High":
+        noise_penalty = 30
 
-    recommended_modules = []
+    ai_accuracy_bonus = (
+        int(ai_buffs.get("Analysis Accuracy", 0))
+        + int(ai_buffs.get("Risk Prediction", 0))
+        + int(ai_buffs.get("Strategy Accuracy", 0))
+        + int(ai_buffs.get("Trap Detection", 0))
+    )
 
-    firewall_text = str(firewall).lower()
-    trap_text = str(trap).lower()
-    style_text = str(defense_style).lower()
+    base_confidence = 45 + (int(ai.get("level", 1)) * 5) + ai_accuracy_bonus
+    confidence = base_confidence - noise_penalty - (len(missing_data) * 7)
+    confidence = max(20, min(95, confidence))
 
-    if "firewall" in firewall_text or "strong" in firewall_text or "basic" in firewall_text:
-        recommended_modules.append("Firewall Breaker")
+    module_text = " ".join(defense_modules) if isinstance(defense_modules, list) else str(defense_modules)
+    style_text = str(defense_style)
 
-    if "trap" in trap_text or "net" in trap_text:
-        recommended_modules.append("Trap Disruptor")
+    recommended_build = "Balanced Breach"
+    recommended_modules = [
+        "trace_masker",
+        "escape_script",
+        "core_breaker",
+        "payload_booster",
+    ]
 
-    if "stealth" in style_text or "jam" in style_text:
-        recommended_modules.append("Signal Purifier")
+    warning = ""
 
-    if "repair" in style_text or "sustain" in style_text:
-        recommended_modules.append("Breach Payload")
+    combined_defense_text = f"{style_text} {module_text}".lower()
 
-    if "Unknown" in str(estimated_power) or str(estimated_power).startswith("???"):
-        recommended_modules.append("Scout Booster")
-    else:
-        recommended_modules.append("Data Extractor")
+    if "firewall" in combined_defense_text:
+        recommended_build = "Firewall Breaker Assault"
+        recommended_modules = [
+            "firewall_crusher",
+            "core_breaker",
+            "payload_booster",
+            "trace_masker",
+            "escape_script",
+            "exploit_chain_script",
+        ]
 
-    while len(recommended_modules) < 4:
-        fallback = ["Relay Booster", "Breach Payload", "Data Extractor", "Route Stabilizer"]
-        for item in fallback:
-            if item not in recommended_modules:
-                recommended_modules.append(item)
-                break
+    elif "trap" in combined_defense_text:
+        recommended_build = "Analyst Breach"
+        recommended_modules = [
+            "trap_detector",
+            "fake_signal_filter",
+            "trace_masker",
+            "escape_script",
+            "ghost_proxy",
+            "exploit_chain_script",
+        ]
 
-    recommended_modules = recommended_modules[:4]
+    elif "jammer" in combined_defense_text or noise in ["Medium", "High"]:
+        recommended_build = "Anti-Jammer Route"
+        recommended_modules = [
+            "anti_jammer_chip",
+            "signal_accelerator",
+            "trace_masker",
+            "escape_script",
+            "exploit_chain_script",
+            "payload_booster",
+        ]
 
-    if missing_data:
-        recommended_build = "Safe Scout-Based Build"
-        warning = "Data scout belum lengkap. Upgrade Scout untuk membuka informasi target lebih akurat."
-    else:
-        recommended_build = "Precision Breach Build"
-        warning = "Data cukup untuk serangan terarah, tapi tetap cek energy dan unit sebelum attack."
+    elif "vault" in combined_defense_text:
+        recommended_build = "Vault Extraction Breach"
+        recommended_modules = [
+            "core_breaker",
+            "payload_booster",
+            "trace_masker",
+            "escape_script",
+            "fake_signal_filter",
+            "ghost_proxy",
+        ]
 
-    active_buffs_preview = {
-        "analysis_accuracy": 0,
-        "module_damage": 0,
-        "trace_reduction": 0,
-        "energy_efficiency": 0
-    }
+    if noise == "High":
+        warning = "Scout report terkena High Noise. Rekomendasi AI berisiko salah. Upgrade Scout Signal, aktifkan ORA, atau scout ulang."
+    elif noise == "Medium":
+        warning = "Sebagian data terkena jammer. Gunakan build aman dan hindari deploy unit terlalu besar."
+    elif missing_data:
+        warning = f"Data kurang: {', '.join(missing_data)}. AI memakai fallback analysis."
 
-    buffs = ai.get("buffs", {}) or {}
+    preferred_ai = ai.get("name", ai_id)
 
-    for key, value in buffs.items():
-        key_text = str(key).lower()
-        value_num = int(value) if isinstance(value, (int, float)) else 0
+    if recommended_build in ["Firewall Breaker Assault", "Anti-Jammer Route"] and "hex" in profile.get("owned_ai", []):
+        preferred_ai = AI_AGENTS["hex"]["name"]
 
-        if "accuracy" in key_text or "analysis" in key_text:
-            active_buffs_preview["analysis_accuracy"] += value_num
-        elif "damage" in key_text or "module" in key_text:
-            active_buffs_preview["module_damage"] += value_num
-        elif "trace" in key_text:
-            active_buffs_preview["trace_reduction"] += value_num
-        elif "energy" in key_text or "cost" in key_text:
-            active_buffs_preview["energy_efficiency"] += value_num
+    if recommended_build == "Analyst Breach" and "ora" in profile.get("owned_ai", []):
+        preferred_ai = AI_AGENTS["ora"]["name"]
 
     analysis = (
         f"Target {target_name} berada pada jarak {distance} Trace Unit. "
-        f"Lab Level terdeteksi: {lab_level}, Tier: {base_tier}. "
-        f"Firewall: {firewall}. Trap: {trap}. "
+        f"Lab Level: {lab_level}, Tier: {base_tier}. "
+        f"Report Quality: {report_quality}, Noise: {noise}. "
         f"Defense Style: {defense_style}. "
         f"Estimated Power: {estimated_power}. "
     )
 
-    if weakness_hint and not str(weakness_hint).startswith("???"):
-        analysis += f"Weakness Hint: {weakness_hint}. "
+    if scout_contest:
+        analysis += (
+            f"Scout Contest: attacker {scout_contest.get('attacker_score', '?')} "
+            f"vs defender {scout_contest.get('defender_score', scout_contest.get('defender_anti_scout_score', '?'))}. "
+        )
 
-    if counter_risk and not str(counter_risk).startswith("???"):
-        analysis += f"Counter Risk: {counter_risk}."
+    if isinstance(defense_modules, list) and defense_modules:
+        analysis += f"Defense Modules: {', '.join(map(str, defense_modules))}. "
+
+    if missing_data:
+        analysis += "Beberapa data tidak lengkap karena scout noise. "
+
+    GAME_STATE["players"][player_id] = profile
 
     return {
         "ai": {
-            "id": ai.get("id", ai_id),
+            "id": ai_id,
             "name": ai.get("name", ai_id),
             "level": ai.get("level", 1),
-            "rarity": ai.get("rarity", "Common")
+            "rarity": ai.get("rarity", "Common"),
         },
+        "player_id": player_id,
         "target": {
             "id": target_id,
             "name": target_name,
             "distance": distance,
             "lab_level": lab_level,
-            "base_tier": base_tier
+            "base_tier": base_tier,
+            "noise": noise,
+            "report_quality": report_quality,
         },
         "confidence": confidence,
         "analysis": analysis,
         "missing_data": missing_data,
         "recommendation": {
             "recommended_build": recommended_build,
-            "recommended_modules": recommended_modules,
-            "recommended_ai": ai.get("name", ai_id),
-            "warning": warning
+            "recommended_modules": recommended_modules[:6],
+            "recommended_ai": preferred_ai,
+            "warning": warning,
         },
-        "active_buffs_preview": active_buffs_preview
+        "active_buffs_preview": active_buffs_preview,
     }
 
 
