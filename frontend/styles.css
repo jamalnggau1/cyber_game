@@ -4058,3 +4058,47 @@ input[type=number] {
   background: rgba(15, 27, 54, .75);
   border: 1px solid rgba(57, 243, 255, .10);
 }
+.defense-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 9px;
+  margin-top: 12px;
+}
+
+.defense-stat-card {
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, .03);
+  border: 1px solid rgba(57, 243, 255, .12);
+}
+
+.defense-stat-card small {
+  display: block;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.defense-stat-card b {
+  display: block;
+  margin-top: 5px;
+  color: var(--accent);
+  font-size: 20px;
+}
+
+.defense-stat-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, .06);
+}
+
+.defense-stat-row span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.defense-stat-row b {
+  color: var(--accent);
+}

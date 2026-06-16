@@ -778,6 +778,50 @@ def get_unit_upgrade_cost(unit_id: str):
         "energy": int((12 + level * 4) * mult),
     }
 
+def get_defense_stats_for_profile(profile: dict):
+    profile = ensure_player_profile_schema(profile)
+    profile = ensure_profile_ai_system(profile)
+
+    defense_units = profile.get("defense_units", [])
+    unit_power = sum(int(u.get("power", 0)) for u in defense_units)
+
+    build = profile.get("defense_build", {})
+    modules = build.get("modules", []) if isinstance(build, dict) else []
+
+    ai_buffs = get_active_ai_buffs(profile.get("active_ai", []))
+
+    ai_defense_bonus = (
+        int(ai_buffs.get("Firewall Stability", 0))
+        + int(ai_buffs.get("Counter-Trace", 0))
+        + int(ai_buffs.get("Shield Decision Accuracy", 0))
+        + int(ai_buffs.get("Honeypot Efficiency", 0))
+    )
+
+    module_score = len(modules) * 250
+
+    anti_scout_score = (
+        int(profile.get("jammer_level", 1)) * 12
+        + int(profile.get("defense_ai_level", 1)) * 8
+        + int(profile.get("trace_monitor_level", 1)) * 5
+        + ai_defense_bonus
+    )
+
+    defense_power = unit_power + module_score + ai_defense_bonus
+
+    return {
+        "jammer_level": profile.get("jammer_level", 1),
+        "defense_ai_level": profile.get("defense_ai_level", 1),
+        "trace_monitor_level": profile.get("trace_monitor_level", 1),
+        "anti_scout_score": anti_scout_score,
+        "defense_power": defense_power,
+        "unit_power": unit_power,
+        "module_score": module_score,
+        "ai_defense_bonus": ai_defense_bonus,
+        "active_ai": profile.get("active_ai", []),
+        "active_ai_buffs": ai_buffs,
+        "modules_count": len(modules),
+    }
+
 def refresh_player_target_from_profile(target: dict):
     if not isinstance(target, dict):
         return target
@@ -1612,9 +1656,6 @@ generate_targets()
 # API models
 # ==========================================================
 class DefenseSetupRequest(BaseModel):
-    jammer_level: int = Field(default=1, ge=1, le=10)
-    defense_ai_level: int = Field(default=1, ge=1, le=10)
-    trace_monitor_level: int = Field(default=1, ge=1, le=10)
     defense_style: str = Field(default="Balanced Defense", max_length=40)
     modules: List[str] = Field(default_factory=list, max_length=6)
 
@@ -3961,19 +4002,29 @@ async def get_defense_setup(request: Request):
 
     player_id, profile = get_or_create_active_player_profile(request)
     profile = ensure_player_profile_schema(profile)
+    profile = ensure_profile_ai_system(profile)
+
+    allowed_modules = [
+        "Firewall Core",
+        "Trace Monitor",
+        "Sentinel",
+        "Jammer Core",
+        "Trap Net",
+        "Repair Node",
+        "Vault Guard",
+    ]
 
     return {
         "player_id": player_id,
         "defense": {
-            "jammer_level": profile.get("jammer_level", 1),
-            "defense_ai_level": profile.get("defense_ai_level", 1),
-            "trace_monitor_level": profile.get("trace_monitor_level", 1),
             "defense_style": profile.get("defense_style", "Balanced Defense"),
             "defense_build": profile.get("defense_build", {
                 "name": "Starter Defense Grid",
                 "modules": ["Firewall Core", "Trace Monitor", "Sentinel"],
             }),
             "defense_units": profile.get("defense_units", []),
+            "stats": get_defense_stats_for_profile(profile),
+            "allowed_modules": allowed_modules,
         }
     }
 
@@ -3995,19 +4046,16 @@ async def save_defense_setup(req: DefenseSetupRequest, request: Request):
         "Vault Guard",
     }
 
-    modules = [
-        m for m in req.modules
-        if m in allowed_modules
-    ]
+    modules = []
+
+    for module in req.modules:
+        if module in allowed_modules and module not in modules:
+            modules.append(module)
 
     if not modules:
         modules = ["Firewall Core", "Trace Monitor", "Sentinel"]
 
-    profile["jammer_level"] = req.jammer_level
-    profile["defense_ai_level"] = req.defense_ai_level
-    profile["trace_monitor_level"] = req.trace_monitor_level
     profile["defense_style"] = req.defense_style.strip() or "Balanced Defense"
-
     profile["defense_build"] = {
         "name": profile["defense_style"],
         "modules": modules,
@@ -4019,14 +4067,12 @@ async def save_defense_setup(req: DefenseSetupRequest, request: Request):
 
     return {
         "success": True,
-        "message": "Defense setup saved",
+        "message": "Defense build saved",
         "player_id": player_id,
         "defense": {
-            "jammer_level": profile["jammer_level"],
-            "defense_ai_level": profile["defense_ai_level"],
-            "trace_monitor_level": profile["trace_monitor_level"],
             "defense_style": profile["defense_style"],
             "defense_build": profile["defense_build"],
+            "stats": get_defense_stats_for_profile(profile),
         }
     }
 

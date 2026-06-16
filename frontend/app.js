@@ -1976,89 +1976,114 @@ function openBuilding(buildingId) {
   );
 }
 
-async function openDefenseSetupSheet() {
+let currentDefenseSetupTab = "build";
+let defenseSetupData = null;
+
+async function openDefenseSetupSheet(tab = "build") {
   try {
-    const data = await api("/api/defense");
-    const d = data.defense || {};
-    const build = d.defense_build || {};
-    const modules = build.modules || [];
+    defenseSetupData = await api("/api/defense");
+    currentDefenseSetupTab = tab;
 
-    const allModules = [
-      "Firewall Core",
-      "Trace Monitor",
-      "Sentinel",
-      "Jammer Core",
-      "Trap Net",
-      "Repair Node",
-      "Vault Guard",
-    ];
-
-    showBuildingSheet(
-      "Defense Setup",
-      `
-        <p class="muted">
-          Atur sistem pertahanan base kamu. Setting ini akan mempengaruhi hasil Scout musuh.
-        </p>
-
-        ${row("Jammer Level", d.jammer_level || 1)}
-        ${row("Defense AI Level", d.defense_ai_level || 1)}
-        ${row("Trace Monitor", d.trace_monitor_level || 1)}
-        ${row("Defense Style", d.defense_style || "Balanced Defense")}
-
-        <div class="defense-setup-card">
-          <label>Jammer Level</label>
-          <input id="defenseJammerLevel" type="number" min="1" max="10" value="${d.jammer_level || 1}">
-
-          <label>Defense AI Level</label>
-          <input id="defenseAiLevel" type="number" min="1" max="10" value="${d.defense_ai_level || 1}">
-
-          <label>Trace Monitor Level</label>
-          <input id="defenseTraceLevel" type="number" min="1" max="10" value="${d.trace_monitor_level || 1}">
-
-          <label>Defense Style</label>
-          <select id="defenseStyle">
-            ${["Balanced Defense", "Jammer Defense", "Firewall Heavy", "Trap Control", "Vault Turtle"]
-              .map(style => `
-                <option value="${style}" ${style === d.defense_style ? "selected" : ""}>
-                  ${style}
-                </option>
-              `).join("")}
-          </select>
-
-          <label>Defense Modules</label>
-          <div class="defense-module-select-grid">
-            ${allModules.map(module => `
-              <label class="defense-module-check">
-                <input
-                  type="checkbox"
-                  value="${module}"
-                  ${modules.includes(module) ? "checked" : ""}
-                >
-                <span>${module}</span>
-              </label>
-            `).join("")}
-          </div>
-        </div>
-
-        <div class="sheet-actions">
-          <button onclick="saveDefenseSetup()">Save Defense</button>
-          <button onclick="closeBuildingSheet()">Close</button>
-        </div>
-      `
-    );
+    renderDefenseSetupSheet();
   } catch (err) {
     alert("Gagal membuka Defense Setup: " + err.message);
   }
 }
 
+function renderDefenseSetupTabs(activeTab) {
+  const tabs = [
+    { id: "build", label: "Defense Build" },
+    { id: "stats", label: "Stats" },
+  ];
 
-async function saveDefenseSetup() {
+  return `
+    <div class="facility-tabs defense-setup-tabs">
+      ${tabs.map(tab => `
+        <button
+          class="${activeTab === tab.id ? "active" : ""}"
+          onclick="openDefenseSetupSheet('${tab.id}')"
+        >
+          ${tab.label}
+        </button>
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderDefenseSetupSheet() {
+  const data = defenseSetupData || {};
+  const d = data.defense || {};
+
+  showBuildingSheet(
+    "Defense Setup",
+    `
+      ${renderDefenseSetupTabs(currentDefenseSetupTab)}
+
+      ${
+        currentDefenseSetupTab === "stats"
+          ? renderDefenseStatsTab(d)
+          : renderDefenseBuildTab(d)
+      }
+    `
+  );
+}
+
+function renderDefenseBuildTab(d) {
+  const build = d.defense_build || {};
+  const modules = build.modules || [];
+
+  const allModules = d.allowed_modules || [
+    "Firewall Core",
+    "Trace Monitor",
+    "Sentinel",
+    "Jammer Core",
+    "Trap Net",
+    "Repair Node",
+    "Vault Guard",
+  ];
+
+  return `
+    <p class="muted">
+      Susun strategi pertahanan saat base kamu diserang. Module ini akan mempengaruhi battle defense.
+    </p>
+
+    <div class="defense-setup-card">
+      <label>Defense Style</label>
+      <select id="defenseStyle">
+        ${["Balanced Defense", "Jammer Defense", "Firewall Heavy", "Trap Control", "Vault Turtle"]
+          .map(style => `
+            <option value="${style}" ${style === d.defense_style ? "selected" : ""}>
+              ${style}
+            </option>
+          `).join("")}
+      </select>
+
+      <label>Defense Modules</label>
+      <div class="defense-module-select-grid">
+        ${allModules.map(module => `
+          <label class="defense-module-check">
+            <input
+              type="checkbox"
+              value="${module}"
+              ${modules.includes(module) ? "checked" : ""}
+            >
+            <span>${module}</span>
+          </label>
+        `).join("")}
+      </div>
+    </div>
+
+    <div class="sheet-actions">
+      <button onclick="saveDefenseBuild()">Save Build</button>
+      <button onclick="closeBuildingSheet()">Close</button>
+    </div>
+  `;
+}
+
+async function saveDefenseBuild() {
   const moduleInputs = [...document.querySelectorAll(".defense-module-check input:checked")];
 
   const payload = {
-    jammer_level: Number(document.getElementById("defenseJammerLevel")?.value || 1),
-    defense_ai_level: Number(document.getElementById("defenseAiLevel")?.value || 1),
-    trace_monitor_level: Number(document.getElementById("defenseTraceLevel")?.value || 1),
     defense_style: document.getElementById("defenseStyle")?.value || "Balanced Defense",
     modules: moduleInputs.map(input => input.value),
   };
@@ -2069,11 +2094,75 @@ async function saveDefenseSetup() {
       body: JSON.stringify(payload)
     });
 
-    alert(result.message || "Defense saved.");
-    openDefenseSetupSheet();
+    alert(result.message || "Defense build saved.");
+    await openDefenseSetupSheet("build");
   } catch (err) {
     alert("Gagal save defense: " + err.message);
   }
+}
+
+function renderDefenseStatsTab(d) {
+  const stats = d.stats || {};
+  const build = d.defense_build || {};
+  const modules = build.modules || [];
+  const buffs = stats.active_ai_buffs || {};
+
+  const buffRows = Object.keys(buffs).length
+    ? Object.entries(buffs).map(([key, value]) => `
+        <div class="defense-stat-row">
+          <span>${escapeHtml(key)}</span>
+          <b>${Number(value) > 0 ? "+" : ""}${escapeHtml(String(value))}%</b>
+        </div>
+      `).join("")
+    : `<p class="muted">Tidak ada active AI buff.</p>`;
+
+  return `
+    <p class="muted">
+      Stats ini dihitung dari upgrade, AI aktif, dan defense build. Jammer tidak diedit manual di sini.
+    </p>
+
+    <div class="defense-stats-grid">
+      <div class="defense-stat-card">
+        <small>Anti Scout Score</small>
+        <b>${stats.anti_scout_score || 0}</b>
+      </div>
+
+      <div class="defense-stat-card">
+        <small>Defense Power</small>
+        <b>${stats.defense_power || 0}</b>
+      </div>
+
+      <div class="defense-stat-card">
+        <small>Unit Power</small>
+        <b>${stats.unit_power || 0}</b>
+      </div>
+
+      <div class="defense-stat-card">
+        <small>Module Score</small>
+        <b>${stats.module_score || 0}</b>
+      </div>
+    </div>
+
+    <div class="defense-setup-card">
+      ${row("Jammer Level", stats.jammer_level || 1)}
+      ${row("Defense AI Level", stats.defense_ai_level || 1)}
+      ${row("Trace Monitor", stats.trace_monitor_level || 1)}
+      ${row("AI Defense Bonus", stats.ai_defense_bonus || 0)}
+      ${row("Defense Style", d.defense_style || "Balanced Defense")}
+      ${row("Modules", modules.length ? modules.join(", ") : "None")}
+    </div>
+
+    <div class="defense-setup-card">
+      <h3>Active AI Buff</h3>
+      ${buffRows}
+    </div>
+
+    <div class="sheet-actions">
+      <button disabled>Upgrade Jammer in Research Later</button>
+      <button onclick="openDefenseSetupSheet('build')">Edit Build</button>
+      <button onclick="closeBuildingSheet()">Close</button>
+    </div>
+  `;
 }
 
 function num(v) {
