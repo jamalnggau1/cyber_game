@@ -2544,4 +2544,9 @@ def auth_telegram(payload: dict = Body(...)):
     }
 
 # WAJIB PALING BAWAH
-app.mount("/", StaticFiles(directory="../frontend", html=True), name="frontend")
+FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
+
+if FRONTEND_DIR.exists():
+    app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
+else:
+    print(f"[WARNING] Frontend folder not found: {FRONTEND_DIR}")
