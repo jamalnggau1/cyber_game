@@ -1495,22 +1495,97 @@ def state():
         "energy_regen_per_minute": get_energy_regen_per_minute(),
     }
 
+def make_player_scan_targets(attacker_player_id: str):
+    ensure_multiplayer_system()
+
+    attacker = GAME_STATE["players"].get(attacker_player_id)
+    if not attacker:
+        return []
+
+    targets = []
+
+    for player_id, defender in GAME_STATE["players"].items():
+        if player_id == attacker_player_id:
+            continue
+
+        dx = int(defender.get("x", 120)) - int(attacker.get("x", 120))
+        dy = int(defender.get("y", 450)) - int(attacker.get("y", 450))
+        distance = int((dx ** 2 + dy ** 2) ** 0.5)
+
+        defense_units = defender.get("defense_units", [])
+        army_power = sum(int(u.get("power", 0)) for u in defense_units)
+
+        build = defender.get("defense_build", {})
+        modules = build.get("modules", [])
+
+        target_id = f"player_{player_id}"
+
+        targets.append({
+            "id": target_id,
+            "kind": "player",
+            "player_id": player_id,
+
+            "name": f"Player Base: {defender.get('name', player_id)}",
+            "x": defender.get("x", 120),
+            "y": defender.get("y", 450),
+            "distance": max(1, distance),
+            "type": "Player Base",
+            "level": defender.get("lab_level", 1),
+            "lab_level": defender.get("lab_level", 1),
+            "lab_tier": "Player",
+            "signal_strength": "Player",
+
+            "enemy_army": defense_units,
+            "enemy_army_power": army_power,
+
+            "enemy_build": build,
+            "defense_modules": modules,
+            "defense_style": defender.get("defense_style", "Balanced Defense"),
+
+            "defense_power": army_power,
+            "estimated_power": army_power,
+
+            "resources": defender.get("resources", {}),
+            "asset": get_player_target_asset(),
+
+            "jammer_level": defender.get("jammer_level", 1),
+            "defense_ai_level": defender.get("defense_ai_level", 1),
+            "trace_monitor_level": defender.get("trace_monitor_level", 1),
+        })
+
+    return targets
 
 @app.get("/api/scan")
-def scan():
+def scan(request: Request):
     apply_energy_regen()
 
     p = GAME_STATE["player"]
 
-    GAME_STATE["scan_counter"] = GAME_STATE.get("scan_counter", 0) + 1
-    persist_state()
+    attacker_player_id = (
+        request.headers.get("X-Player-Id")
+        or p.get("player_id")
+        or "dev_player"
+    )
 
+    GAME_STATE["scan_counter"] = GAME_STATE.get("scan_counter", 0) + 1
+
+    # 1. Target NPC lama
     fresh_targets = generate_targets()
+
+    # 2. Target player Telegram / player lain
+    player_targets = make_player_scan_targets(attacker_player_id)
+
+    # 3. Gabungkan NPC + player
+    all_targets = fresh_targets + player_targets
+
+    # Mining tetap dibuat dari NPC dulu, jangan dari player target
     fresh_mining_nodes = generate_mining_nodes(fresh_targets)
 
+    # Simpan target full ke GAME_STATE supaya scout bisa membaca data lengkap
     GAME_STATE["targets"] = {
-        t["id"]: t for t in fresh_targets
+        t["id"]: t for t in all_targets
     }
+
     GAME_STATE["mining_nodes"] = {
         n["id"]: n for n in fresh_mining_nodes
     }
@@ -1520,37 +1595,42 @@ def scan():
 
     visible = []
 
-    for t in fresh_targets:
+    for t in all_targets:
         if t["distance"] <= radius:
             visible.append({
                 "id": t["id"],
-                "kind": "enemy",
+                "kind": t.get("kind", "enemy"),
                 "name": t["name"],
                 "x": t["x"],
                 "y": t["y"],
                 "distance": t["distance"],
-                "type": t["type"],
+                "type": t.get("type", "Unknown"),
                 "level": t.get("level", 1),
                 "defense_power": t.get("defense_power", 500),
-                "signal_strength": t["signal_strength"],
-                "lab_tier": t["lab_tier"],
-                "vault_signal": t["vault_signal"],
-                
+                "signal_strength": t.get("signal_strength", "Unknown"),
+                "lab_tier": t.get("lab_tier", "Unknown"),
+                "vault_signal": t.get("vault_signal", "Unknown"),
+
                 "firewall": t.get("firewall", "Basic Firewall"),
                 "asset": t.get("asset"),
+                "player_id": t.get("player_id"),
             })
+
     visible_mining = []
 
     for node in fresh_mining_nodes:
         if node["distance"] <= radius:
             visible_mining.append(node)
 
+    persist_state()
+
     return {
         "scan_id": GAME_STATE["scan_counter"],
         "scanner_level": scanner_level,
         "radius": radius,
         "targets": visible + visible_mining,
-        "enemy_count": len(visible),
+        "enemy_count": len([t for t in visible if t.get("kind") != "player"]),
+        "player_count": len([t for t in visible if t.get("kind") == "player"]),
         "mining_count": len(visible_mining),
     }
 
@@ -1634,8 +1714,16 @@ def build_scout_report(target_id: str):
         "build_clue": target.get("build_clue", "Unknown") if level >= 10 else "??? Unlock Scout Lv.10",
     }
 
-    attacker_score = level * 10
-    defender_score = int(target.get("defense_ai_level", 0)) * 7 + int(target.get("jammer_level", 0)) * 5
+    attacker_score = (
+        int(level) * 10
+        + int(p.get("scanner_level", 1)) * 3
+    )
+
+    defender_score = (
+        int(target.get("jammer_level", 0)) * 12
+        + int(target.get("defense_ai_level", 0)) * 8
+        + int(target.get("trace_monitor_level", 0)) * 5
+    )
 
     if defender_score > attacker_score + 15:
         report["counter_scout_status"] = "Scout channel cut off by enemy Defense AI"
@@ -1652,6 +1740,61 @@ def build_scout_report(target_id: str):
 @app.get("/api/scout/{target_id}")
 def scout(target_id: str):
     return build_scout_report(target_id)
+
+@app.post("/api/debug/reset-defense")
+def reset_defense(request: Request, payload: dict = Body(default={})):
+    ensure_multiplayer_system()
+
+    player_id = request.headers.get("X-Player-Id") or GAME_STATE["player"].get("player_id", "dev_player")
+
+    profile = GAME_STATE["players"].get(player_id)
+
+    if not profile:
+        raise HTTPException(status_code=404, detail="Player profile not found")
+
+    jammer_level = int(payload.get("jammer_level", 1))
+    defense_ai_level = int(payload.get("defense_ai_level", 1))
+    trace_monitor_level = int(payload.get("trace_monitor_level", 1))
+
+    profile["jammer_level"] = jammer_level
+    profile["defense_ai_level"] = defense_ai_level
+    profile["trace_monitor_level"] = trace_monitor_level
+
+    profile["defense_style"] = payload.get("defense_style", "Balanced Defense")
+    profile["defense_build"] = {
+        "name": payload.get("build_name", "Test Jammer Grid"),
+        "modules": payload.get("modules", ["Jammer Core", "Trace Monitor", "Firewall Core"]),
+    }
+
+    profile["defense_units"] = payload.get("defense_units", [
+        {
+            "id": "breaker",
+            "name": "Breaker",
+            "role": "Frontline",
+            "level": 2,
+            "count": 50,
+            "hp": 155,
+            "attack": 48,
+            "defense": 24,
+            "speed": 7,
+            "cargo": 4,
+            "power": 4200,
+        }
+    ])
+
+    persist_state()
+
+    return {
+        "success": True,
+        "player_id": player_id,
+        "defense": {
+            "jammer_level": jammer_level,
+            "defense_ai_level": defense_ai_level,
+            "trace_monitor_level": trace_monitor_level,
+            "defense_build": profile["defense_build"],
+            "defense_units": profile["defense_units"],
+        }
+    }
 
 @app.post("/api/scout/start")
 def start_scout(payload: dict = Body(...)):
@@ -2523,6 +2666,8 @@ def auth_telegram(payload: dict = Body(...)):
     if not telegram_id:
         raise HTTPException(status_code=400, detail="Telegram user id kosong")
 
+    player_id = f"tg_{telegram_id}"
+
     p = GAME_STATE["player"]
 
     p["telegram"] = {
@@ -2533,15 +2678,112 @@ def auth_telegram(payload: dict = Body(...)):
         "language_code": user.get("language_code", ""),
     }
 
-    p["player_id"] = f"tg_{telegram_id}"
+    p["player_id"] = player_id
+
+    profile = register_or_update_telegram_player(user)
 
     persist_state()
 
     return {
         "success": True,
-        "player_id": p["player_id"],
+        "player_id": player_id,
         "telegram": p["telegram"],
+        "profile": profile,
     }
+
+def get_player_target_asset():
+    return "assets/enemies/enemy_medium.png"
+
+
+def ensure_multiplayer_system():
+    if "players" not in GAME_STATE or not isinstance(GAME_STATE["players"], dict):
+        GAME_STATE["players"] = {}
+
+
+def get_request_player_id_from_payload(payload: dict):
+    user = payload.get("user") or {}
+    telegram_id = str(user.get("id", "")).strip()
+
+    if telegram_id:
+        return f"tg_{telegram_id}"
+
+    return GAME_STATE["player"].get("player_id", "dev_player")
+
+
+def make_default_player_profile(player_id: str, user: dict):
+    p = GAME_STATE["player"]
+
+    username = user.get("username") or user.get("first_name") or player_id
+
+    return {
+        "player_id": player_id,
+        "telegram_id": str(user.get("id", "")),
+        "name": username,
+        "username": user.get("username", ""),
+        "first_name": user.get("first_name", ""),
+
+        "x": p.get("x", 120),
+        "y": p.get("y", 450),
+
+        "lab_level": p.get("lab_level", 1),
+        "scanner_level": p.get("scanner_level", 1),
+        "scout_level": p.get("scout_level", 1),
+
+        # ini inti PvP scout nanti
+        "jammer_level": 1,
+        "defense_ai_level": 1,
+        "trace_monitor_level": 1,
+
+        "defense_style": "Balanced Defense",
+        "defense_build": {
+            "name": "Starter Defense Grid",
+            "modules": ["Firewall Core", "Trace Monitor", "Sentinel"],
+        },
+
+        "defense_units": [
+            {
+                "id": "breaker",
+                "name": "Breaker",
+                "role": "Frontline",
+                "level": 1,
+                "count": 30,
+                "hp": 120,
+                "attack": 35,
+                "defense": 18,
+                "speed": 7,
+                "cargo": 3,
+                "power": 1950,
+            }
+        ],
+
+        "resources": {
+            "credits": p.get("credits", 0),
+            "data_shard": p.get("resources", {}).get("data_shard", 0),
+            "nano_parts": p.get("resources", {}).get("nano_parts", 0),
+            "nexus_core": p.get("resources", {}).get("nexus_core", 0),
+        },
+    }
+
+
+def register_or_update_telegram_player(user: dict):
+    ensure_multiplayer_system()
+
+    telegram_id = str(user.get("id", "")).strip()
+
+    if not telegram_id:
+        raise HTTPException(status_code=400, detail="Telegram user id kosong")
+
+    player_id = f"tg_{telegram_id}"
+
+    if player_id not in GAME_STATE["players"]:
+        GAME_STATE["players"][player_id] = make_default_player_profile(player_id, user)
+    else:
+        profile = GAME_STATE["players"][player_id]
+        profile["username"] = user.get("username", profile.get("username", ""))
+        profile["first_name"] = user.get("first_name", profile.get("first_name", ""))
+        profile["name"] = user.get("username") or user.get("first_name") or profile.get("name", player_id)
+
+    return GAME_STATE["players"][player_id]
 
 # WAJIB PALING BAWAH
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
