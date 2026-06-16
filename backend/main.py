@@ -737,6 +737,23 @@ def get_unit_power(unit_id: str) -> int:
 
     return int(unit["base_power"] + ((level - 1) * unit["power_growth"]))
 
+def get_building_upgrade_cost(building_id: str, level: int):
+    base_costs = {
+        "main_lab": 1200,
+        "radar_tower": 900,
+        "ai_core": 1000,
+        "unit_factory": 850,
+        "research_lab": 1100,
+        "recovery_center": 750,
+        "guild_gate": 2500,
+    }
+
+    base = base_costs.get(building_id, 1000)
+
+    return {
+        "credits": int(base * (1.45 ** max(0, level - 1))),
+        "energy": 5 + level,
+    }
 
 def get_unit_upgrade_cost(unit_id: str):
     unit = get_unit_config(unit_id)
@@ -1031,42 +1048,63 @@ def make_default_player_buildings():
             "name": "Main Lab",
             "level": 1,
             "locked": False,
+            "asset": "assets/base.png",
+            "description": "Level utama akun, membuka bangunan baru, kapasitas dasar, dan syarat upgrade fitur besar.",
+            "actions": ["Upgrade Main Lab", "View Lab Stats"],
         },
         "radar_tower": {
             "id": "radar_tower",
             "name": "Radar Tower",
             "level": 1,
             "locked": False,
+            "asset": "assets/radar.png",
+            "description": "Untuk Scan area, Scout target, dan membuka informasi musuh berdasarkan Scout level.",
+            "actions": ["Open Radar", "Upgrade Scanner", "Upgrade Scout"],
         },
         "ai_core": {
             "id": "ai_core",
             "name": "AI Core",
             "level": 1,
             "locked": False,
+            "asset": "assets/ai_core.png",
+            "description": "Mengatur AI Agent, slot AI aktif, fragment, training AI, dan buff aktif.",
+            "actions": ["Open AI Agent", "Upgrade AI Core"],
         },
         "unit_factory": {
             "id": "unit_factory",
             "name": "Unit Factory",
             "level": 1,
             "locked": False,
+            "asset": "assets/unit_factory.png",
+            "description": "Tempat membuat pasukan cyber untuk menyerang. Unit bisa mati/disabled saat gagal menyerang.",
+            "actions": ["Train Unit", "Upgrade Unit Factory"],
         },
         "research_lab": {
             "id": "research_lab",
             "name": "Research Lab",
             "level": 1,
             "locked": False,
+            "asset": "assets/research_lab.png",
+            "description": "Tempat riset Network Speed, Scout Signal, Unit Capacity, AI Sync, dan Attack Routing.",
+            "actions": ["Start Research", "Upgrade Research Lab"],
         },
         "recovery_center": {
             "id": "recovery_center",
             "name": "Recovery Center",
             "level": 1,
             "locked": False,
+            "asset": "assets/recovery_center.png",
+            "description": "Memulihkan unit disabled, energy, cooldown, dan recovery setelah battle.",
+            "actions": ["Recover Units", "Upgrade Recovery Center"],
         },
         "guild_gate": {
             "id": "guild_gate",
             "name": "Guild Gate",
             "level": 0,
             "locked": True,
+            "asset": "assets/guild_gate.png",
+            "description": "Membuka guild, rally, guild building, guild war, dan territory.",
+            "actions": ["Locked"],
         },
     }
 
@@ -1085,6 +1123,7 @@ def ensure_player_profile_schema(profile: dict):
     profile.setdefault("lab_level", 1)
     profile.setdefault("scanner_level", 1)
     profile.setdefault("scout_level", 1)
+    profile.setdefault("ai_core_level", 1)
 
     profile.setdefault("jammer_level", 1)
     profile.setdefault("defense_ai_level", 1)
@@ -1548,6 +1587,24 @@ def get_unit_tech_list():
 
     return items
 
+def get_building_upgrade_cost(building_id: str, current_level: int):
+    base_costs = {
+        "main_lab": 1200,
+        "radar_tower": 900,
+        "ai_core": 1000,
+        "unit_factory": 850,
+        "research_lab": 1100,
+        "recovery_center": 750,
+        "guild_gate": 2500,
+    }
+
+    base = base_costs.get(building_id, 1000)
+    level = max(1, int(current_level or 1))
+
+    return {
+        "credits": int(base * (1.45 ** (level - 1))),
+        "energy": 5 + level,
+    }
 
 def normalize_unit_payload(units: Dict[str, Any]) -> Dict[str, Dict[str, int]]:
     """
@@ -2478,14 +2535,20 @@ class UpgradeUnitTechRequest(BaseModel):
 
 
 @app.get("/api/buildings")
-def get_buildings():
-    return {
-        "buildings": GAME_STATE["buildings"],
-        "player": GAME_STATE["player"],
-        "units": get_units_for_player(),
-        "unit_training_cost": GAME_STATE["unit_training_cost"],
-    }
+async def get_buildings(request: Request):
+    await sync_state_from_db()
 
+    player_id, profile = get_or_create_active_player_profile(request)
+
+    await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
+
+    return {
+        "player_id": player_id,
+        "buildings": profile["buildings"],
+        "main_lab_level": profile.get("lab_level", 1),
+        "scanner_level": profile.get("scanner_level", 1),
+        "scout_level": profile.get("scout_level", 1),
+    }
 
 @app.post("/api/units/train")
 def train_unit(req: TrainUnitRequest):
@@ -2949,6 +3012,24 @@ def get_active_player_id(request: Request):
         or "dev_player"
     )
 
+def get_or_create_active_player_profile(request: Request):
+    ensure_multiplayer_system()
+
+    player_id = get_active_player_id(request)
+    profile = GAME_STATE["players"].get(player_id)
+
+    if not profile:
+        profile = make_reset_player_profile(player_id, {
+            "name": player_id,
+            "username": player_id,
+            "telegram_id": player_id.replace("tg_", ""),
+        })
+        GAME_STATE["players"][player_id] = profile
+
+    profile = ensure_player_profile_schema(profile)
+    GAME_STATE["players"][player_id] = profile
+
+    return player_id, profile
 
 def get_active_player_profile(request: Request):
     ensure_multiplayer_system()
@@ -3131,6 +3212,85 @@ async def admin_reset_player(request: Request, payload: dict = Body(...)):
         "message": f"Player {target_player_id} berhasil direset",
         "player_id": target_player_id,
         "profile": GAME_STATE["players"][target_player_id],
+    }
+
+@app.post("/api/buildings/{building_id}/upgrade")
+async def upgrade_building(building_id: str, request: Request):
+    await sync_state_from_db()
+
+    player_id, profile = get_or_create_active_player_profile(request)
+
+    buildings = profile.get("buildings", {})
+
+    if building_id not in buildings:
+        raise HTTPException(status_code=404, detail="Building tidak ditemukan")
+
+    building = buildings[building_id]
+
+    if building.get("locked"):
+        raise HTTPException(status_code=400, detail="Building masih terkunci")
+
+    current_level = int(building.get("level", 0))
+    next_level = current_level + 1
+
+    if current_level >= 30:
+        raise HTTPException(status_code=400, detail="Building sudah max level")
+
+    cost = get_building_upgrade_cost(building_id, current_level)
+
+    resources = profile.get("resources", {})
+    credits = int(resources.get("credits", 0))
+    energy = int(profile.get("energy", 0))
+
+    if credits < cost["credits"]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Credits tidak cukup. Butuh {cost['credits']}, punya {credits}"
+        )
+
+    if energy < cost["energy"]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Energy tidak cukup. Butuh {cost['energy']}, punya {energy}"
+        )
+
+    resources["credits"] = credits - cost["credits"]
+    profile["energy"] = energy - cost["energy"]
+
+    building["level"] = next_level
+
+    if building_id == "main_lab":
+        profile["lab_level"] = next_level
+
+    if building_id == "radar_tower":
+        profile["scanner_level"] = next_level
+        profile["scout_level"] = next_level
+
+    if building_id == "ai_core":
+        profile["ai_core_level"] = next_level
+
+    profile["resources"] = resources
+    profile["buildings"][building_id] = building
+    GAME_STATE["players"][player_id] = profile
+
+    await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
+
+    return {
+        "success": True,
+        "message": f"{building['name']} berhasil naik ke Lv.{next_level}",
+        "player_id": player_id,
+        "building_id": building_id,
+        "building": building,
+        "new_level": next_level,
+        "cost": cost,
+        "resources": profile["resources"],
+        "energy": profile.get("energy", 0),
+        "profile_levels": {
+            "lab_level": profile.get("lab_level", 1),
+            "scanner_level": profile.get("scanner_level", 1),
+            "scout_level": profile.get("scout_level", 1),
+            "ai_core_level": profile.get("ai_core_level", 1),
+        },
     }
 
 # WAJIB PALING BAWAH
