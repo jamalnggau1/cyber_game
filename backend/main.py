@@ -3584,7 +3584,12 @@ def register_or_update_telegram_player(user: dict):
     player_id = f"tg_{telegram_id}"
 
     if player_id not in GAME_STATE["players"]:
-        GAME_STATE["players"][player_id] = make_default_player_profile(player_id, user)
+        GAME_STATE["players"][player_id] = make_reset_player_profile(player_id, {
+            "telegram_id": telegram_id,
+            "name": user.get("username") or user.get("first_name") or player_id,
+            "username": user.get("username", ""),
+            "first_name": user.get("first_name", ""),
+        })
     else:
         profile = GAME_STATE["players"][player_id]
         profile["username"] = user.get("username", profile.get("username", ""))
