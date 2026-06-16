@@ -26,7 +26,7 @@ let engineerDrones = [
 let telegramUser = null;
 let telegramInitData = "";
 
-function initTelegramMiniApp() {
+async function initTelegramMiniApp() {
   const tg = window.Telegram?.WebApp;
 
   if (!tg) {
@@ -50,10 +50,28 @@ function initTelegramMiniApp() {
   console.log("Telegram user:", telegramUser);
 
   if (telegramUser?.id) {
-    authTelegramUser();
+    await authTelegramUser();
   }
 
   return telegramUser;
+}
+
+async function api(path, options = {}) {
+  const res = await fetch(path, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      "X-Player-Id": localStorage.getItem("cybercore_player_id") || "",
+      ...(options.headers || {})
+    }
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text);
+  }
+
+  return res.json();
 }
 
 async function authTelegramUser() {
@@ -81,24 +99,6 @@ async function authTelegramUser() {
   } catch (err) {
     console.log("Telegram auth failed:", err.message);
   }
-}
-
-async function api(path, options = {}) {
-  const res = await fetch(path, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      "X-Player-Id": localStorage.getItem("cybercore_player_id") || "",
-      ...(options.headers || {})
-    }
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(text);
-  }
-
-  return res.json();
 }
 
 async function loadContestedNodes() {
@@ -4505,7 +4505,8 @@ function switchPage(id) {
 }
 
 async function initApp() {
-  initTelegramMiniApp();
+  await initTelegramMiniApp();
+  await loadState();
   document.querySelectorAll(".tab").forEach(btn => {
     btn.addEventListener("click", () => {
       switchPage(btn.dataset.page);

@@ -1750,6 +1750,32 @@ def build_scout_report(target_id: str):
 def scout(target_id: str):
     return build_scout_report(target_id)
 
+@app.get("/api/debug/players")
+def debug_players(request: Request):
+    ensure_multiplayer_system()
+
+    header_player_id = request.headers.get("X-Player-Id")
+    current_player_id = GAME_STATE["player"].get("player_id", "dev_player")
+
+    return {
+        "header_player_id": header_player_id,
+        "current_player_id": current_player_id,
+        "players_count": len(GAME_STATE["players"]),
+        "players": [
+            {
+                "player_id": player_id,
+                "name": profile.get("name"),
+                "telegram_id": profile.get("telegram_id"),
+                "username": profile.get("username"),
+                "x": profile.get("x"),
+                "y": profile.get("y"),
+                "jammer_level": profile.get("jammer_level"),
+                "defense_ai_level": profile.get("defense_ai_level"),
+            }
+            for player_id, profile in GAME_STATE["players"].items()
+        ],
+    }
+
 @app.post("/api/debug/reset-defense")
 def reset_defense(request: Request, payload: dict = Body(default={})):
     ensure_multiplayer_system()
