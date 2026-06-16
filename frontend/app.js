@@ -633,7 +633,7 @@ function renderScoutIntelReport(msg) {
   const distance = scoutValue(r.distance, "?");
   const labLevel = scoutValue(r.lab_level, "Unknown");
   const baseTier = scoutValue(r.base_tier, "Unknown");
-  <b>${typeof power === "number" ? formatPower(power) : escapeHtml(String(power))}</b>
+  const power = scoutValue(r.estimated_power, "Unknown");
   const noise = scoutValue(r.noise, "Unknown");
   const defenseStyle = scoutValue(r.defense_style, "Unknown");
 
@@ -663,7 +663,7 @@ function renderScoutIntelReport(msg) {
 
         <div>
           <small>Power</small>
-          <b>${escapeHtml(String(power))}</b>
+          <b>${typeof power === "number" ? formatPower(power) : escapeHtml(String(power))}</b>
         </div>
       </div>
 
