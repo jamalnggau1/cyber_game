@@ -1730,47 +1730,68 @@ async def state(request: Request):
     await sync_state_from_db()
     apply_energy_regen()
 
-    p = GAME_STATE["player"]
+    base_player = GAME_STATE["player"]
 
-    player_id, profile = get_active_player_profile(request)
+    player_id, profile = get_or_create_active_player_profile(request)
+    profile = ensure_player_profile_schema(profile)
 
-    if profile:
-        player_view = copy.deepcopy(p)
+    resources = profile.get("resources", {})
 
-        player_view["player_id"] = player_id
-        player_view["telegram_id"] = profile.get("telegram_id", "")
-        player_view["name"] = profile.get("name", "")
-        player_view["username"] = profile.get("username", "")
-        player_view["first_name"] = profile.get("first_name", "")
+    player_view = copy.deepcopy(base_player)
 
-        player_view["lab_level"] = profile.get("lab_level", player_view.get("lab_level", 1))
-        player_view["scanner_level"] = profile.get("scanner_level", player_view.get("scanner_level", 1))
-        player_view["scout_level"] = profile.get("scout_level", player_view.get("scout_level", 1))
+    # Identity
+    player_view["id"] = player_id
+    player_view["player_id"] = player_id
+    player_view["telegram_id"] = profile.get("telegram_id", "")
+    player_view["name"] = profile.get("name", player_id)
+    player_view["username"] = profile.get("username", "")
+    player_view["first_name"] = profile.get("first_name", "")
 
-        player_view["jammer_level"] = profile.get("jammer_level", 1)
-        player_view["defense_ai_level"] = profile.get("defense_ai_level", 1)
-        player_view["trace_monitor_level"] = profile.get("trace_monitor_level", 1)
+    # Core levels
+    player_view["x"] = profile.get("x", 120)
+    player_view["y"] = profile.get("y", 450)
+    player_view["lab_level"] = profile.get("lab_level", 1)
+    player_view["scanner_level"] = profile.get("scanner_level", 1)
+    player_view["scout_level"] = profile.get("scout_level", 1)
+    player_view["ai_core_level"] = profile.get("ai_core_level", 1)
 
-        profile_resources = profile.get("resources", {})
-        player_view["credits"] = profile_resources.get("credits", player_view.get("credits", 0))
+    # Economy
+    player_view["credits"] = resources.get("credits", 0)
+    player_view["energy"] = profile.get("energy", 100)
+    player_view["max_energy"] = profile.get("max_energy", 100)
 
-        if "resources" not in player_view or not isinstance(player_view["resources"], dict):
-            player_view["resources"] = {}
+    player_view["resources"] = {
+        "data_shard": resources.get("data_shard", 0),
+        "nano_parts": resources.get("nano_parts", 0),
+        "nexus_core": resources.get("nexus_core", 0),
+    }
 
-        player_view["resources"]["data_shard"] = profile_resources.get("data_shard", 0)
-        player_view["resources"]["nano_parts"] = profile_resources.get("nano_parts", 0)
-        player_view["resources"]["nexus_core"] = profile_resources.get("nexus_core", 0)
-    else:
-        player_view = p
+    # Trace
+    player_view["trace"] = profile.get("trace", 0)
+    player_view["trace_exposure"] = profile.get("trace", 0)
+
+    # Player owned systems
+    player_view["owned_ai"] = profile.get("owned_ai", ["nova_lite"])
+    player_view["active_ai"] = profile.get("active_ai", [])
+    player_view["unit_inventory"] = profile.get("unit_inventory", {})
+    player_view["unit_tech"] = profile.get("research", {}).get("unit_tech", {})
+
+    GAME_STATE["players"][player_id] = profile
 
     return {
         "player": player_view,
-        "ai_agents": {ai_id: AI_AGENTS[ai_id] for ai_id in p["owned_ai"]},
+        "resources": player_view["resources"],
+
+        "ai_agents": {
+            ai_id: AI_AGENTS[ai_id]
+            for ai_id in player_view["owned_ai"]
+            if ai_id in AI_AGENTS
+        },
         "all_ai_catalog": AI_AGENTS,
         "attack_modules": ATTACK_MODULES,
         "units": get_units_for_player(),
         "scout_unlocks": SCOUT_UNLOCKS,
-        "active_ai_buffs": get_effective_ai_buffs(p["active_ai"]),
+        "active_ai_buffs": get_effective_ai_buffs(player_view["active_ai"]),
         "max_deploy_units": get_max_deploy_units(),
         "research": GAME_STATE["research"],
         "energy_regen_per_minute": get_energy_regen_per_minute(),
