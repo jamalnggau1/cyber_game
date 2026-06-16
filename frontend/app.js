@@ -1558,6 +1558,43 @@ async function loadState() {
   await loadBuildings();
 }
 
+async function upgradeBuilding(buildingId) {
+  try {
+    const result = await api(`/api/buildings/${buildingId}/upgrade`, {
+      method: "POST"
+    });
+
+    await loadState();
+    await loadBuildings();
+
+    alert(result.message || "Building upgraded.");
+
+    if (buildingId === "ai_core") {
+      renderAiCoreSheet("upgrade");
+      return;
+    }
+
+    if (buildingId === "unit_factory") {
+      renderUnitFactorySheet("upgrade");
+      return;
+    }
+
+    if (buildingId === "research_lab") {
+      renderResearchLabSheet("upgrade");
+      return;
+    }
+
+    if (buildingId === "radar_tower") {
+      openRadarUpgradeSheet();
+      return;
+    }
+
+    openBuilding(buildingId);
+  } catch (err) {
+    alert("Gagal upgrade building: " + err.message);
+  }
+}
+
 async function loadBuildings() {
   buildingsData = await api("/api/buildings");
   renderBaseBuildings();
@@ -1635,8 +1672,8 @@ function openRadarUpgradeSheet() {
       ${row("Scout", `Lv.${player.scout_level || 1}`)}
 
       <div class="sheet-actions">
-        <button disabled>Upgrade Radar Soon</button>
-        <button disabled>Upgrade Scout Soon</button>
+        <button onclick="upgradeBuilding('radar_tower')">Upgrade Radar Tower</button>
+        <button disabled>Split Scanner/Scout Later</button>
         <button onclick="closeBuildingSheet()">Close</button>
       </div>
     `
@@ -1781,7 +1818,7 @@ function renderAiCoreUpgradeTab(core, level) {
       </div>
 
       <div class="sheet-actions">
-        <button disabled>Upgrade AI Core Soon</button>
+        <button onclick="upgradeBuilding('ai_core')">Upgrade AI Core</button>
       </div>
     </div>
   `;
@@ -1878,7 +1915,7 @@ function openBuilding(buildingId) {
   } else {
     actionHtml = `
       <div class="sheet-actions">
-        <button disabled>Upgrade Soon</button>
+        <button onclick="upgradeBuilding('${buildingId}')">Upgrade</button>
         <button disabled>View Stats Soon</button>
       </div>
     `;
@@ -2275,7 +2312,7 @@ function renderUnitFactoryUpgradeTab(factory) {
       </div>
 
       <div class="sheet-actions">
-        <button disabled>Upgrade Unit Factory Soon</button>
+        <button onclick="upgradeBuilding('unit_factory')">Upgrade Unit Factory</button>
       </div>
     </div>
   `;
@@ -2693,7 +2730,7 @@ function renderResearchUpgradeTab(data) {
       </div>
 
       <div class="sheet-actions">
-        <button disabled>Upgrade Research Lab Soon</button>
+        <button onclick="upgradeBuilding('research_lab')">Upgrade Research Lab</button>
       </div>
     </div>
   `;
