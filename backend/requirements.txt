@@ -1,7 +1,9 @@
 fastapi
 uvicorn
 python-multipart
-sqlalchemy
 aiosqlite
 python-dotenv
 requests
+asyncpg
+sqlalchemy
+python-dotenv
