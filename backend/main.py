@@ -2412,6 +2412,66 @@ async def scan(request: Request):
         }
     }
 
+def apply_scout_noise_mask(report: dict):
+    noise = str(report.get("noise", "Low"))
+
+    if noise == "Low":
+        report["report_quality"] = "Clean Intel"
+        return report
+
+    if noise == "Medium":
+        report["report_quality"] = "Partially Jammed"
+
+        # Data sensitif mulai terganggu
+        report["resources"] = {
+            "credits": "??? Jammed",
+            "data_shard": "??? Jammed",
+            "nano_parts": "??? Jammed",
+            "nexus_core": "??? Jammed",
+        }
+
+        report["defense_modules"] = [
+            "??? Jammed",
+            "Partial signal only",
+        ]
+
+        report["counter_risk"] = "??? Jammed by defender anti-scout"
+        report["weakness_hint"] = "??? Need stronger Scout/ORA"
+        return report
+
+    if noise == "High":
+        report["report_quality"] = "Severely Jammed"
+
+        # Hampir semua data battle penting dikunci
+        report["enemy_army"] = [
+            {
+                "name": "???",
+                "level": "???",
+                "count": "???",
+                "role": "Signal jammed",
+            }
+        ]
+
+        report["resources"] = {
+            "credits": "??? Jammed",
+            "data_shard": "??? Jammed",
+            "nano_parts": "??? Jammed",
+            "nexus_core": "??? Jammed",
+        }
+
+        report["enemy_build"] = "??? Jammed"
+        report["defense_modules"] = ["??? Jammed"]
+        report["defense_style"] = "??? Jammed"
+        report["estimated_power"] = "??? Jammed"
+        report["counter_risk"] = "??? Jammed"
+        report["weakness_hint"] = "??? Jammed"
+        report["build_clue"] = "??? Jammed"
+
+        return report
+
+    report["report_quality"] = "Unknown"
+    return report
+
 def build_scout_report(target_id: str, attacker_profile: dict):
     p = attacker_profile
 
@@ -2545,6 +2605,8 @@ def build_scout_report(target_id: str, attacker_profile: dict):
     else:
         report["counter_scout_status"] = "Scout successful"
         report["noise"] = "Low"
+
+    report = apply_scout_noise_mask(report)
 
     return report
 

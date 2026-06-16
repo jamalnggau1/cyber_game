@@ -673,6 +673,7 @@ function renderScoutIntelReport(msg) {
       </div>
 
       ${renderScoutDroneBlock(r)}
+      ${renderScoutContestBlock(r)}
       ${renderScoutEnemyArmyBlock(r.enemy_army)}
       ${renderScoutDefenseBuildBlock(r)}
       ${renderScoutResourcesBlock(r.resources)}
@@ -715,8 +716,66 @@ function renderScoutDroneBlock(r) {
         <div>
           <b>Recon Drone</b>
           <p class="muted">${escapeHtml(String(status))}</p>
-          <small>Report quality depends on Scout level and enemy jammer.</small>
+          <small>Report quality depends on Scout level, Scout Signal, active AI, and enemy Anti Scout.</small>
         </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderScoutContestBlock(r) {
+  const contest = r.scout_contest || null;
+
+  if (!contest) {
+    return "";
+  }
+
+  const attackerScore = Number(contest.attacker_score || 0);
+  const defenderScore = Number(contest.defender_score || contest.defender_anti_scout_score || 0);
+  const total = Math.max(1, attackerScore + defenderScore);
+  const attackerPct = Math.round((attackerScore / total) * 100);
+  const defenderPct = Math.round((defenderScore / total) * 100);
+
+  const noise = scoutValue(r.noise, "Unknown");
+  const quality = scoutValue(r.report_quality, "Unknown");
+
+  return `
+    <div class="intel-section scout-contest-section">
+      <div class="intel-section-title">
+        <h3>Scout Contest</h3>
+        <span>${escapeHtml(String(quality))}</span>
+      </div>
+
+      <div class="scout-contest-card">
+        <div class="contest-score-row">
+          <div>
+            <small>Your Scout</small>
+            <b>${attackerScore}</b>
+          </div>
+
+          <div>
+            <small>Enemy Anti Scout</small>
+            <b>${defenderScore}</b>
+          </div>
+        </div>
+
+        <div class="contest-bar">
+          <div class="contest-attacker" style="width:${attackerPct}%"></div>
+          <div class="contest-defender" style="width:${defenderPct}%"></div>
+        </div>
+
+        <div class="contest-detail-grid">
+          ${row("Noise", noise)}
+          ${row("Scout Lv", contest.attacker_scout_level ?? "?")}
+          ${row("Scanner Lv", contest.attacker_scanner_level ?? "?")}
+          ${row("Scout Signal", contest.attacker_scout_signal ?? "?")}
+          ${row("Defender Jammer", contest.defender_jammer_level ?? "?")}
+          ${row("DEF AI Bonus", `${contest.defender_ai_defense_bonus_percent || 0}%`)}
+        </div>
+
+        <p class="muted">
+          Jika Enemy Anti Scout lebih tinggi, report akan terkena noise dan sebagian data berubah menjadi ???.
+        </p>
       </div>
     </div>
   `;

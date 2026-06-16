@@ -4243,3 +4243,64 @@ input[type=number] {
     font-size: 22px;
   }
 }
+.scout-contest-card {
+  padding: 12px;
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 20% 0%, rgba(57, 243, 255, .12), transparent 55%),
+    rgba(255, 255, 255, .035);
+  border: 1px solid rgba(57, 243, 255, .13);
+}
+
+.contest-score-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+}
+
+.contest-score-row div {
+  padding: 10px;
+  border-radius: 15px;
+  background: rgba(15, 27, 54, .75);
+  border: 1px solid rgba(57, 243, 255, .09);
+}
+
+.contest-score-row small {
+  display: block;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.contest-score-row b {
+  display: block;
+  margin-top: 4px;
+  color: var(--accent);
+  font-size: 20px;
+}
+
+.contest-bar {
+  display: flex;
+  height: 9px;
+  overflow: hidden;
+  margin: 12px 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .06);
+  border: 1px solid rgba(255, 255, 255, .05);
+}
+
+.contest-attacker {
+  height: 100%;
+  background: rgba(57, 243, 255, .85);
+}
+
+.contest-defender {
+  height: 100%;
+  background: rgba(255, 72, 128, .78);
+}
+
+.contest-detail-grid {
+  display: grid;
+  gap: 2px;
+  margin-top: 8px;
+}
