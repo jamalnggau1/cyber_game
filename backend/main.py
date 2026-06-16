@@ -1734,6 +1734,7 @@ async def state(request: Request):
 
     player_id, profile = get_or_create_active_player_profile(request)
     profile = ensure_player_profile_schema(profile)
+    profile = ensure_profile_unit_system(profile)
 
     resources = profile.get("resources", {})
 
@@ -1774,10 +1775,10 @@ async def state(request: Request):
     player_view["owned_ai"] = profile.get("owned_ai", ["nova_lite"])
     player_view["active_ai"] = profile.get("active_ai", [])
     player_view["unit_inventory"] = profile.get("unit_inventory", {})
-    player_view["unit_tech"] = profile.get("research", {}).get("unit_tech", {})
+    player_view["unit_tech"] = profile.get("unit_tech", {})
 
     GAME_STATE["players"][player_id] = profile
-
+    await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
     return {
         "player": player_view,
         "resources": player_view["resources"],
@@ -1789,7 +1790,7 @@ async def state(request: Request):
         },
         "all_ai_catalog": AI_AGENTS,
         "attack_modules": ATTACK_MODULES,
-        "units": get_units_for_player(),
+        "units": get_units_for_profile(profile),
         "scout_unlocks": SCOUT_UNLOCKS,
         "active_ai_buffs": get_effective_ai_buffs(player_view["active_ai"]),
         "max_deploy_units": get_max_deploy_units(),
@@ -2560,6 +2561,10 @@ async def get_buildings(request: Request):
     await sync_state_from_db()
 
     player_id, profile = get_or_create_active_player_profile(request)
+    profile = ensure_player_profile_schema(profile)
+    profile = ensure_profile_unit_system(profile)
+
+    GAME_STATE["players"][player_id] = profile
 
     await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
 
@@ -2569,16 +2574,34 @@ async def get_buildings(request: Request):
         "main_lab_level": profile.get("lab_level", 1),
         "scanner_level": profile.get("scanner_level", 1),
         "scout_level": profile.get("scout_level", 1),
+
+        "player": {
+            "player_id": player_id,
+            "credits": profile["resources"].get("credits", 0),
+            "energy": profile.get("energy", 100),
+            "max_energy": profile.get("max_energy", 100),
+            "resources": profile["resources"],
+            "unit_inventory": profile["unit_inventory"],
+            "unit_tech": profile["unit_tech"],
+        },
+
+        "units": get_units_for_profile(profile),
     }
 
 @app.post("/api/units/train")
-def train_unit(req: TrainUnitRequest):
-    ensure_unit_system()
+async def train_unit(req: TrainUnitRequest, request: Request):
+    await sync_state_from_db()
 
-    p = GAME_STATE["player"]
+    player_id, profile = get_or_create_active_player_profile(request)
+    profile = ensure_player_profile_schema(profile)
+    profile = ensure_profile_unit_system(profile)
+
     unit = get_unit_config(req.unit_id)
 
-    unlocked_level = int(p["unit_tech"].get(req.unit_id, 1))
+    if not unit:
+        raise HTTPException(status_code=400, detail="Unknown unit")
+
+    unlocked_level = int(profile["unit_tech"].get(req.unit_id, 1))
 
     if req.level > unlocked_level:
         raise HTTPException(
@@ -2589,23 +2612,48 @@ def train_unit(req: TrainUnitRequest):
     cost = get_unit_train_cost(req.unit_id, req.level)
 
     total_nano = int(cost.get("nano_parts", 0)) * req.amount
+    total_credits = int(cost.get("credits", 0)) * req.amount
+    total_energy = int(cost.get("energy", 0)) * req.amount
 
-    if p["resources"]["nano_parts"] < total_nano:
-        raise HTTPException(status_code=400, detail="Not enough Nano Parts")
+    resources = profile["resources"]
 
-    p["resources"]["nano_parts"] -= total_nano
-    p["unit_inventory"][req.unit_id][str(req.level)] += req.amount
+    if resources.get("nano_parts", 0) < total_nano:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Nano Parts tidak cukup. Butuh {total_nano}, punya {resources.get('nano_parts', 0)}"
+        )
+
+    if resources.get("credits", 0) < total_credits:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Credits tidak cukup. Butuh {total_credits}, punya {resources.get('credits', 0)}"
+        )
+
+    if profile.get("energy", 0) < total_energy:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Energy tidak cukup. Butuh {total_energy}, punya {profile.get('energy', 0)}"
+        )
+
+    resources["nano_parts"] = resources.get("nano_parts", 0) - total_nano
+    resources["credits"] = resources.get("credits", 0) - total_credits
+    profile["energy"] = profile.get("energy", 0) - total_energy
 
     level_key = str(req.level)
-    p["unit_inventory"][req.unit_id][level_key] += req.amount
+    profile["unit_inventory"][req.unit_id][level_key] += req.amount
 
-    persist_state()
+    GAME_STATE["players"][player_id] = profile
+
+    await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
+
     return {
         "success": True,
         "message": f"Trained {req.amount} {unit['name']} Lv.{req.level}",
-        "credits_left": p["credits"],
-        "energy_left": p["energy"],
-        "unit_inventory": p["unit_inventory"],
+        "player_id": player_id,
+        "resources": profile["resources"],
+        "energy_left": profile["energy"],
+        "unit_inventory": profile["unit_inventory"],
+        "units": get_units_for_profile(profile),
     }
 
 def ensure_resource_system():
@@ -2649,11 +2697,12 @@ def ensure_unit_system():
             p["unit_inventory"][unit_id].setdefault(str(level), 0)
 
 @app.post("/api/units/promote")
-def promote_unit(req: PromoteUnitRequest):
-    ensure_unit_system()
-    ensure_resource_system()
+async def promote_unit(req: PromoteUnitRequest, request: Request):
+    await sync_state_from_db()
 
-    p = GAME_STATE["player"]
+    player_id, profile = get_or_create_active_player_profile(request)
+    profile = ensure_player_profile_schema(profile)
+    profile = ensure_profile_unit_system(profile)
 
     unit_id = req.unit_id
     from_level = int(req.from_level)
@@ -2669,7 +2718,7 @@ def promote_unit(req: PromoteUnitRequest):
     if from_level < 1 or from_level >= max_level:
         raise HTTPException(status_code=400, detail="Invalid promote level")
 
-    unlocked_level = int(p["unit_tech"].get(unit_id, 1))
+    unlocked_level = int(profile["unit_tech"].get(unit_id, 1))
 
     if to_level > unlocked_level:
         raise HTTPException(
@@ -2677,17 +2726,13 @@ def promote_unit(req: PromoteUnitRequest):
             detail=f"{unit['name']} Lv.{to_level} belum terbuka di Research Lab"
         )
 
-    # Pastikan inventory unit dan level aman
-    if unit_id not in p["unit_inventory"] or not isinstance(p["unit_inventory"][unit_id], dict):
-        p["unit_inventory"][unit_id] = {}
-
     from_key = str(from_level)
     to_key = str(to_level)
 
-    p["unit_inventory"][unit_id].setdefault(from_key, 0)
-    p["unit_inventory"][unit_id].setdefault(to_key, 0)
+    profile["unit_inventory"][unit_id].setdefault(from_key, 0)
+    profile["unit_inventory"][unit_id].setdefault(to_key, 0)
 
-    owned_from = int(p["unit_inventory"][unit_id].get(from_key, 0))
+    owned_from = int(profile["unit_inventory"][unit_id].get(from_key, 0))
 
     if owned_from < amount:
         raise HTTPException(
@@ -2695,35 +2740,33 @@ def promote_unit(req: PromoteUnitRequest):
             detail=f"Tidak cukup {unit['name']} Lv.{from_level}. Punya {owned_from}, butuh {amount}"
         )
 
-    # Cost promote sementara pakai Nano Parts
     nano_per_unit = 40 * to_level
     total_nano = nano_per_unit * amount
 
-    p["resources"].setdefault("nano_parts", 0)
+    resources = profile["resources"]
 
-    if int(p["resources"]["nano_parts"]) < total_nano:
+    if int(resources.get("nano_parts", 0)) < total_nano:
         raise HTTPException(
             status_code=400,
-            detail=f"Nano Parts tidak cukup. Butuh {total_nano}, punya {p['resources']['nano_parts']}"
+            detail=f"Nano Parts tidak cukup. Butuh {total_nano}, punya {resources.get('nano_parts', 0)}"
         )
 
-    p["resources"]["nano_parts"] -= total_nano
+    resources["nano_parts"] = int(resources.get("nano_parts", 0)) - total_nano
 
-    p["unit_inventory"][unit_id][from_key] -= amount
-    p["unit_inventory"][unit_id][to_key] += amount
+    profile["unit_inventory"][unit_id][from_key] = owned_from - amount
+    profile["unit_inventory"][unit_id][to_key] = int(profile["unit_inventory"][unit_id].get(to_key, 0)) + amount
 
-    persist_state()
+    GAME_STATE["players"][player_id] = profile
+
+    await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
+
     return {
+        "success": True,
         "message": f"Promoted {amount} {unit['name']} Lv.{from_level} → Lv.{to_level}",
-        "unit_id": unit_id,
-        "from_level": from_level,
-        "to_level": to_level,
-        "amount": amount,
-        "cost": {
-            "nano_parts": total_nano
-        },
-        "inventory": p["unit_inventory"][unit_id],
-        "resources": p["resources"],
+        "player_id": player_id,
+        "resources": profile["resources"],
+        "unit_inventory": profile["unit_inventory"],
+        "units": get_units_for_profile(profile),
     }
 
 @app.post("/api/research/unit-tech/upgrade")
@@ -3051,6 +3094,104 @@ def get_or_create_active_player_profile(request: Request):
     GAME_STATE["players"][player_id] = profile
 
     return player_id, profile
+
+def ensure_profile_unit_system(profile: dict):
+    if "resources" not in profile or not isinstance(profile["resources"], dict):
+        profile["resources"] = {}
+
+    profile["resources"].setdefault("credits", 5000)
+    profile["resources"].setdefault("data_shard", 0)
+    profile["resources"].setdefault("nano_parts", 0)
+    profile["resources"].setdefault("nexus_core", 0)
+
+    if "unit_inventory" not in profile or not isinstance(profile["unit_inventory"], dict):
+        profile["unit_inventory"] = {}
+
+    # Unit tech bisa ada di profile["research"]["unit_tech"]
+    if "research" not in profile or not isinstance(profile["research"], dict):
+        profile["research"] = {"level": 1, "unit_tech": {}}
+
+    if "unit_tech" not in profile["research"] or not isinstance(profile["research"]["unit_tech"], dict):
+        profile["research"]["unit_tech"] = {}
+
+    # Alias supaya kode lebih mudah
+    profile["unit_tech"] = profile["research"]["unit_tech"]
+
+    for unit_id, unit in UNITS.items():
+        profile["unit_tech"].setdefault(unit_id, 1)
+
+        current_inventory = profile["unit_inventory"].get(unit_id)
+
+        # Migrasi dari format lama:
+        # "breaker": 30
+        # menjadi:
+        # "breaker": {"1": 30, "2": 0, ...}
+        if isinstance(current_inventory, int):
+            profile["unit_inventory"][unit_id] = {
+                "1": current_inventory
+            }
+        elif not isinstance(current_inventory, dict):
+            profile["unit_inventory"][unit_id] = {}
+
+        max_level = int(unit.get("max_level", 5))
+
+        for level in range(1, max_level + 1):
+            profile["unit_inventory"][unit_id].setdefault(str(level), 0)
+
+    return profile
+
+def get_units_for_profile(profile: dict):
+    profile = ensure_profile_unit_system(profile)
+
+    result = []
+
+    for unit_id, unit in UNITS.items():
+        unlocked_level = int(profile["unit_tech"].get(unit_id, 1))
+        inventory = profile["unit_inventory"].get(unit_id, {})
+
+        levels = []
+
+        for level in range(1, unit["max_level"] + 1):
+            stats = get_unit_stats(unit_id, level)
+            owned = int(inventory.get(str(level), 0))
+            next_level = level + 1
+            promote_to_next_unlocked = (
+                next_level <= unlocked_level
+                and next_level <= unit["max_level"]
+            )
+
+            train_cost = stats.get("train_cost", {})
+
+            levels.append({
+                "promote_to_next_unlocked": promote_to_next_unlocked,
+                "level": level,
+                "unlocked": level <= unlocked_level,
+                "owned": owned,
+
+                "hp": stats["hp"],
+                "attack": stats["attack"],
+                "defense": stats["defense"],
+                "speed": stats["speed"],
+                "cargo": stats["cargo"],
+
+                "train_cost": train_cost,
+                "promote_cost": {
+                    "nano_parts": 40 * (level + 1)
+                },
+            })
+
+        result.append({
+            "id": unit_id,
+            "name": unit["name"],
+            "role": unit.get("role", ""),
+            "description": unit.get("description", ""),
+            "max_level": unit["max_level"],
+            "unlocked_level": unlocked_level,
+            "total_owned": sum(int(v or 0) for v in inventory.values()),
+            "levels": levels,
+        })
+
+    return result
 
 def get_active_player_profile(request: Request):
     ensure_multiplayer_system()
