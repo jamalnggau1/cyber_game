@@ -1555,11 +1555,45 @@ def calculate_unit_power_score(units):
 # ==========================================================
 
 @app.get("/api/state")
-def state():
+async def state(request: Request):
+    await sync_state_from_db()
     apply_energy_regen()
+
     p = GAME_STATE["player"]
+
+    player_id, profile = get_active_player_profile(request)
+
+    if profile:
+        player_view = copy.deepcopy(p)
+
+        player_view["player_id"] = player_id
+        player_view["telegram_id"] = profile.get("telegram_id", "")
+        player_view["name"] = profile.get("name", "")
+        player_view["username"] = profile.get("username", "")
+        player_view["first_name"] = profile.get("first_name", "")
+
+        player_view["lab_level"] = profile.get("lab_level", player_view.get("lab_level", 1))
+        player_view["scanner_level"] = profile.get("scanner_level", player_view.get("scanner_level", 1))
+        player_view["scout_level"] = profile.get("scout_level", player_view.get("scout_level", 1))
+
+        player_view["jammer_level"] = profile.get("jammer_level", 1)
+        player_view["defense_ai_level"] = profile.get("defense_ai_level", 1)
+        player_view["trace_monitor_level"] = profile.get("trace_monitor_level", 1)
+
+        profile_resources = profile.get("resources", {})
+        player_view["credits"] = profile_resources.get("credits", player_view.get("credits", 0))
+
+        if "resources" not in player_view or not isinstance(player_view["resources"], dict):
+            player_view["resources"] = {}
+
+        player_view["resources"]["data_shard"] = profile_resources.get("data_shard", 0)
+        player_view["resources"]["nano_parts"] = profile_resources.get("nano_parts", 0)
+        player_view["resources"]["nexus_core"] = profile_resources.get("nexus_core", 0)
+    else:
+        player_view = p
+
     return {
-        "player": p,
+        "player": player_view,
         "ai_agents": {ai_id: AI_AGENTS[ai_id] for ai_id in p["owned_ai"]},
         "all_ai_catalog": AI_AGENTS,
         "attack_modules": ATTACK_MODULES,
@@ -2794,6 +2828,24 @@ def make_default_player_profile(player_id: str, user: dict):
         },
     }
 
+def get_active_player_id(request: Request):
+    return (
+        request.headers.get("X-Player-Id")
+        or GAME_STATE.get("player", {}).get("player_id")
+        or "dev_player"
+    )
+
+
+def get_active_player_profile(request: Request):
+    ensure_multiplayer_system()
+
+    player_id = get_active_player_id(request)
+    profile = GAME_STATE["players"].get(player_id)
+
+    if profile:
+        return player_id, profile
+
+    return player_id, None
 
 def register_or_update_telegram_player(user: dict):
     ensure_multiplayer_system()
