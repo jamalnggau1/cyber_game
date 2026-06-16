@@ -778,6 +778,49 @@ def get_unit_upgrade_cost(unit_id: str):
         "energy": int((12 + level * 4) * mult),
     }
 
+def refresh_player_target_from_profile(target: dict):
+    if not isinstance(target, dict):
+        return target
+
+    if target.get("kind") != "player":
+        return target
+
+    defender_player_id = target.get("player_id")
+    defender = GAME_STATE.get("players", {}).get(defender_player_id)
+
+    if not defender:
+        return target
+
+    defender = ensure_player_profile_schema(defender)
+
+    defense_units = defender.get("defense_units", [])
+    army_power = sum(int(u.get("power", 0)) for u in defense_units)
+
+    build = defender.get("defense_build", {})
+    modules = build.get("modules", []) if isinstance(build, dict) else []
+
+    target["name"] = f"Player Base: {defender.get('name', defender_player_id)}"
+    target["level"] = defender.get("lab_level", 1)
+    target["lab_level"] = defender.get("lab_level", 1)
+    target["lab_tier"] = "Player"
+    target["signal_strength"] = "Player"
+    target["vault_signal"] = "Player Vault"
+
+    target["enemy_army"] = defense_units
+    target["enemy_army_power"] = army_power
+    target["enemy_build"] = build
+    target["defense_modules"] = modules
+    target["defense_style"] = defender.get("defense_style", "Balanced Defense")
+
+    target["defense_power"] = army_power
+    target["estimated_power"] = army_power
+    target["resources"] = defender.get("resources", {})
+
+    target["jammer_level"] = defender.get("jammer_level", 1)
+    target["defense_ai_level"] = defender.get("defense_ai_level", 1)
+    target["trace_monitor_level"] = defender.get("trace_monitor_level", 1)
+
+    return target
 
 def get_units_for_player():
     p = GAME_STATE["player"]
@@ -2131,8 +2174,8 @@ async def scan(request: Request):
         }
     }
 
-def build_scout_report(target_id: str):
-    p = GAME_STATE["player"]
+def build_scout_report(target_id: str, attacker_profile: dict):
+    p = attacker_profile
 
     target = GAME_STATE.get("targets", {}).get(target_id)
 
@@ -2211,9 +2254,25 @@ def build_scout_report(target_id: str):
         "build_clue": target.get("build_clue", "Unknown") if level >= 10 else "??? Unlock Scout Lv.10",
     }
 
+    scout_signal_level = 0
+    try:
+        scout_signal_level = get_profile_research_level(p, "scout_signal")
+    except Exception:
+        scout_signal_level = 0
+
+    ai_buffs = get_active_ai_buffs(p.get("active_ai", []))
+
+    ai_scout_bonus = (
+        int(ai_buffs.get("Scout Reading", 0))
+        + int(ai_buffs.get("Analysis Accuracy", 0))
+        + int(ai_buffs.get("Trap Detection", 0))
+    )
+
     attacker_score = (
         int(level) * 10
         + int(p.get("scanner_level", 1)) * 3
+        + int(scout_signal_level) * 4
+        + ai_scout_bonus
     )
 
     defender_score = (
@@ -2222,11 +2281,23 @@ def build_scout_report(target_id: str):
         + int(target.get("trace_monitor_level", 0)) * 5
     )
 
-    if defender_score > attacker_score + 15:
-        report["counter_scout_status"] = "Scout channel cut off by enemy Defense AI"
+    report["scout_contest"] = {
+        "attacker_score": attacker_score,
+        "defender_score": defender_score,
+        "attacker_scout_level": int(level),
+        "attacker_scanner_level": int(p.get("scanner_level", 1)),
+        "attacker_scout_signal": int(scout_signal_level),
+        "attacker_active_ai": p.get("active_ai", []),
+        "defender_jammer_level": int(target.get("jammer_level", 0)),
+        "defender_ai_level": int(target.get("defense_ai_level", 0)),
+        "defender_trace_monitor_level": int(target.get("trace_monitor_level", 0)),
+    }
+
+    if defender_score > attacker_score + 25:
+        report["counter_scout_status"] = "Scout drone cut off by defender jammer"
         report["noise"] = "High"
-    elif defender_score > attacker_score:
-        report["counter_scout_status"] = "Scout data partially jammed"
+    elif defender_score > attacker_score + 8:
+        report["counter_scout_status"] = "Scout data partially jammed by defender"
         report["noise"] = "Medium"
     else:
         report["counter_scout_status"] = "Scout successful"
@@ -2235,12 +2306,24 @@ def build_scout_report(target_id: str):
     return report
 
 @app.get("/api/scout/{target_id}")
-def scout(target_id: str):
-    return build_scout_report(target_id)
+async def scout(target_id: str, request: Request):
+    await sync_state_from_db()
+
+    player_id, profile = get_or_create_active_player_profile(request)
+    profile = ensure_player_profile_schema(profile)
+    profile = ensure_profile_ai_system(profile)
+
+    GAME_STATE["players"][player_id] = profile
+
+    return build_scout_report(target_id, profile)
 
 @app.post("/api/scout/start")
-def start_scout(payload: dict = Body(...)):
-    p = GAME_STATE["player"]
+async def start_scout(payload: dict = Body(...), request: Request = None):
+    await sync_state_from_db()
+
+    player_id, profile = get_or_create_active_player_profile(request)
+    profile = ensure_player_profile_schema(profile)
+    profile = ensure_profile_ai_system(profile)
 
     target_id = str(payload.get("target_id", "")).strip()
 
@@ -2258,35 +2341,50 @@ def start_scout(payload: dict = Body(...)):
             detail="Target not found. Lakukan Scan Area dulu."
         )
 
+    target = refresh_player_target_from_profile(target)
+
     if target.get("kind") == "mining":
         raise HTTPException(
             status_code=400,
             detail="Mining node belum bisa di-scout dengan Scout Drone."
         )
 
+    if target.get("kind") == "player" and target.get("player_id") == player_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Tidak bisa scout base sendiri."
+        )
+
     distance_value = float(target.get("distance", 0))
-    scout_level = int(p.get("scout_level", 1))
+    scout_level = int(profile.get("scout_level", 1))
 
     energy_cost = scout_energy_cost(distance_value)
 
-    if int(p.get("energy", 0)) < energy_cost:
+    if int(profile.get("energy", 0)) < energy_cost:
         raise HTTPException(
             status_code=400,
-            detail=f"Energy tidak cukup. Butuh {energy_cost}, punya {p.get('energy', 0)}"
+            detail=f"Energy tidak cukup. Butuh {energy_cost}, punya {profile.get('energy', 0)}"
         )
 
-    p["energy"] -= energy_cost
-
-    persist_state()
-    report = build_scout_report(target_id)
+    report = build_scout_report(target_id, profile)
     trip = scout_trip_time(distance_value, scout_level)
+
+    profile["energy"] = int(profile.get("energy", 0)) - energy_cost
+
+    GAME_STATE["players"][player_id] = profile
+    GAME_STATE["targets"][target_id] = target
+
+    await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
 
     scout_id = f"sct_{int(time.time())}_{random.randint(1000, 9999)}"
 
     return {
         "id": scout_id,
         "type": "scout",
+        "player_id": player_id,
         "target_id": target_id,
+        "target_kind": target.get("kind", "enemy"),
+        "target_player_id": target.get("player_id"),
         "target_name": target.get("name", "Unknown Target"),
         "distance": target.get("distance", "?"),
         "outbound_seconds": trip["outbound_seconds"],
@@ -2294,7 +2392,7 @@ def start_scout(payload: dict = Body(...)):
         "travel_seconds": trip["total_seconds"],
         "energy_cost": energy_cost,
         "report": report,
-        "energy_left": p["energy"],
+        "energy_left": profile["energy"],
     }
 
 @app.post("/api/ai/analyze")
