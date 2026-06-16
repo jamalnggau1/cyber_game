@@ -778,48 +778,236 @@ def get_unit_upgrade_cost(unit_id: str):
         "energy": int((12 + level * 4) * mult),
     }
 
-def get_defense_stats_for_profile(profile: dict):
-    profile = ensure_player_profile_schema(profile)
+DEFENSE_MODULE_CONFIG = {
+    "Firewall Core": {
+        "power": 280,
+        "anti_scout": 2,
+    },
+    "Trace Monitor": {
+        "power": 220,
+        "anti_scout": 8,
+    },
+    "Sentinel": {
+        "power": 260,
+        "anti_scout": 2,
+    },
+    "Jammer Core": {
+        "power": 240,
+        "anti_scout": 14,
+    },
+    "Trap Net": {
+        "power": 230,
+        "anti_scout": 4,
+    },
+    "Repair Node": {
+        "power": 260,
+        "anti_scout": 1,
+    },
+    "Vault Guard": {
+        "power": 320,
+        "anti_scout": 1,
+    },
+}
+
+
+def get_ai_defense_bonus_percent(profile: dict):
     profile = ensure_profile_ai_system(profile)
 
-    defense_units = profile.get("defense_units", [])
-    unit_power = sum(int(u.get("power", 0)) for u in defense_units)
+    buffs = get_active_ai_buffs(profile.get("active_ai", []))
+
+    defense_buff_keys = {
+        "Firewall Stability",
+        "Counter-Trace",
+        "Shield Decision Accuracy",
+        "Honeypot Efficiency",
+    }
+
+    total = 0
+
+    for key in defense_buff_keys:
+        total += int(buffs.get(key, 0))
+
+    return max(0, total)
+
+
+def get_profile_army_power(profile: dict):
+    profile = ensure_profile_unit_system(profile)
+
+    total = 0
+
+    for unit_id, inventory in profile.get("unit_inventory", {}).items():
+        if unit_id not in UNITS:
+            continue
+
+        if not isinstance(inventory, dict):
+            continue
+
+        for level_text, amount in inventory.items():
+            amount = int(amount or 0)
+
+            if amount <= 0:
+                continue
+
+            level = int(level_text)
+            stats = get_unit_stats(unit_id, level)
+
+            unit_score = int(
+                (stats["hp"] * 0.08)
+                + (stats["attack"] * 1.4)
+                + (stats["defense"] * 1.2)
+                + (stats["speed"] * 5)
+                + (stats["cargo"] * 2)
+            )
+
+            total += unit_score * amount
+
+    return int(total)
+
+
+def get_profile_base_power(profile: dict):
+    buildings = profile.get("buildings", {})
+
+    building_weights = {
+        "main_lab": 520,
+        "radar_tower": 220,
+        "ai_core": 260,
+        "unit_factory": 240,
+        "research_lab": 240,
+        "recovery_center": 180,
+        "guild_gate": 400,
+    }
+
+    total = 0
+
+    for building_id, weight in building_weights.items():
+        building = buildings.get(building_id, {})
+        level = int(building.get("level", 0) or 0)
+
+        if building.get("locked"):
+            continue
+
+        total += level * weight
+
+    return int(total)
+
+
+def get_profile_research_power(profile: dict):
+    profile = ensure_player_profile_schema(profile)
+
+    research = profile.get("research", {})
+    core = research.get("core", {})
+    unit_tech = research.get("unit_tech", {})
+
+    core_power = sum(int(level or 0) * 180 for level in core.values())
+    unit_tech_power = sum(max(0, int(level or 1) - 1) * 140 for level in unit_tech.values())
+
+    return int(core_power + unit_tech_power)
+
+
+def get_profile_ai_power(profile: dict):
+    profile = ensure_profile_ai_system(profile)
+
+    rarity_weight = {
+        "Common": 1.0,
+        "Rare": 1.35,
+        "Epic": 1.75,
+        "Legendary": 2.35,
+    }
+
+    total = 0
+
+    for ai_id in profile.get("active_ai", []):
+        ai = AI_AGENTS.get(ai_id)
+
+        if not ai:
+            continue
+
+        level = int(ai.get("level", 1))
+        star = int(ai.get("star", 1))
+        rarity = ai.get("rarity", "Common")
+
+        total += int(level * star * 120 * rarity_weight.get(rarity, 1.0))
+
+    return int(total)
+
+
+def get_defense_module_score(modules: list[str]):
+    total_power = 0
+    total_anti_scout = 0
+
+    for module in modules:
+        config = DEFENSE_MODULE_CONFIG.get(module, {
+            "power": 180,
+            "anti_scout": 0,
+        })
+
+        total_power += int(config["power"])
+        total_anti_scout += int(config["anti_scout"])
+
+    return {
+        "module_score": total_power,
+        "module_anti_scout": total_anti_scout,
+    }
+
+
+def get_defense_stats_for_profile(profile: dict):
+    profile = ensure_player_profile_schema(profile)
+    profile = ensure_profile_unit_system(profile)
+    profile = ensure_profile_ai_system(profile)
 
     build = profile.get("defense_build", {})
     modules = build.get("modules", []) if isinstance(build, dict) else []
 
-    ai_buffs = get_active_ai_buffs(profile.get("active_ai", []))
+    module_stats = get_defense_module_score(modules)
 
-    ai_defense_bonus = (
-        int(ai_buffs.get("Firewall Stability", 0))
-        + int(ai_buffs.get("Counter-Trace", 0))
-        + int(ai_buffs.get("Shield Decision Accuracy", 0))
-        + int(ai_buffs.get("Honeypot Efficiency", 0))
+    army_power = get_profile_army_power(profile)
+    base_power = get_profile_base_power(profile)
+    research_power = get_profile_research_power(profile)
+    ai_power = get_profile_ai_power(profile)
+
+    module_score = module_stats["module_score"]
+    module_anti_scout = module_stats["module_anti_scout"]
+
+    ai_defense_bonus_percent = get_ai_defense_bonus_percent(profile)
+    ai_multiplier = 1 + (ai_defense_bonus_percent / 100)
+
+    raw_defense_power = (
+        army_power
+        + base_power
+        + research_power
+        + ai_power
+        + module_score
     )
 
-    module_score = len(modules) * 250
+    defense_power = int(raw_defense_power * ai_multiplier)
 
-    anti_scout_score = (
+    anti_scout_base = (
         int(profile.get("jammer_level", 1)) * 12
-        + int(profile.get("defense_ai_level", 1)) * 8
-        + int(profile.get("trace_monitor_level", 1)) * 5
-        + ai_defense_bonus
+        + module_anti_scout
+        + int(base_power * 0.002)
+        + int(research_power * 0.003)
     )
 
-    defense_power = unit_power + module_score + ai_defense_bonus
+    anti_scout_score = int(anti_scout_base * ai_multiplier)
 
     return {
-        "jammer_level": profile.get("jammer_level", 1),
-        "defense_ai_level": profile.get("defense_ai_level", 1),
-        "trace_monitor_level": profile.get("trace_monitor_level", 1),
         "anti_scout_score": anti_scout_score,
         "defense_power": defense_power,
-        "unit_power": unit_power,
+
+        "army_power": army_power,
+        "base_power": base_power,
+        "research_power": research_power,
+        "ai_power": ai_power,
         "module_score": module_score,
-        "ai_defense_bonus": ai_defense_bonus,
-        "active_ai": profile.get("active_ai", []),
-        "active_ai_buffs": ai_buffs,
+
+        "raw_defense_power": raw_defense_power,
+        "ai_defense_bonus_percent": ai_defense_bonus_percent,
+        "ai_multiplier": round(ai_multiplier, 2),
+
+        "jammer_level": profile.get("jammer_level", 1),
         "modules_count": len(modules),
+        "active_ai": profile.get("active_ai", []),
+        "active_ai_buffs": get_active_ai_buffs(profile.get("active_ai", [])),
     }
 
 def refresh_player_target_from_profile(target: dict):
@@ -836,6 +1024,7 @@ def refresh_player_target_from_profile(target: dict):
         return target
 
     defender = ensure_player_profile_schema(defender)
+    defense_stats = get_defense_stats_for_profile(defender)
 
     defense_units = defender.get("defense_units", [])
     army_power = sum(int(u.get("power", 0)) for u in defense_units)
@@ -856,8 +1045,9 @@ def refresh_player_target_from_profile(target: dict):
     target["defense_modules"] = modules
     target["defense_style"] = defender.get("defense_style", "Balanced Defense")
 
-    target["defense_power"] = army_power
-    target["estimated_power"] = army_power
+    target["defense_stats"] = defense_stats
+    target["defense_power"] = defense_stats["defense_power"]
+    target["estimated_power"] = defense_stats["defense_power"]
     target["resources"] = defender.get("resources", {})
 
     target["jammer_level"] = defender.get("jammer_level", 1)
@@ -2323,10 +2513,13 @@ def build_scout_report(target_id: str, attacker_profile: dict):
         + ai_scout_bonus
     )
 
-    defender_score = (
-        int(target.get("jammer_level", 0)) * 12
-        + int(target.get("defense_ai_level", 0)) * 8
-        + int(target.get("trace_monitor_level", 0)) * 5
+    defense_stats = target.get("defense_stats") or {}
+
+    defender_score = int(
+        defense_stats.get(
+            "anti_scout_score",
+            int(target.get("jammer_level", 1)) * 12
+        )
     )
 
     report["scout_contest"] = {
@@ -2337,8 +2530,10 @@ def build_scout_report(target_id: str, attacker_profile: dict):
         "attacker_scout_signal": int(scout_signal_level),
         "attacker_active_ai": p.get("active_ai", []),
         "defender_jammer_level": int(target.get("jammer_level", 0)),
-        "defender_ai_level": int(target.get("defense_ai_level", 0)),
-        "defender_trace_monitor_level": int(target.get("trace_monitor_level", 0)),
+        "defender_anti_scout_score": defender_score,
+        "defender_jammer_level": int(target.get("jammer_level", 1)),
+        "defender_modules": target.get("defense_modules", []),
+        "defender_ai_defense_bonus_percent": defense_stats.get("ai_defense_bonus_percent", 0),
     }
 
     if defender_score > attacker_score + 25:

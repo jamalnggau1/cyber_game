@@ -2101,11 +2101,21 @@ async function saveDefenseBuild() {
   }
 }
 
+function formatPower(value) {
+  const n = Number(value || 0);
+
+  if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`;
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}K`;
+
+  return String(Math.round(n));
+}
+
 function renderDefenseStatsTab(d) {
   const stats = d.stats || {};
   const build = d.defense_build || {};
   const modules = build.modules || [];
   const buffs = stats.active_ai_buffs || {};
+  const aiDefenseBonus = Number(stats.ai_defense_bonus_percent || 0);
 
   const buffRows = Object.keys(buffs).length
     ? Object.entries(buffs).map(([key, value]) => `
@@ -2118,38 +2128,57 @@ function renderDefenseStatsTab(d) {
 
   return `
     <p class="muted">
-      Stats ini dihitung dari upgrade, AI aktif, dan defense build. Jammer tidak diedit manual di sini.
+      Stats ini dihitung dari unit, bangunan, research, AI aktif, dan defense build.
+      Angka Anti Scout dipakai saat musuh melakukan Scout ke base kamu.
     </p>
 
     <div class="defense-stats-grid">
-      <div class="defense-stat-card">
-        <small>Anti Scout Score</small>
-        <b>${stats.anti_scout_score || 0}</b>
-      </div>
-
-      <div class="defense-stat-card">
+      <div class="defense-stat-card primary-stat">
         <small>Defense Power</small>
-        <b>${stats.defense_power || 0}</b>
+        <b>${formatPower(stats.defense_power)}</b>
+      </div>
+
+      <div class="defense-stat-card primary-stat">
+        <small>Anti Scout Score</small>
+        <b>${formatPower(stats.anti_scout_score)}</b>
       </div>
 
       <div class="defense-stat-card">
-        <small>Unit Power</small>
-        <b>${stats.unit_power || 0}</b>
+        <small>Army Power</small>
+        <b>${formatPower(stats.army_power)}</b>
+      </div>
+
+      <div class="defense-stat-card">
+        <small>Base Power</small>
+        <b>${formatPower(stats.base_power)}</b>
+      </div>
+
+      <div class="defense-stat-card">
+        <small>Research Power</small>
+        <b>${formatPower(stats.research_power)}</b>
+      </div>
+
+      <div class="defense-stat-card">
+        <small>AI Power</small>
+        <b>${formatPower(stats.ai_power)}</b>
       </div>
 
       <div class="defense-stat-card">
         <small>Module Score</small>
-        <b>${stats.module_score || 0}</b>
+        <b>${formatPower(stats.module_score)}</b>
+      </div>
+
+      <div class="defense-stat-card">
+        <small>AI Defense Bonus</small>
+        <b>${aiDefenseBonus > 0 ? "+" : ""}${aiDefenseBonus}%</b>
       </div>
     </div>
 
     <div class="defense-setup-card">
       ${row("Jammer Level", stats.jammer_level || 1)}
-      ${row("Defense AI Level", stats.defense_ai_level || 1)}
-      ${row("Trace Monitor", stats.trace_monitor_level || 1)}
-      ${row("AI Defense Bonus", stats.ai_defense_bonus || 0)}
       ${row("Defense Style", d.defense_style || "Balanced Defense")}
       ${row("Modules", modules.length ? modules.join(", ") : "None")}
+      ${row("AI Multiplier", `×${stats.ai_multiplier || 1}`)}
     </div>
 
     <div class="defense-setup-card">
