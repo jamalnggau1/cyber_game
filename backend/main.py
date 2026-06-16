@@ -1145,13 +1145,106 @@ def ensure_player_profile_schema(profile: dict):
             "extractor": 0,
         }
 
+    default_research = make_default_player_research()
+
     if "research" not in profile or not isinstance(profile["research"], dict):
-        profile["research"] = {
-            "level": 1,
-            "unit_tech": {},
-        }
+        profile["research"] = copy.deepcopy(default_research)
+
+    if "core" not in profile["research"] or not isinstance(profile["research"]["core"], dict):
+        profile["research"]["core"] = copy.deepcopy(default_research["core"])
+
+    if "unit_tech" not in profile["research"] or not isinstance(profile["research"]["unit_tech"], dict):
+        profile["research"]["unit_tech"] = copy.deepcopy(default_research["unit_tech"])
+
+    for research_id, level in default_research["core"].items():
+        profile["research"]["core"].setdefault(research_id, level)
+
+    for unit_id, level in default_research["unit_tech"].items():
+        profile["research"]["unit_tech"].setdefault(unit_id, level)
 
     return profile
+
+def get_profile_research_level(profile: dict, research_id: str) -> int:
+    profile = ensure_player_profile_schema(profile)
+    return int(profile.get("research", {}).get("core", {}).get(research_id, 0))
+
+
+def get_profile_research_next_cost(research: dict):
+    next_level = int(research.get("level", 0)) + 1
+
+    return {
+        "credits": int(research.get("base_credits", 1000)) * next_level,
+        "energy": int(research.get("base_energy", 0)) * next_level,
+    }
+
+
+def get_research_with_costs_for_profile(profile: dict):
+    profile = ensure_player_profile_schema(profile)
+
+    result = {}
+    core_levels = profile["research"]["core"]
+
+    for research_id, template in GAME_STATE.get("research", {}).items():
+        item = copy.deepcopy(template)
+
+        item["level"] = int(core_levels.get(research_id, item.get("level", 0)))
+
+        if item["level"] >= item["max_level"]:
+            item["next_cost"] = None
+            item["maxed"] = True
+        else:
+            item["next_cost"] = get_profile_research_next_cost(item)
+            item["maxed"] = False
+
+        result[research_id] = item
+
+    return result
+
+
+def get_energy_regen_per_minute_for_profile(profile: dict) -> int:
+    return 1 + get_profile_research_level(profile, "energy_generation")
+
+
+def get_max_deploy_units_for_profile(profile: dict) -> int:
+    return 100 + (get_profile_research_level(profile, "unit_capacity") * 10)
+
+
+def get_unit_tech_cost_for_profile(profile: dict, unit_id: str):
+    profile = ensure_profile_unit_system(profile)
+
+    current = int(profile["unit_tech"].get(unit_id, 1))
+    next_level = current + 1
+
+    return {
+        "credits": 1000 * next_level,
+        "energy": 4 * next_level,
+    }
+
+
+def get_unit_tech_list_for_profile(profile: dict):
+    profile = ensure_profile_unit_system(profile)
+
+    result = []
+
+    for unit_id, unit in UNITS.items():
+        current = int(profile["unit_tech"].get(unit_id, 1))
+        max_level = int(unit.get("max_level", 5))
+        next_level = current + 1
+
+        maxed = current >= max_level
+
+        result.append({
+            "unit_id": unit_id,
+            "name": unit["name"],
+            "current_level": current,
+            "next_level": next_level if not maxed else None,
+            "max_level": max_level,
+            "maxed": maxed,
+            "next_cost": None if maxed else get_unit_tech_cost_for_profile(profile, unit_id),
+            "effect": f"Unlock {unit['name']} higher level training and promote path.",
+        })
+
+    return result
 
 def generate_targets():
     p = GAME_STATE["player"]
@@ -1498,6 +1591,21 @@ def get_unit_promote_cost(unit_id: str, from_level: int, amount: int) -> Dict[st
         "energy": max(1, int(train_cost["energy"] * amount)),
     }
 
+def make_default_player_research():
+    return {
+        "core": {
+            "energy_generation": 0,
+            "network_speed": 0,
+            "scout_signal": 1,
+            "unit_capacity": 0,
+            "ai_sync": 0,
+            "attack_routing": 0,
+        },
+        "unit_tech": {
+            unit_id: 1
+            for unit_id in UNITS.keys()
+        },
+    }
 
 def get_unit_tech_cost(unit_id: str) -> Dict[str, int] | None:
     ensure_unit_system()
@@ -1793,9 +1901,9 @@ async def state(request: Request):
         "units": get_units_for_profile(profile),
         "scout_unlocks": SCOUT_UNLOCKS,
         "active_ai_buffs": get_effective_ai_buffs(player_view["active_ai"]),
-        "max_deploy_units": get_max_deploy_units(),
-        "research": GAME_STATE["research"],
-        "energy_regen_per_minute": get_energy_regen_per_minute(),
+        "max_deploy_units": get_max_deploy_units_for_profile(profile),
+        "research": get_research_with_costs_for_profile(profile),
+        "energy_regen_per_minute": get_energy_regen_per_minute_for_profile(profile),
     }
 
 def make_player_scan_targets(attacker_player_id: str):
@@ -2770,83 +2878,155 @@ async def promote_unit(req: PromoteUnitRequest, request: Request):
     }
 
 @app.post("/api/research/unit-tech/upgrade")
-def upgrade_unit_tech(req: UpgradeUnitTechRequest):
-    ensure_unit_system()
+async def upgrade_unit_tech(req: UpgradeUnitTechRequest, request: Request):
+    await sync_state_from_db()
 
-    p = GAME_STATE["player"]
+    player_id, profile = get_or_create_active_player_profile(request)
+    profile = ensure_player_profile_schema(profile)
+    profile = ensure_profile_unit_system(profile)
+
     unit = get_unit_config(req.unit_id)
 
-    current = int(p["unit_tech"].get(req.unit_id, 1))
+    current = int(profile["unit_tech"].get(req.unit_id, 1))
     next_level = current + 1
 
-    if next_level > unit["max_level"]:
+    if next_level > int(unit["max_level"]):
         raise HTTPException(status_code=400, detail="Unit tech already max level")
 
-    cost = get_unit_tech_cost(req.unit_id)
+    cost = get_unit_tech_cost_for_profile(profile, req.unit_id)
 
-    if p["credits"] < cost["credits"]:
-        raise HTTPException(status_code=400, detail="Not enough credits")
+    resources = profile["resources"]
+    credits = int(resources.get("credits", 0))
+    energy = int(profile.get("energy", 0))
 
-    if p["energy"] < cost["energy"]:
-        raise HTTPException(status_code=400, detail="Not enough energy")
+    if credits < cost["credits"]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Credits tidak cukup. Butuh {cost['credits']}, punya {credits}"
+        )
 
-    p["credits"] -= cost["credits"]
-    p["energy"] -= cost["energy"]
+    if energy < cost["energy"]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Energy tidak cukup. Butuh {cost['energy']}, punya {energy}"
+        )
 
-    p["unit_tech"][req.unit_id] = next_level
-    persist_state()
+    resources["credits"] = credits - cost["credits"]
+    profile["energy"] = energy - cost["energy"]
+
+    profile["unit_tech"][req.unit_id] = next_level
+    profile["research"]["unit_tech"][req.unit_id] = next_level
+
+    GAME_STATE["players"][player_id] = profile
+
+    await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
 
     return {
         "success": True,
         "message": f"{unit['name']} Lv.{next_level} unlocked",
+        "player_id": player_id,
         "unit_id": req.unit_id,
         "unlocked_level": next_level,
-        "credits_left": p["credits"],
-        "energy_left": p["energy"],
+        "cost": cost,
+        "resources": profile["resources"],
+        "energy": profile.get("energy", 0),
+        "unit_tech": get_unit_tech_list_for_profile(profile),
+        "units": get_units_for_profile(profile),
     }
 
 @app.get("/api/research")
-def get_research():
-    apply_energy_regen()
+async def get_research(request: Request):
+    await sync_state_from_db()
+
+    player_id, profile = get_or_create_active_player_profile(request)
+    profile = ensure_player_profile_schema(profile)
+    profile = ensure_profile_unit_system(profile)
+
+    buildings = profile.get("buildings", {})
+    research_lab = buildings.get("research_lab", {
+        "id": "research_lab",
+        "name": "Research Lab",
+        "level": 1,
+        "locked": False,
+    })
+
+    GAME_STATE["players"][player_id] = profile
+
+    await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
+
     return {
-        "research": get_research_with_costs(),
-        "player": GAME_STATE["player"],
-        "research_lab": GAME_STATE["buildings"]["research_lab"],
-        "unit_tech": get_unit_tech_list(),
-        "energy_regen_per_minute": get_energy_regen_per_minute(),
+        "player_id": player_id,
+        "research": get_research_with_costs_for_profile(profile),
+        "player": {
+            "player_id": player_id,
+            "credits": profile["resources"].get("credits", 0),
+            "energy": profile.get("energy", 100),
+            "resources": profile["resources"],
+        },
+        "research_lab": research_lab,
+        "unit_tech": get_unit_tech_list_for_profile(profile),
+        "energy_regen_per_minute": get_energy_regen_per_minute_for_profile(profile),
     }
 
 @app.post("/api/research/upgrade")
-def upgrade_research(req: UpgradeResearchRequest):
-    apply_energy_regen()
-    p = GAME_STATE["player"]
+async def upgrade_research(req: UpgradeResearchRequest, request: Request):
+    await sync_state_from_db()
 
-    research = GAME_STATE["research"].get(req.research_id)
-    if not research:
+    player_id, profile = get_or_create_active_player_profile(request)
+    profile = ensure_player_profile_schema(profile)
+    profile = ensure_profile_unit_system(profile)
+
+    research_template = GAME_STATE.get("research", {}).get(req.research_id)
+
+    if not research_template:
         raise HTTPException(status_code=404, detail="Research not found")
 
-    if research["level"] >= research["max_level"]:
+    current_level = int(profile["research"]["core"].get(req.research_id, 0))
+    max_level = int(research_template.get("max_level", 10))
+
+    if current_level >= max_level:
         raise HTTPException(status_code=400, detail="Research already max level")
 
-    cost = get_research_next_cost(research)
+    research_item = copy.deepcopy(research_template)
+    research_item["level"] = current_level
 
-    if p["credits"] < cost["credits"]:
-        raise HTTPException(status_code=400, detail="Not enough credits")
+    cost = get_profile_research_next_cost(research_item)
 
-    if p["energy"] < cost["energy"]:
-        raise HTTPException(status_code=400, detail="Not enough energy")
+    resources = profile["resources"]
+    credits = int(resources.get("credits", 0))
+    energy = int(profile.get("energy", 0))
 
-    p["credits"] -= cost["credits"]
-    p["energy"] -= cost["energy"]
+    if credits < cost["credits"]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Credits tidak cukup. Butuh {cost['credits']}, punya {credits}"
+        )
 
-    research["level"] += 1
-    persist_state()
+    if energy < cost["energy"]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Energy tidak cukup. Butuh {cost['energy']}, punya {energy}"
+        )
+
+    resources["credits"] = credits - cost["credits"]
+    profile["energy"] = energy - cost["energy"]
+
+    profile["research"]["core"][req.research_id] = current_level + 1
+
+    GAME_STATE["players"][player_id] = profile
+
+    await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
 
     return {
         "success": True,
-        "message": f"{research['name']} upgraded to Lv.{research['level']}",
-        "research": research,
-        "player": p,
+        "message": f"{research_template['name']} upgraded to Lv.{current_level + 1}",
+        "player_id": player_id,
+        "research_id": req.research_id,
+        "new_level": current_level + 1,
+        "cost": cost,
+        "resources": profile["resources"],
+        "energy": profile.get("energy", 0),
+        "research": get_research_with_costs_for_profile(profile),
     }
 
 @app.get("/api/contested-nodes")
