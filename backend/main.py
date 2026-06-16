@@ -11,7 +11,6 @@ try:
 except ImportError:
     from database import init_db, load_game_state, save_game_state, PLAYER_ID
 from typing import Dict, List, Optional, Literal, Any
-from database import init_db, load_game_state, save_game_state, PLAYER_ID
 from fastapi import FastAPI, HTTPException, Body
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
