@@ -69,7 +69,7 @@ def make_reset_player_profile(player_id: str, old_profile: dict | None = None):
         or player_id
     )
 
-    return {
+    profile = {
         "player_id": player_id,
         "telegram_id": old_profile.get("telegram_id", ""),
         "name": username,
@@ -82,6 +82,9 @@ def make_reset_player_profile(player_id: str, old_profile: dict | None = None):
         "lab_level": 1,
         "scanner_level": 1,
         "scout_level": 1,
+
+        "energy": 100,
+        "trace": 0,
 
         "jammer_level": 1,
         "defense_ai_level": 1,
@@ -115,7 +118,28 @@ def make_reset_player_profile(player_id: str, old_profile: dict | None = None):
             "nano_parts": 0,
             "nexus_core": 0,
         },
+
+        "buildings": make_default_player_buildings(),
+
+        "owned_ai": ["nova_lite"],
+        "active_ai": [],
+
+        "unit_inventory": {
+            "breaker": 30,
+            "ghost": 0,
+            "probe": 0,
+            "payload": 0,
+            "relay": 0,
+            "extractor": 0,
+        },
+
+        "research": {
+            "level": 1,
+            "unit_tech": {},
+        },
     }
+
+    return ensure_player_profile_schema(profile)
 # ==========================================================
 # Game constants
 # ==========================================================
@@ -999,6 +1023,96 @@ def make_enemy_resources(target_level: int, signal_strength: str):
         "nano_parts": int((80 + target_level * 25 + random.randint(0, 120)) * mult),
         "nexus_core": 1 if target_level >= 8 and random.random() < 0.22 else 0,
     }
+
+def make_default_player_buildings():
+    return {
+        "main_lab": {
+            "id": "main_lab",
+            "name": "Main Lab",
+            "level": 1,
+            "locked": False,
+        },
+        "radar_tower": {
+            "id": "radar_tower",
+            "name": "Radar Tower",
+            "level": 1,
+            "locked": False,
+        },
+        "ai_core": {
+            "id": "ai_core",
+            "name": "AI Core",
+            "level": 1,
+            "locked": False,
+        },
+        "unit_factory": {
+            "id": "unit_factory",
+            "name": "Unit Factory",
+            "level": 1,
+            "locked": False,
+        },
+        "research_lab": {
+            "id": "research_lab",
+            "name": "Research Lab",
+            "level": 1,
+            "locked": False,
+        },
+        "recovery_center": {
+            "id": "recovery_center",
+            "name": "Recovery Center",
+            "level": 1,
+            "locked": False,
+        },
+        "guild_gate": {
+            "id": "guild_gate",
+            "name": "Guild Gate",
+            "level": 0,
+            "locked": True,
+        },
+    }
+
+def ensure_player_profile_schema(profile: dict):
+    if "resources" not in profile or not isinstance(profile["resources"], dict):
+        profile["resources"] = {}
+
+    profile["resources"].setdefault("credits", 5000)
+    profile["resources"].setdefault("data_shard", 0)
+    profile["resources"].setdefault("nano_parts", 0)
+    profile["resources"].setdefault("nexus_core", 0)
+
+    profile.setdefault("energy", 100)
+    profile.setdefault("trace", 0)
+
+    profile.setdefault("lab_level", 1)
+    profile.setdefault("scanner_level", 1)
+    profile.setdefault("scout_level", 1)
+
+    profile.setdefault("jammer_level", 1)
+    profile.setdefault("defense_ai_level", 1)
+    profile.setdefault("trace_monitor_level", 1)
+
+    if "buildings" not in profile or not isinstance(profile["buildings"], dict):
+        profile["buildings"] = make_default_player_buildings()
+
+    profile.setdefault("owned_ai", ["nova_lite"])
+    profile.setdefault("active_ai", [])
+
+    if "unit_inventory" not in profile or not isinstance(profile["unit_inventory"], dict):
+        profile["unit_inventory"] = {
+            "breaker": 30,
+            "ghost": 0,
+            "probe": 0,
+            "payload": 0,
+            "relay": 0,
+            "extractor": 0,
+        }
+
+    if "research" not in profile or not isinstance(profile["research"], dict):
+        profile["research"] = {
+            "level": 1,
+            "unit_tech": {},
+        }
+
+    return profile
 
 def generate_targets():
     p = GAME_STATE["player"]
@@ -2864,6 +2978,10 @@ def register_or_update_telegram_player(user: dict):
         profile["username"] = user.get("username", profile.get("username", ""))
         profile["first_name"] = user.get("first_name", profile.get("first_name", ""))
         profile["name"] = user.get("username") or user.get("first_name") or profile.get("name", player_id)
+
+    GAME_STATE["players"][player_id] = ensure_player_profile_schema(
+        GAME_STATE["players"][player_id]
+    )
 
     return GAME_STATE["players"][player_id]
 
