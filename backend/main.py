@@ -1750,87 +1750,6 @@ def build_scout_report(target_id: str):
 def scout(target_id: str):
     return build_scout_report(target_id)
 
-@app.get("/api/debug/players")
-def debug_players(request: Request):
-    ensure_multiplayer_system()
-
-    header_player_id = request.headers.get("X-Player-Id")
-    current_player_id = GAME_STATE["player"].get("player_id", "dev_player")
-
-    return {
-        "header_player_id": header_player_id,
-        "current_player_id": current_player_id,
-        "players_count": len(GAME_STATE["players"]),
-        "players": [
-            {
-                "player_id": player_id,
-                "name": profile.get("name"),
-                "telegram_id": profile.get("telegram_id"),
-                "username": profile.get("username"),
-                "x": profile.get("x"),
-                "y": profile.get("y"),
-                "jammer_level": profile.get("jammer_level"),
-                "defense_ai_level": profile.get("defense_ai_level"),
-            }
-            for player_id, profile in GAME_STATE["players"].items()
-        ],
-    }
-
-@app.post("/api/debug/reset-defense")
-def reset_defense(request: Request, payload: dict = Body(default={})):
-    ensure_multiplayer_system()
-
-    player_id = request.headers.get("X-Player-Id") or GAME_STATE["player"].get("player_id", "dev_player")
-
-    profile = GAME_STATE["players"].get(player_id)
-
-    if not profile:
-        raise HTTPException(status_code=404, detail="Player profile not found")
-
-    jammer_level = int(payload.get("jammer_level", 1))
-    defense_ai_level = int(payload.get("defense_ai_level", 1))
-    trace_monitor_level = int(payload.get("trace_monitor_level", 1))
-
-    profile["jammer_level"] = jammer_level
-    profile["defense_ai_level"] = defense_ai_level
-    profile["trace_monitor_level"] = trace_monitor_level
-
-    profile["defense_style"] = payload.get("defense_style", "Balanced Defense")
-    profile["defense_build"] = {
-        "name": payload.get("build_name", "Test Jammer Grid"),
-        "modules": payload.get("modules", ["Jammer Core", "Trace Monitor", "Firewall Core"]),
-    }
-
-    profile["defense_units"] = payload.get("defense_units", [
-        {
-            "id": "breaker",
-            "name": "Breaker",
-            "role": "Frontline",
-            "level": 2,
-            "count": 50,
-            "hp": 155,
-            "attack": 48,
-            "defense": 24,
-            "speed": 7,
-            "cargo": 4,
-            "power": 4200,
-        }
-    ])
-
-    persist_state()
-
-    return {
-        "success": True,
-        "player_id": player_id,
-        "defense": {
-            "jammer_level": jammer_level,
-            "defense_ai_level": defense_ai_level,
-            "trace_monitor_level": trace_monitor_level,
-            "defense_build": profile["defense_build"],
-            "defense_units": profile["defense_units"],
-        }
-    }
-
 @app.post("/api/scout/start")
 def start_scout(payload: dict = Body(...)):
     p = GAME_STATE["player"]
@@ -2821,6 +2740,109 @@ def register_or_update_telegram_player(user: dict):
         profile["name"] = user.get("username") or user.get("first_name") or profile.get("name", player_id)
 
     return GAME_STATE["players"][player_id]
+
+@app.get("/api/debug/ping")
+async def debug_ping():
+    return {
+        "ok": True,
+        "message": "Debug API hidup"
+    }
+
+
+@app.get("/api/debug/players")
+async def debug_players(request: Request):
+    await sync_state_from_db()
+    ensure_multiplayer_system()
+
+    return {
+        "header_player_id": request.headers.get("X-Player-Id"),
+        "current_player_id": GAME_STATE["player"].get("player_id", "dev_player"),
+        "players_count": len(GAME_STATE["players"]),
+        "players": [
+            {
+                "player_id": player_id,
+                "name": profile.get("name"),
+                "telegram_id": profile.get("telegram_id"),
+                "username": profile.get("username"),
+                "x": profile.get("x"),
+                "y": profile.get("y"),
+                "jammer_level": profile.get("jammer_level"),
+                "defense_ai_level": profile.get("defense_ai_level"),
+            }
+            for player_id, profile in GAME_STATE["players"].items()
+        ],
+    }
+
+
+@app.post("/api/debug/seed-player")
+async def seed_test_player(request: Request):
+    await sync_state_from_db()
+    ensure_multiplayer_system()
+
+    attacker_id = (
+        request.headers.get("X-Player-Id")
+        or GAME_STATE["player"].get("player_id")
+        or "dev_player"
+    )
+
+    test_player_id = "tg_test_defender"
+
+    GAME_STATE["players"][test_player_id] = {
+        "player_id": test_player_id,
+        "telegram_id": "test_defender",
+        "name": "Test Defender",
+        "username": "test_defender",
+        "first_name": "Test Defender",
+
+        "x": 155,
+        "y": 470,
+
+        "lab_level": 6,
+        "scanner_level": 3,
+        "scout_level": 2,
+
+        "jammer_level": 5,
+        "defense_ai_level": 3,
+        "trace_monitor_level": 4,
+
+        "defense_style": "Jammer Defense",
+        "defense_build": {
+            "name": "Jammer Grid",
+            "modules": ["Jammer Core", "Trace Monitor", "Firewall Core"],
+        },
+
+        "defense_units": [
+            {
+                "id": "sentinel",
+                "name": "Sentinel",
+                "role": "Defense",
+                "level": 3,
+                "count": 45,
+                "hp": 180,
+                "attack": 42,
+                "defense": 55,
+                "speed": 5,
+                "cargo": 1,
+                "power": 5200,
+            }
+        ],
+
+        "resources": {
+            "credits": 12000,
+            "data_shard": 300,
+            "nano_parts": 800,
+            "nexus_core": 1,
+        },
+    }
+
+    await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
+
+    return {
+        "success": True,
+        "attacker_id": attacker_id,
+        "seeded_player": GAME_STATE["players"][test_player_id],
+        "players_count": len(GAME_STATE["players"]),
+    }
 
 # WAJIB PALING BAWAH
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
