@@ -75,6 +75,9 @@ async function authTelegramUser() {
     });
 
     console.log("Telegram auth success:", data);
+    if (data.player_id) {
+      localStorage.setItem("cybercore_player_id", data.player_id);
+    }
   } catch (err) {
     console.log("Telegram auth failed:", err.message);
   }
@@ -85,6 +88,7 @@ async function api(path, options = {}) {
     ...options,
     headers: {
       "Content-Type": "application/json",
+      "X-Player-Id": localStorage.getItem("cybercore_player_id") || "",
       ...(options.headers || {})
     }
   });
