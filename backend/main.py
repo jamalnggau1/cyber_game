@@ -6,6 +6,7 @@ import threading
 import math
 import random
 import time
+import requests
 from backend.database import init_db, load_game_state, save_game_state, PLAYER_ID
 from typing import Dict, List, Optional, Literal, Any
 from fastapi import FastAPI, HTTPException, Body
