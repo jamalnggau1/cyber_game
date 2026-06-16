@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" href="data:,">
+  <title>CyberCore Lab MVP</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="mobile-topbar clean-game-header">
+      <div class="topbar-row profile-header-row header-inline-row">
+        <button class="profile-avatar-button" onclick="openProfileSheet()" title="Profile" aria-label="Profile">
+          <span class="profile-avatar-frame">
+            <img class="profile-avatar-img" src="assets/profile/avatar.png" alt="Profile">
+            <img class="profile-border-img" src="assets/borders/topup_basic.png" alt="">
+          </span>
+        </button>
+
+        <div class="top-resource-inline" id="playerStatus">Loading...</div>
+
+        <button class="settings-orb" onclick="openSettingsSheet()" title="Settings" aria-label="Settings">⚙</button>
+      </div>
+    </header>
+
+    <nav class="tabs">
+      <button class="tab active" data-page="basePage">Base</button>
+      <button class="tab" data-page="shopPage">Shop</button>
+      <button class="tab" data-page="buildPage">Build</button>
+      <button class="tab" data-page="inventoryPage">Inventory</button>
+      <button class="tab" data-page="logPage">Battle Log</button>
+    </nav>
+
+    <main>
+      <section id="basePage" class="page active-page">
+        <div class="panel base-panel">
+          <div class="base-map">
+            <div id="baseGrid" class="base-grid"></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="radarPage" class="page">
+        <div class="panel">
+          <h2>Radar Tower</h2>
+          <p class="muted">Scan signal di sekitar koordinat lab kamu.</p>
+
+          <div class="radar-map" id="radarMap">
+            <div class="radar-grid"></div>
+            <div class="radar-sweep-line" id="radarSweep"></div>
+
+            <div class="my-base-marker">
+              <span></span>
+              <small>Your Lab</small>
+            </div>
+
+            <div id="radarMarkers"></div>
+          </div>
+
+          <div class="radar-action-row">
+            <button id="scanBtn">Scan Area</button>
+            <button onclick="openRadarUpgradeSheet()">Upgrade Radar</button>
+          </div>
+
+          <p id="scanInfo" class="muted">Radar standby. Tekan Scan untuk mencari signal.</p>
+        </div>
+
+        <div class="panel">
+          <h2>Signal Detail</h2>
+          <div id="radarTargetInfo" class="info-box">
+            Belum ada signal dipilih.
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Nexus War</h2>
+          <p class="muted">
+            Weekly guild war node. Kuasai node sampai waktu berakhir untuk menang.
+          </p>
+
+          <button onclick="openNexusWarSheet()">Open Nexus War</button>
+        </div>
+        
+        
+      </section>
+
+      <section id="buildPage" class="page">
+        <div class="panel">
+          <h2>Build Academy</h2>
+          <p class="muted">
+            Tempat belajar strategi, counter-build, dan fungsi module.
+            Pemilihan build untuk attack tetap dilakukan di Attack Setup.
+          </p>
+
+          <div class="academy-menu">
+            <button onclick="openBuildTypesSheet()">Build Types</button>
+            <button onclick="openCounterGuideSheet()">Counter Guide</button>
+            <button onclick="openModuleLibrarySheet()">Module Library</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="aiPage" class="page">
+        <div class="panel">
+          <h2>AI Agent Inventory</h2>
+          <p class="muted">Buff AI terlihat jelas. AI yang tidak masuk slot tidak aktif.</p>
+          <div id="aiInventory" class="ai-grid"></div>
+        </div>
+      </section>
+
+      <section id="shopPage" class="page">
+        <div class="panel">
+          <h2>Shop</h2>
+          <p class="muted">Tempat membeli speedup, cosmetic border, avatar, dan item convenience.</p>
+
+          <div class="shop-placeholder">
+            <button disabled>Speedup Soon</button>
+            <button disabled>Avatar Border Soon</button>
+            <button disabled>Resource Pack Soon</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="inventoryPage" class="page">
+        <div class="panel">
+          <h2>Inventory</h2>
+          <p class="muted">Tempat melihat item, border, speedup, shard, dan reward yang kamu punya.</p>
+
+          <div class="inventory-placeholder">
+            <button disabled>Items Soon</button>
+            <button disabled>Borders Soon</button>
+            <button disabled>Rewards Soon</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="logPage" class="page">
+        <div class="panel">
+          <h2>Battle Log</h2>
+
+          <div id="battleLog" class="message-log">
+            <div class="log-message system">
+              <div class="log-source">SYSTEM</div>
+              <div class="log-text">Battle log ready.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+  
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="app.js"></script>
+  <div id="sheetBackdrop" class="sheet-backdrop" onclick="closeBuildingSheet()"></div>
+  <div id="operationQueueWidget" class="operation-queue-widget hidden" onclick="openOperationQueueSheet()">
+    <div>
+      <b id="operationQueueTitle">Operations</b>
+      <small id="operationQueueSubtitle">No active operation</small>
+    </div>
+
+    <div class="operation-badge" id="operationQueueBadge">0</div>
+  </div>
+
+  <div id="buildingSheet" class="building-sheet">
+    <div class="sheet-handle"></div>
+
+    <div class="sheet-header">
+      <h2 id="buildingSheetTitle">Building</h2>
+      <button class="sheet-close" onclick="closeBuildingSheet()">×</button>
+    </div>
+
+    <div id="buildingSheetBody" class="sheet-body">
+      Pilih bangunan.
+    </div>
+  </div>
+</body>
+</html>

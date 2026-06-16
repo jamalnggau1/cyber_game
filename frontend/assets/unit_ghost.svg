@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <radialGradient id="g" cx="30%" cy="20%" r="80%">
+      <stop offset="0" stop-color="#b8f7ff" stop-opacity=".95"/>
+      <stop offset="1" stop-color="#39f3ff" stop-opacity=".65"/>
+    </radialGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+      <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="256" height="256" rx="48" fill="#060912"/>
+  <circle cx="128" cy="128" r="82" fill="none" stroke="url(#g)" stroke-width="8" opacity=".9" filter="url(#glow)"/>
+  <circle cx="128" cy="128" r="48" fill="rgba(57,243,255,.06)" stroke="#b8f7ff" stroke-width="3"/>
+  <text x="128" y="144" text-anchor="middle" font-family="Arial, sans-serif" font-size="64" font-weight="700" fill="#b8f7ff" filter="url(#glow)">G</text>
+  <text x="128" y="222" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" fill="#e9f2ff">GHOST</text>
+</svg>
