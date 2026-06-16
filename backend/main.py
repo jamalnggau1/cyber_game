@@ -6,10 +6,7 @@ import threading
 import math
 import random
 import time
-try:
-    from backend.database import init_db, load_game_state, save_game_state, PLAYER_ID
-except ImportError:
-    from database import init_db, load_game_state, save_game_state, PLAYER_ID
+from backend.database import init_db, load_game_state, save_game_state, PLAYER_ID
 from typing import Dict, List, Optional, Literal, Any
 from fastapi import FastAPI, HTTPException, Body
 from fastapi.staticfiles import StaticFiles
