@@ -981,8 +981,14 @@ def get_defense_stats_for_profile(profile: dict):
 
     defense_power = int(raw_defense_power * ai_multiplier)
 
+    jammer_level = int(profile.get("jammer_level", 1))
+
+    # Lv.1 adalah baseline, belum memberi bonus besar.
+    # Bonus anti-scout baru terasa mulai Lv.2.
+    jammer_bonus = max(0, jammer_level - 1) * 12
+
     anti_scout_base = (
-        int(profile.get("jammer_level", 1)) * 12
+        jammer_bonus
         + module_anti_scout
         + int(base_power * 0.002)
         + int(research_power * 0.003)

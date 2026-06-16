@@ -1023,7 +1023,10 @@ async function askAiFromLog(logId) {
       method: "POST",
       body: JSON.stringify({
         target_id: msg.targetId,
-        ai_id: preferredAi
+        target_name: msg.targetName,
+        ai_id: preferredAi,
+        scout_report: msg.rawReport || msg.text || "",
+        scout_report_data: msg.rawReportData || null
       })
     });
 
