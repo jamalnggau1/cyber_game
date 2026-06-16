@@ -1611,6 +1611,13 @@ generate_targets()
 # ==========================================================
 # API models
 # ==========================================================
+class DefenseSetupRequest(BaseModel):
+    jammer_level: int = Field(default=1, ge=1, le=10)
+    defense_ai_level: int = Field(default=1, ge=1, le=10)
+    trace_monitor_level: int = Field(default=1, ge=1, le=10)
+    defense_style: str = Field(default="Balanced Defense", max_length=40)
+    modules: List[str] = Field(default_factory=list, max_length=6)
+
 class SetActiveAiRequest(BaseModel):
     active_ai: List[str] = Field(default_factory=list, max_length=6)
 
@@ -3946,6 +3953,81 @@ async def set_active_ai(req: SetActiveAiRequest, request: Request):
         "active_ai_buffs": get_effective_ai_buffs(profile["active_ai"]),
         "max_slot": slot_limit,
         "ai_agents": get_ai_agents_for_profile(profile),
+    }
+
+@app.get("/api/defense")
+async def get_defense_setup(request: Request):
+    await sync_state_from_db()
+
+    player_id, profile = get_or_create_active_player_profile(request)
+    profile = ensure_player_profile_schema(profile)
+
+    return {
+        "player_id": player_id,
+        "defense": {
+            "jammer_level": profile.get("jammer_level", 1),
+            "defense_ai_level": profile.get("defense_ai_level", 1),
+            "trace_monitor_level": profile.get("trace_monitor_level", 1),
+            "defense_style": profile.get("defense_style", "Balanced Defense"),
+            "defense_build": profile.get("defense_build", {
+                "name": "Starter Defense Grid",
+                "modules": ["Firewall Core", "Trace Monitor", "Sentinel"],
+            }),
+            "defense_units": profile.get("defense_units", []),
+        }
+    }
+
+
+@app.post("/api/defense")
+async def save_defense_setup(req: DefenseSetupRequest, request: Request):
+    await sync_state_from_db()
+
+    player_id, profile = get_or_create_active_player_profile(request)
+    profile = ensure_player_profile_schema(profile)
+
+    allowed_modules = {
+        "Firewall Core",
+        "Trace Monitor",
+        "Sentinel",
+        "Jammer Core",
+        "Trap Net",
+        "Repair Node",
+        "Vault Guard",
+    }
+
+    modules = [
+        m for m in req.modules
+        if m in allowed_modules
+    ]
+
+    if not modules:
+        modules = ["Firewall Core", "Trace Monitor", "Sentinel"]
+
+    profile["jammer_level"] = req.jammer_level
+    profile["defense_ai_level"] = req.defense_ai_level
+    profile["trace_monitor_level"] = req.trace_monitor_level
+    profile["defense_style"] = req.defense_style.strip() or "Balanced Defense"
+
+    profile["defense_build"] = {
+        "name": profile["defense_style"],
+        "modules": modules,
+    }
+
+    GAME_STATE["players"][player_id] = profile
+
+    await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
+
+    return {
+        "success": True,
+        "message": "Defense setup saved",
+        "player_id": player_id,
+        "defense": {
+            "jammer_level": profile["jammer_level"],
+            "defense_ai_level": profile["defense_ai_level"],
+            "trace_monitor_level": profile["trace_monitor_level"],
+            "defense_style": profile["defense_style"],
+            "defense_build": profile["defense_build"],
+        }
     }
 
 # WAJIB PALING BAWAH

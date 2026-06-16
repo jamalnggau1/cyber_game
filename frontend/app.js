@@ -1926,7 +1926,15 @@ function openBuilding(buildingId) {
 
   let actionHtml = "";
 
-  if (buildingId === "radar_tower") {
+    if (buildingId === "main_lab") {
+    actionHtml = `
+      <div class="sheet-actions">
+        <button onclick="upgradeBuilding('main_lab')">Upgrade Main Lab</button>
+        <button onclick="openDefenseSetupSheet()">Defense Setup</button>
+        <button disabled>Lab Stats Soon</button>
+      </div>
+    `;
+  } else if (buildingId === "radar_tower") {
     actionHtml = `
       <div class="sheet-actions">
         <button onclick="closeBuildingSheet(); switchPage('radarPage')">Open Radar</button>
@@ -1966,6 +1974,106 @@ function openBuilding(buildingId) {
       ${actionHtml}
     `
   );
+}
+
+async function openDefenseSetupSheet() {
+  try {
+    const data = await api("/api/defense");
+    const d = data.defense || {};
+    const build = d.defense_build || {};
+    const modules = build.modules || [];
+
+    const allModules = [
+      "Firewall Core",
+      "Trace Monitor",
+      "Sentinel",
+      "Jammer Core",
+      "Trap Net",
+      "Repair Node",
+      "Vault Guard",
+    ];
+
+    showBuildingSheet(
+      "Defense Setup",
+      `
+        <p class="muted">
+          Atur sistem pertahanan base kamu. Setting ini akan mempengaruhi hasil Scout musuh.
+        </p>
+
+        ${row("Jammer Level", d.jammer_level || 1)}
+        ${row("Defense AI Level", d.defense_ai_level || 1)}
+        ${row("Trace Monitor", d.trace_monitor_level || 1)}
+        ${row("Defense Style", d.defense_style || "Balanced Defense")}
+
+        <div class="defense-setup-card">
+          <label>Jammer Level</label>
+          <input id="defenseJammerLevel" type="number" min="1" max="10" value="${d.jammer_level || 1}">
+
+          <label>Defense AI Level</label>
+          <input id="defenseAiLevel" type="number" min="1" max="10" value="${d.defense_ai_level || 1}">
+
+          <label>Trace Monitor Level</label>
+          <input id="defenseTraceLevel" type="number" min="1" max="10" value="${d.trace_monitor_level || 1}">
+
+          <label>Defense Style</label>
+          <select id="defenseStyle">
+            ${["Balanced Defense", "Jammer Defense", "Firewall Heavy", "Trap Control", "Vault Turtle"]
+              .map(style => `
+                <option value="${style}" ${style === d.defense_style ? "selected" : ""}>
+                  ${style}
+                </option>
+              `).join("")}
+          </select>
+
+          <label>Defense Modules</label>
+          <div class="defense-module-select-grid">
+            ${allModules.map(module => `
+              <label class="defense-module-check">
+                <input
+                  type="checkbox"
+                  value="${module}"
+                  ${modules.includes(module) ? "checked" : ""}
+                >
+                <span>${module}</span>
+              </label>
+            `).join("")}
+          </div>
+        </div>
+
+        <div class="sheet-actions">
+          <button onclick="saveDefenseSetup()">Save Defense</button>
+          <button onclick="closeBuildingSheet()">Close</button>
+        </div>
+      `
+    );
+  } catch (err) {
+    alert("Gagal membuka Defense Setup: " + err.message);
+  }
+}
+
+
+async function saveDefenseSetup() {
+  const moduleInputs = [...document.querySelectorAll(".defense-module-check input:checked")];
+
+  const payload = {
+    jammer_level: Number(document.getElementById("defenseJammerLevel")?.value || 1),
+    defense_ai_level: Number(document.getElementById("defenseAiLevel")?.value || 1),
+    trace_monitor_level: Number(document.getElementById("defenseTraceLevel")?.value || 1),
+    defense_style: document.getElementById("defenseStyle")?.value || "Balanced Defense",
+    modules: moduleInputs.map(input => input.value),
+  };
+
+  try {
+    const result = await api("/api/defense", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+
+    alert(result.message || "Defense saved.");
+    openDefenseSetupSheet();
+  } catch (err) {
+    alert("Gagal save defense: " + err.message);
+  }
 }
 
 function num(v) {

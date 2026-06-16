@@ -4017,3 +4017,44 @@ input[type=number] {
   color: #06101b;
   background: linear-gradient(135deg, #39f3ff, #8b5cf6);
 }
+.defense-setup-card {
+  display: grid;
+  gap: 9px;
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, .03);
+  border: 1px solid rgba(57, 243, 255, .12);
+}
+
+.defense-setup-card label {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--muted);
+}
+
+.defense-setup-card input,
+.defense-setup-card select {
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: 13px;
+  padding: 10px;
+  color: white;
+  background: rgba(3, 8, 18, .94);
+  border: 1px solid rgba(57, 243, 255, .16);
+}
+
+.defense-module-select-grid {
+  display: grid;
+  gap: 7px;
+}
+
+.defense-module-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px;
+  border-radius: 13px;
+  background: rgba(15, 27, 54, .75);
+  border: 1px solid rgba(57, 243, 255, .10);
+}
