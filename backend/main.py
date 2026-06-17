@@ -2242,6 +2242,73 @@ def remove_deployed_units_from_inventory(profile: dict, selected_units: dict):
 
     return profile
 
+def calculate_deployed_unit_outcome(selected_units: dict, loss_rate: float):
+    """
+    Menghitung hasil unit yang SUDAH dideploy.
+    Jangan mengurangi unit_inventory di sini,
+    karena unit sudah keluar dari inventory saat /api/attack start.
+    """
+    destroyed = {}
+    disabled = {}
+    surviving = {}
+
+    for unit_id, levels in selected_units.items():
+        destroyed[unit_id] = {}
+        disabled[unit_id] = {}
+        surviving[unit_id] = {}
+
+        if unit_id not in UNITS:
+            continue
+
+        for level_text, amount in levels.items():
+            amount = int(amount or 0)
+
+            if amount <= 0:
+                continue
+
+            level_text = str(level_text)
+
+            lost = int(amount * loss_rate)
+            lost = max(0, min(amount, lost))
+
+            dis = int(lost * 0.35)
+            des = lost - dis
+            survive = amount - lost
+
+            destroyed[unit_id][level_text] = des
+            disabled[unit_id][level_text] = dis
+            surviving[unit_id][level_text] = survive
+
+    return destroyed, disabled, surviving
+
+def add_units_to_inventory(profile: dict, units_to_add: dict):
+    """
+    Mengembalikan surviving units ke inventory siap tempur.
+    Dipakai saat pasukan sudah pulang ke base.
+    """
+    profile = ensure_profile_unit_system(profile)
+
+    for unit_id, levels in units_to_add.items():
+        if unit_id not in UNITS:
+            continue
+
+        if not isinstance(levels, dict):
+            continue
+
+        profile["unit_inventory"].setdefault(unit_id, {})
+
+        for level_text, amount in levels.items():
+            amount = int(amount or 0)
+
+            if amount <= 0:
+                continue
+
+            level_text = str(level_text)
+            current = int(profile["unit_inventory"][unit_id].get(level_text, 0))
+            profile["unit_inventory"][unit_id][level_text] = current + amount
+
+    return profile
+
 def calculate_attack_unit_power(profile: dict, selected_units: dict):
     profile = ensure_profile_unit_system(profile)
 
@@ -3575,7 +3642,6 @@ async def ai_analyze(request: Request, payload: dict = Body(...)):
         "active_buffs_preview": active_buffs_preview,
     }
 
-
 @app.post("/api/attack")
 async def attack(req: AttackRequest, request: Request):
     await sync_state_from_db()
@@ -3813,6 +3879,504 @@ async def attack(req: AttackRequest, request: Request):
     GAME_STATE["players"][attacker_id] = attacker
     GAME_STATE.setdefault("active_attacks", {})
     GAME_STATE["active_attacks"][attack_id] = active_attack
+
+    await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
+
+    return active_attack
+
+@app.post("/api/attack/{attack_id}/impact")
+async def attack_impact(attack_id: str, request: Request):
+    await sync_state_from_db()
+
+    attacker_id, attacker = get_or_create_active_player_profile(request)
+    attacker = ensure_player_profile_schema(attacker)
+    attacker = ensure_profile_unit_system(attacker)
+    attacker = ensure_profile_ai_system(attacker)
+    attacker = ensure_recovery_system(attacker)
+
+    active_attacks = GAME_STATE.setdefault("active_attacks", {})
+    active_attack = active_attacks.get(attack_id)
+
+    if not active_attack:
+        raise HTTPException(status_code=404, detail="Attack operation tidak ditemukan.")
+
+    if active_attack.get("player_id") != attacker_id:
+        raise HTTPException(status_code=403, detail="Attack ini bukan milik player ini.")
+
+    if active_attack.get("type") != "attack":
+        raise HTTPException(status_code=400, detail="Operation ini bukan attack.")
+
+    if active_attack.get("battle_resolved"):
+        return active_attack
+
+    if active_attack.get("phase") != "outbound":
+        return active_attack
+
+    now = time.time()
+    impact_at = float(active_attack.get("impact_at", 0) or 0)
+
+    if now < impact_at:
+        return {
+            **active_attack,
+            "not_ready": True,
+            "remaining_seconds": max(1, math.ceil(impact_at - now)),
+            "message": "Pasukan belum sampai target."
+        }
+
+    target_id = active_attack.get("target_id")
+    target = GAME_STATE.get("targets", {}).get(target_id)
+
+    if not target:
+        # Target hilang sebelum pasukan sampai.
+        # Unit tidak mati, hanya pulang kosong.
+        return_seconds = int(active_attack.get("return_seconds", 1) or 1)
+
+        active_attack["phase"] = "returning"
+        active_attack["battle_resolved"] = True
+        active_attack["success"] = False
+        active_attack["return_at"] = now + return_seconds
+        active_attack["pending_reward"] = {
+            "credits": 0,
+            "data_shard": 0,
+            "nano_parts": 0,
+            "nexus_core": 0,
+        }
+        active_attack["surviving_units"] = copy.deepcopy(active_attack.get("selected_units", {}))
+        active_attack["destroyed_units"] = {}
+        active_attack["disabled_units"] = {}
+        active_attack["enemy_destroyed_units"] = {}
+        active_attack["battle_log"] = [
+            "TARGET SIGNAL LOST",
+            "Pasukan sampai di koordinat target, tapi signal target sudah hilang.",
+            "No battle occurred.",
+            "Units are returning to base.",
+        ]
+
+        active_attacks[attack_id] = active_attack
+        GAME_STATE["active_attacks"] = active_attacks
+        GAME_STATE["players"][attacker_id] = attacker
+
+        await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
+        return active_attack
+
+    target = refresh_player_target_from_profile(target)
+
+    if target.get("kind") == "enemy" and target.get("status") in ["depleted", "collapsed"]:
+        return_seconds = int(active_attack.get("return_seconds", 1) or 1)
+
+        active_attack["phase"] = "returning"
+        active_attack["battle_resolved"] = True
+        active_attack["success"] = False
+        active_attack["target_depleted"] = True
+        active_attack["return_at"] = now + return_seconds
+        active_attack["pending_reward"] = {
+            "credits": 0,
+            "data_shard": 0,
+            "nano_parts": 0,
+            "nexus_core": 0,
+        }
+        active_attack["surviving_units"] = copy.deepcopy(active_attack.get("selected_units", {}))
+        active_attack["destroyed_units"] = {}
+        active_attack["disabled_units"] = {}
+        active_attack["enemy_destroyed_units"] = {}
+        active_attack["battle_log"] = [
+            "TARGET ALREADY CLEARED",
+            "Pasukan sampai target, tapi enemy sudah dikalahkan.",
+            "No loot secured.",
+            "Units are returning to base.",
+        ]
+
+        active_attacks[attack_id] = active_attack
+        GAME_STATE["active_attacks"] = active_attacks
+        GAME_STATE["players"][attacker_id] = attacker
+
+        await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
+        return active_attack
+
+    selected_units = active_attack.get("selected_units", {})
+    module_ids = active_attack.get("module_ids", [])
+    ai_ids = active_attack.get("ai_ids", [])
+
+    module_bonus = get_attack_module_bonus(module_ids)
+    research_bonus = get_attack_research_bonus(attacker)
+    ai_bonus = get_attack_ai_bonus(attacker, ai_ids)
+
+    unit_power = int(active_attack.get("unit_power_score", 0) or 0)
+
+    attack_percent = (
+        module_bonus["attack_percent"]
+        + research_bonus["attack_percent"]
+        + ai_bonus["attack_percent"]
+    )
+
+    attack_score = int(
+        (unit_power + module_bonus["attack_flat"])
+        * (1 + attack_percent / 100)
+    )
+
+    defense_modules = target.get("defense_modules", [])
+    defense_stats = target.get("defense_stats") or {}
+
+    defense_score = int(
+        defense_stats.get(
+            "defense_power",
+            target.get("defense_power", target.get("estimated_power", 1000))
+        )
+    )
+
+    # Defense module tetap memengaruhi battle,
+    # tapi detailnya tidak dibocorkan ke battle log.
+    if "Firewall Core" in defense_modules and "firewall_crusher" not in module_ids:
+        defense_score += 350
+
+    if "Trap Net" in defense_modules and "trap_detector" not in module_ids:
+        defense_score += 280
+
+    if "Vault Guard" in defense_modules and "core_breaker" not in module_ids:
+        defense_score += 320
+
+    if "Repair Node" in defense_modules and "payload_booster" not in module_ids:
+        defense_score += 260
+
+    attack_roll = random.uniform(0.92, 1.08)
+    defense_roll = random.uniform(0.95, 1.06)
+
+    final_attack_score = int(attack_score * attack_roll)
+    final_defense_score = int(defense_score * defense_roll)
+
+    success = final_attack_score > final_defense_score
+
+    loss_rate = 0.16 if success else 0.42
+
+    loss_rate -= module_bonus["loss_reduction"] / 100
+    loss_rate -= ai_bonus["loss_reduction"] / 100
+
+    loss_rate = max(0.05, min(0.65, loss_rate))
+
+    destroyed, disabled, surviving = calculate_deployed_unit_outcome(
+        selected_units,
+        loss_rate
+    )
+
+    attacker = add_disabled_units_to_recovery(attacker, disabled)
+
+    enemy_destroyed_units = apply_npc_guard_damage(
+        target=target,
+        final_attack_score=final_attack_score,
+        final_defense_score=final_defense_score,
+        success=success,
+    )
+
+    trace_gain = 8 if success else 20
+    trace_gain -= module_bonus["trace_reduction"]
+    trace_gain += ai_bonus["trace_delta"]
+    trace_gain = max(1, min(40, trace_gain))
+
+    attacker["trace"] = max(
+        0,
+        min(100, int(attacker.get("trace", 0)) + trace_gain)
+    )
+
+    reward = {
+        "credits": 0,
+        "data_shard": 0,
+        "nano_parts": 0,
+        "nexus_core": 0,
+    }
+
+    defender = get_target_defender_profile(target)
+
+    if success:
+        target_resources = target.get("resources", {})
+
+        loot_rate = random.uniform(0.08, 0.18)
+        loot_rate += module_bonus["loot_bonus"] / 100
+        loot_rate = min(0.35, loot_rate)
+
+        for key in ["credits", "data_shard", "nano_parts"]:
+            available = int(target_resources.get(key, 0) or 0)
+            stolen = int(available * loot_rate)
+
+            if stolen <= 0:
+                continue
+
+            reward[key] = stolen
+
+            # Loot belum masuk ke player.
+            # Ini hanya cargo/pending reward.
+            target_resources[key] = max(0, available - stolen)
+            target["resources"] = target_resources
+
+            if defender:
+                defender_resources = defender.get("resources", {})
+                defender_resources[key] = max(
+                    0,
+                    int(defender_resources.get(key, 0)) - stolen
+                )
+                defender["resources"] = defender_resources
+
+        if int(target_resources.get("nexus_core", 0) or 0) > 0 and random.random() < 0.08:
+            reward["nexus_core"] = 1
+
+            target_resources["nexus_core"] = max(
+                0,
+                int(target_resources.get("nexus_core", 0)) - 1
+            )
+            target["resources"] = target_resources
+
+            if defender:
+                defender["resources"]["nexus_core"] = max(
+                    0,
+                    int(defender["resources"].get("nexus_core", 0)) - 1
+                )
+
+    if success and target.get("kind") == "enemy":
+        target["status"] = "depleted"
+        target["depleted_at"] = now
+        target["defeated_by"] = attacker_id
+
+    battle_log = []
+
+    battle_log.append(f"Attack impact at {target.get('name', target_id)}.")
+    battle_log.append("")
+    battle_log.append("RESULT: SUCCESS" if success else "RESULT: FAILED")
+
+    battle_log.append("")
+    battle_log.append("YOUR LOSSES:")
+
+    has_loss = False
+
+    for unit_id, level_map in destroyed.items():
+        unit_name = UNITS.get(unit_id, {}).get("name", unit_id)
+
+        for level_text, amount in level_map.items():
+            amount = int(amount or 0)
+
+            if amount > 0:
+                has_loss = True
+                battle_log.append(f"- {unit_name} Lv.{level_text} destroyed: {amount}")
+
+    for unit_id, level_map in disabled.items():
+        unit_name = UNITS.get(unit_id, {}).get("name", unit_id)
+
+        for level_text, amount in level_map.items():
+            amount = int(amount or 0)
+
+            if amount > 0:
+                has_loss = True
+                battle_log.append(f"- {unit_name} Lv.{level_text} disabled: {amount}")
+
+    if not has_loss:
+        battle_log.append("- No confirmed unit losses.")
+
+    has_disabled = any(
+        int(amount or 0) > 0
+        for level_map in disabled.values()
+        for amount in level_map.values()
+    )
+
+    if has_disabled:
+        battle_log.append("- Disabled units moved to Recovery Center.")
+
+    battle_log.append("")
+    battle_log.append("ENEMY DAMAGE:")
+
+    if enemy_destroyed_units:
+        for name, amount in enemy_destroyed_units.items():
+            battle_log.append(f"- {name} destroyed: {amount}")
+    else:
+        battle_log.append("- No confirmed enemy casualties.")
+
+    battle_log.append("")
+    battle_log.append("CARGO:")
+
+    if success:
+        battle_log.append(f"- Credits secured: {reward.get('credits', 0)}")
+        battle_log.append(f"- Data Shard secured: {reward.get('data_shard', 0)}")
+        battle_log.append(f"- Nano Parts secured: {reward.get('nano_parts', 0)}")
+
+        if reward.get("nexus_core", 0):
+            battle_log.append(f"- Nexus Core secured: {reward.get('nexus_core', 0)}")
+
+        battle_log.append("- Cargo is returning to base. Reward not added yet.")
+    else:
+        battle_log.append("- No cargo secured.")
+
+    battle_log.append("")
+    battle_log.append(f"TRACE: +{trace_gain}. Current Trace: {attacker['trace']}%.")
+    battle_log.append("")
+    battle_log.append("STATUS: RETURNING TO BASE")
+
+    return_seconds = int(active_attack.get("return_seconds", 1) or 1)
+
+    active_attack["phase"] = "returning"
+    active_attack["status"] = "running"
+    active_attack["battle_resolved"] = True
+    active_attack["success"] = success
+
+    active_attack["return_at"] = now + return_seconds
+    active_attack["impact_resolved_at"] = now
+
+    active_attack["pending_reward"] = reward
+    active_attack["reward"] = {
+        "credits": 0,
+        "data_shard": 0,
+        "nano_parts": 0,
+        "nexus_core": 0,
+    }
+
+    active_attack["destroyed_units"] = destroyed
+    active_attack["disabled_units"] = disabled
+    active_attack["surviving_units"] = surviving
+    active_attack["enemy_destroyed_units"] = enemy_destroyed_units
+
+    active_attack["trace_gain"] = trace_gain
+    active_attack["trace_exposure"] = attacker["trace"]
+
+    active_attack["target_status"] = target.get("status", "active")
+    active_attack["target_depleted"] = target.get("status") in ["depleted", "collapsed"]
+
+    active_attack["battle_log"] = battle_log
+
+    GAME_STATE["players"][attacker_id] = attacker
+
+    if defender and target.get("player_id"):
+        GAME_STATE["players"][target["player_id"]] = defender
+
+    GAME_STATE["targets"][target_id] = target
+
+    active_attacks[attack_id] = active_attack
+    GAME_STATE["active_attacks"] = active_attacks
+
+    await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
+
+    return active_attack
+
+@app.post("/api/attack/{attack_id}/return")
+async def attack_return(attack_id: str, request: Request):
+    await sync_state_from_db()
+
+    attacker_id, attacker = get_or_create_active_player_profile(request)
+    attacker = ensure_player_profile_schema(attacker)
+    attacker = ensure_profile_unit_system(attacker)
+    attacker = ensure_profile_ai_system(attacker)
+    attacker = ensure_recovery_system(attacker)
+
+    active_attacks = GAME_STATE.setdefault("active_attacks", {})
+    active_attack = active_attacks.get(attack_id)
+
+    if not active_attack:
+        raise HTTPException(status_code=404, detail="Attack operation tidak ditemukan.")
+
+    if active_attack.get("player_id") != attacker_id:
+        raise HTTPException(status_code=403, detail="Attack ini bukan milik player ini.")
+
+    if active_attack.get("type") != "attack":
+        raise HTTPException(status_code=400, detail="Operation ini bukan attack.")
+
+    # Idempotent: kalau sudah pernah return, jangan tambah reward/unit dua kali.
+    if active_attack.get("return_resolved"):
+        return active_attack
+
+    if not active_attack.get("battle_resolved"):
+        return {
+            **active_attack,
+            "not_ready": True,
+            "message": "Battle belum terjadi. Pasukan belum sampai target.",
+        }
+
+    if active_attack.get("phase") != "returning":
+        return {
+            **active_attack,
+            "not_ready": True,
+            "message": "Pasukan belum dalam fase pulang.",
+        }
+
+    now = time.time()
+    return_at = float(active_attack.get("return_at", 0) or 0)
+
+    if now < return_at:
+        return {
+            **active_attack,
+            "not_ready": True,
+            "remaining_seconds": max(1, math.ceil(return_at - now)),
+            "message": "Pasukan masih dalam perjalanan pulang.",
+        }
+
+    pending_reward = active_attack.get("pending_reward", {}) or {}
+    surviving_units = active_attack.get("surviving_units", {}) or {}
+
+    attacker.setdefault("resources", {})
+
+    for key in ["credits", "data_shard", "nano_parts", "nexus_core"]:
+        amount = int(pending_reward.get(key, 0) or 0)
+
+        if amount <= 0:
+            continue
+
+        attacker["resources"][key] = int(attacker["resources"].get(key, 0)) + amount
+
+    attacker = add_units_to_inventory(attacker, surviving_units)
+
+    active_attack["phase"] = "completed"
+    active_attack["status"] = "completed"
+    active_attack["return_resolved"] = True
+    active_attack["completed_at"] = now
+
+    # Reward baru resmi masuk saat pasukan pulang.
+    active_attack["reward"] = {
+        "credits": int(pending_reward.get("credits", 0) or 0),
+        "data_shard": int(pending_reward.get("data_shard", 0) or 0),
+        "nano_parts": int(pending_reward.get("nano_parts", 0) or 0),
+        "nexus_core": int(pending_reward.get("nexus_core", 0) or 0),
+    }
+
+    active_attack["pending_reward"] = {
+        "credits": 0,
+        "data_shard": 0,
+        "nano_parts": 0,
+        "nexus_core": 0,
+    }
+
+    battle_log = active_attack.get("battle_log", [])
+
+    if not isinstance(battle_log, list):
+        battle_log = [str(battle_log)]
+
+    battle_log.append("")
+    battle_log.append("RETURN COMPLETE")
+    battle_log.append("Units have returned to base.")
+
+    has_survivors = any(
+        int(amount or 0) > 0
+        for level_map in surviving_units.values()
+        for amount in level_map.values()
+    )
+
+    if has_survivors:
+        battle_log.append("Surviving units are ready again.")
+    else:
+        battle_log.append("No surviving units returned.")
+
+    reward = active_attack["reward"]
+
+    if any(int(v or 0) > 0 for v in reward.values()):
+        battle_log.append("")
+        battle_log.append("REWARD DELIVERED:")
+        battle_log.append(f"- Credits +{reward.get('credits', 0)}")
+        battle_log.append(f"- Data Shard +{reward.get('data_shard', 0)}")
+        battle_log.append(f"- Nano Parts +{reward.get('nano_parts', 0)}")
+
+        if reward.get("nexus_core", 0):
+            battle_log.append(f"- Nexus Core +{reward.get('nexus_core', 0)}")
+    else:
+        battle_log.append("No reward delivered.")
+
+    active_attack["battle_log"] = battle_log
+
+    GAME_STATE["players"][attacker_id] = attacker
+    active_attacks[attack_id] = active_attack
+    GAME_STATE["active_attacks"] = active_attacks
 
     await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
 
