@@ -1984,6 +1984,11 @@ function openBuilding(buildingId) {
     return;
   }
 
+  if (buildingId === "recovery_center") {
+    renderRecoveryCenterSheet();
+    return;
+  }
+
   const levelText = b.locked ? "LOCKED" : `Lv.${b.level}`;
 
   let actionHtml = "";
@@ -2070,6 +2075,119 @@ function renderDefenseSetupTabs(activeTab) {
       `).join("")}
     </div>
   `;
+}
+
+function formatRecoveryCost(cost) {
+  const parts = [];
+
+  if (Number(cost?.credits || 0) > 0) {
+    parts.push(`Credits ${Number(cost.credits).toLocaleString()}`);
+  }
+
+  if (Number(cost?.nano_parts || 0) > 0) {
+    parts.push(`Nano ${Number(cost.nano_parts).toLocaleString()}`);
+  }
+
+  if (Number(cost?.energy || 0) > 0) {
+    parts.push(`Energy ${Number(cost.energy).toLocaleString()}`);
+  }
+
+  return parts.length ? parts.join(" · ") : "Free";
+}
+
+function renderRecoveryItem(item) {
+  return `
+    <div class="recovery-unit-card">
+      <div class="recovery-unit-top">
+        <div>
+          <b>${escapeHtml(item.name)} Lv.${item.level}</b>
+          <small>Ready: ${Number(item.owned || 0).toLocaleString()}</small>
+        </div>
+
+        <span>${Number(item.disabled || 0).toLocaleString()} Disabled</span>
+      </div>
+
+      ${row("Recover x1", formatRecoveryCost(item.cost_one))}
+      ${row("Recover All", formatRecoveryCost(item.cost_all))}
+
+      <div class="sheet-actions recovery-actions">
+        <button onclick="recoverUnit('${item.unit_id}', ${item.level}, 1)">
+          Recover 1
+        </button>
+
+        <button onclick="recoverUnit('${item.unit_id}', ${item.level}, ${item.disabled})">
+          Recover All
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+async function renderRecoveryCenterSheet() {
+  try {
+    const data = await api("/api/recovery");
+
+    const items = data.items || [];
+
+    const listHtml = items.length
+      ? items.map(renderRecoveryItem).join("")
+      : `
+        <div class="recovery-empty">
+          <b>No disabled units</b>
+          <p class="muted">
+            Unit disabled dari battle akan muncul di sini dan bisa dipulihkan.
+          </p>
+        </div>
+      `;
+
+    showBuildingSheet(
+      `Recovery Center Lv.${data.recovery_center_level || 1}`,
+      `
+        <p class="muted">
+          Memulihkan unit disabled agar kembali ke pasukan siap tempur.
+          Destroyed unit tidak bisa dipulihkan.
+        </p>
+
+        <div class="recovery-summary">
+          ${row("Disabled Units", Number(data.total_disabled || 0).toLocaleString())}
+          ${row("Credits", Number(data.resources?.credits || 0).toLocaleString())}
+          ${row("Nano Parts", Number(data.resources?.nano_parts || 0).toLocaleString())}
+          ${row("Energy", Number(data.energy || 0).toLocaleString())}
+        </div>
+
+        <div class="recovery-list">
+          ${listHtml}
+        </div>
+
+        <div class="sheet-actions">
+          <button onclick="renderRecoveryCenterSheet()">Refresh</button>
+          <button onclick="closeBuildingSheet()">Close</button>
+        </div>
+      `
+    );
+  } catch (err) {
+    alert("Gagal membuka Recovery Center: " + err.message);
+  }
+}
+
+async function recoverUnit(unitId, level, amount) {
+  try {
+    const result = await api("/api/recovery/recover", {
+      method: "POST",
+      body: JSON.stringify({
+        unit_id: unitId,
+        level: Number(level),
+        amount: Number(amount),
+      }),
+    });
+
+    await loadState();
+    await renderRecoveryCenterSheet();
+
+    alert(result.message || "Unit recovered.");
+  } catch (err) {
+    alert("Gagal recover unit: " + err.message);
+  }
 }
 
 function renderDefenseSetupSheet() {

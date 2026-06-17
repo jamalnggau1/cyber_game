@@ -949,39 +949,6 @@ def get_defense_module_score(modules: list[str]):
         "module_anti_scout": total_anti_scout,
     }
 
-def ensure_recovery_system(profile: dict):
-    profile.setdefault("disabled_units", {})
-
-    for unit_id in UNITS.keys():
-        profile["disabled_units"].setdefault(unit_id, {})
-
-        for level in range(1, int(UNITS[unit_id].get("max_level", 5)) + 1):
-            profile["disabled_units"][unit_id].setdefault(str(level), 0)
-
-    return profile
-
-
-def add_disabled_units_to_recovery(profile: dict, disabled_units: dict):
-    profile = ensure_recovery_system(profile)
-
-    for unit_id, level_map in disabled_units.items():
-        if unit_id not in UNITS:
-            continue
-
-        profile["disabled_units"].setdefault(unit_id, {})
-
-        for level_text, amount in level_map.items():
-            amount = int(amount or 0)
-
-            if amount <= 0:
-                continue
-
-            level_text = str(level_text)
-            current = int(profile["disabled_units"][unit_id].get(level_text, 0))
-            profile["disabled_units"][unit_id][level_text] = current + amount
-
-    return profile
-
 def apply_npc_guard_damage(target: dict, final_attack_score: int, final_defense_score: int, success: bool):
     if target.get("kind") != "enemy":
         return {}
@@ -2016,6 +1983,11 @@ generate_targets()
 # ==========================================================
 # API models
 # ==========================================================
+class RecoverUnitRequest(BaseModel):
+    unit_id: str
+    level: int = Field(ge=1)
+    amount: int = Field(ge=1)
+
 class DefenseSetupRequest(BaseModel):
     defense_style: str = Field(default="Balanced Defense", max_length=40)
     modules: List[str] = Field(default_factory=list, max_length=6)
@@ -2119,6 +2091,120 @@ def get_attack_module_bonus(module_ids: list[str]):
 
     return bonus
 
+def ensure_recovery_system(profile: dict):
+    profile.setdefault("disabled_units", {})
+
+    for unit_id in UNITS.keys():
+        profile["disabled_units"].setdefault(unit_id, {})
+
+        max_level = int(UNITS[unit_id].get("max_level", 5))
+
+        for level in range(1, max_level + 1):
+            profile["disabled_units"][unit_id].setdefault(str(level), 0)
+
+    return profile
+
+
+def add_disabled_units_to_recovery(profile: dict, disabled_units: dict):
+    profile = ensure_recovery_system(profile)
+
+    for unit_id, level_map in disabled_units.items():
+        if unit_id not in UNITS:
+            continue
+
+        profile["disabled_units"].setdefault(unit_id, {})
+
+        for level_text, amount in level_map.items():
+            amount = int(amount or 0)
+
+            if amount <= 0:
+                continue
+
+            level_text = str(level_text)
+            current = int(profile["disabled_units"][unit_id].get(level_text, 0))
+            profile["disabled_units"][unit_id][level_text] = current + amount
+
+    return profile
+
+
+def get_recovery_center_level(profile: dict):
+    buildings = profile.get("buildings", {})
+    recovery = buildings.get("recovery_center", {})
+
+    return max(1, int(recovery.get("level", 1) or 1))
+
+
+def get_recovery_cost(profile: dict, unit_id: str, level: int, amount: int):
+    unit = UNITS.get(unit_id)
+
+    if not unit:
+        raise HTTPException(status_code=400, detail=f"Unknown unit: {unit_id}")
+
+    level = int(level)
+    amount = int(amount)
+
+    level_data = unit.get("levels", {}).get(level, {})
+    train_cost = level_data.get("train_cost", {})
+
+    recovery_level = get_recovery_center_level(profile)
+
+    # Recovery lebih murah dari train.
+    # Semakin tinggi Recovery Center, semakin murah.
+    discount = max(0.55, 1 - ((recovery_level - 1) * 0.05))
+
+    base_nano = int(train_cost.get("nano_parts", 0) or (30 * level))
+    base_credits = int(train_cost.get("credits", 0) or (20 * level))
+
+    nano_parts = int(base_nano * 0.40 * amount * discount)
+    credits = int(base_credits * 0.30 * amount * discount)
+
+    # Energy dibuat ringan supaya recovery tetap terasa aktif.
+    energy = max(1, math.ceil(amount / max(4, 8 + recovery_level)))
+
+    return {
+        "credits": max(0, credits),
+        "nano_parts": max(1, nano_parts),
+        "energy": max(1, energy),
+    }
+
+
+def build_recovery_items(profile: dict):
+    profile = ensure_profile_unit_system(profile)
+    profile = ensure_recovery_system(profile)
+
+    items = []
+
+    for unit_id, level_map in profile.get("disabled_units", {}).items():
+        unit = UNITS.get(unit_id)
+
+        if not unit:
+            continue
+
+        for level_text, disabled_count in level_map.items():
+            disabled_count = int(disabled_count or 0)
+
+            if disabled_count <= 0:
+                continue
+
+            level = int(level_text)
+            ready_owned = int(
+                profile
+                .get("unit_inventory", {})
+                .get(unit_id, {})
+                .get(level_text, 0)
+            )
+
+            items.append({
+                "unit_id": unit_id,
+                "name": unit.get("name", unit_id),
+                "level": level,
+                "disabled": disabled_count,
+                "owned": ready_owned,
+                "cost_one": get_recovery_cost(profile, unit_id, level, 1),
+                "cost_all": get_recovery_cost(profile, unit_id, level, disabled_count),
+            })
+
+    return items
 
 def calculate_attack_unit_power(profile: dict, selected_units: dict):
     profile = ensure_profile_unit_system(profile)
@@ -2579,6 +2665,119 @@ def calculate_unit_power_score(units):
 # ==========================================================
 # API endpoints
 # ==========================================================
+
+@app.get("/api/recovery")
+async def get_recovery(request: Request):
+    await sync_state_from_db()
+
+    player_id, profile = get_or_create_active_player_profile(request)
+    profile = ensure_player_profile_schema(profile)
+    profile = ensure_profile_unit_system(profile)
+    profile = ensure_recovery_system(profile)
+
+    GAME_STATE["players"][player_id] = profile
+    await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
+
+    items = build_recovery_items(profile)
+
+    return {
+        "player_id": player_id,
+        "recovery_center_level": get_recovery_center_level(profile),
+        "resources": profile.get("resources", {}),
+        "energy": int(profile.get("energy", 0)),
+        "items": items,
+        "total_disabled": sum(int(item["disabled"]) for item in items),
+    }
+
+
+@app.post("/api/recovery/recover")
+async def recover_unit(req: RecoverUnitRequest, request: Request):
+    await sync_state_from_db()
+
+    player_id, profile = get_or_create_active_player_profile(request)
+    profile = ensure_player_profile_schema(profile)
+    profile = ensure_profile_unit_system(profile)
+    profile = ensure_recovery_system(profile)
+
+    unit_id = str(req.unit_id).strip()
+    level = int(req.level)
+    amount = int(req.amount)
+
+    if unit_id not in UNITS:
+        raise HTTPException(status_code=400, detail=f"Unknown unit: {unit_id}")
+
+    level_text = str(level)
+
+    disabled_available = int(
+        profile
+        .get("disabled_units", {})
+        .get(unit_id, {})
+        .get(level_text, 0)
+    )
+
+    if disabled_available <= 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Tidak ada unit disabled: {unit_id} Lv.{level}"
+        )
+
+    if amount > disabled_available:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Jumlah recover melebihi disabled unit. Ada {disabled_available}, diminta {amount}"
+        )
+
+    cost = get_recovery_cost(profile, unit_id, level, amount)
+
+    resources = profile.get("resources", {})
+
+    if int(resources.get("credits", 0)) < cost["credits"]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Credits tidak cukup. Butuh {cost['credits']}"
+        )
+
+    if int(resources.get("nano_parts", 0)) < cost["nano_parts"]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Nano Parts tidak cukup. Butuh {cost['nano_parts']}"
+        )
+
+    if int(profile.get("energy", 0)) < cost["energy"]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Energy tidak cukup. Butuh {cost['energy']}"
+        )
+
+    resources["credits"] = int(resources.get("credits", 0)) - cost["credits"]
+    resources["nano_parts"] = int(resources.get("nano_parts", 0)) - cost["nano_parts"]
+    profile["energy"] = int(profile.get("energy", 0)) - cost["energy"]
+
+    profile["resources"] = resources
+
+    profile["disabled_units"][unit_id][level_text] = disabled_available - amount
+
+    profile["unit_inventory"].setdefault(unit_id, {})
+    current_ready = int(profile["unit_inventory"][unit_id].get(level_text, 0))
+    profile["unit_inventory"][unit_id][level_text] = current_ready + amount
+
+    GAME_STATE["players"][player_id] = profile
+    await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
+
+    unit_name = UNITS[unit_id].get("name", unit_id)
+
+    return {
+        "success": True,
+        "message": f"Recovered {amount} {unit_name} Lv.{level}",
+        "unit_id": unit_id,
+        "level": level,
+        "amount": amount,
+        "cost": cost,
+        "remaining_disabled": profile["disabled_units"][unit_id][level_text],
+        "ready_owned": profile["unit_inventory"][unit_id][level_text],
+        "resources": profile["resources"],
+        "energy": profile["energy"],
+    }
 
 @app.get("/api/state")
 async def state(request: Request):
