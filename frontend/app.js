@@ -5021,6 +5021,38 @@ function toggleAiFromSheet(aiId, targetId) {
   if (target) showAttackSetupSheet(target);
 }
 
+function removeTargetFromLocalRadar(targetId) {
+  if (!targetId) return;
+
+  // Hapus dari state targets jika ada.
+  if (Array.isArray(state?.targets)) {
+    state.targets = state.targets.filter(t => String(t.id) !== String(targetId));
+  }
+
+  // Hapus elemen DOM kalau target card/pin memakai data-target-id.
+  document.querySelectorAll(`[data-target-id="${targetId}"]`).forEach(el => {
+    el.remove();
+  });
+
+  // Reset selectedTarget kalau target yang dihapus sedang dipilih.
+  if (String(selectedTarget) === String(targetId)) {
+    selectedTarget = null;
+  }
+
+  // Render ulang radar/map kalau function-nya ada.
+  if (typeof renderRadarTargets === "function") {
+    renderRadarTargets();
+  }
+
+  if (typeof renderMap === "function") {
+    renderMap();
+  }
+
+  if (typeof renderRadar === "function") {
+    renderRadar();
+  }
+}
+
 async function launchAttack() {
   try {
     if (!selectedTarget) {
@@ -5028,8 +5060,10 @@ async function launchAttack() {
       return;
     }
 
+    const targetId = selectedTarget;
+
     const payload = {
-      target_id: selectedTarget,
+      target_id: targetId,
       module_ids: [...selectedModules],
       ai_ids: [...selectedAi],
       units: buildUnitPayload()
@@ -5053,35 +5087,55 @@ async function launchAttack() {
       body: JSON.stringify(payload)
     });
 
-    const unitLossLines = [
-      "Destroyed Units:",
-      ...Object.entries(res.destroyed_units).map(([k, v]) => `- ${k}: ${v}`),
-      "Disabled Units:",
-      ...Object.entries(res.disabled_units).map(([k, v]) => `- ${k}: ${v}`)
-    ];
+    // Kalau server bilang target sudah habis/depleted,
+    // hapus dari radar lokal dan jangan tampilkan travel attack.
+    if (
+      res.target_depleted ||
+      res.ignored ||
+      res.target_status === "depleted" ||
+      res.target_status === "collapsed"
+    ) {
+      removeTargetFromLocalRadar(targetId);
+
+      addGameMessage(
+        "system",
+        "Target Cleared",
+        "Target ini sudah dikalahkan dan tidak bisa diserang lagi."
+      );
+
+      alert("Target sudah dikalahkan dan dihapus dari radar.");
+      return;
+    }
 
     const log = [
       ...res.battle_log,
       "",
       `Travel Time: ${res.final_travel_seconds}s`,
-      
       `Energy Cost: ${res.energy_cost}`,
       `Trace Exposure Now: ${res.trace_exposure}%`,
-      "",
-      ...unitLossLines,
       "",
       `Reward: ${JSON.stringify(res.reward, null, 2)}`
     ].join("\n");
 
     addGameMessage(
       "system",
-      "Attack Prepared",
-      "Payload accepted. Units, modules, and AI Agent locked for attack."
+      res.success ? "Attack Successful" : "Attack Failed",
+      res.success
+        ? "Target breached. Battle result recorded."
+        : "Attack failed. Battle result recorded."
     );
+
+    // Kalau NPC berhasil dikalahkan, hapus dari radar lokal.
+    if (
+      res.target_kind === "enemy" &&
+      (res.success || res.target_status === "depleted")
+    ) {
+      removeTargetFromLocalRadar(targetId);
+    }
 
     await loadState();
 
-    showAttackTravelSheet(res, log, selectedTarget);
+    showAttackTravelSheet(res, log, targetId);
   } catch (err) {
     alert("Attack gagal: " + err.message);
   }
