@@ -1736,6 +1736,166 @@ function fmtBuffs(buffs) {
 }
 
 function row(label, value) {
+  function getBuildingLevel(building) {
+  return Number(building?.level ?? 0);
+}
+
+function isBuildingLocked(building) {
+  return Boolean(building?.locked);
+}
+
+function getBuildingStatusText(building) {
+  if (!building) return "Unknown";
+
+  if (isBuildingLocked(building)) {
+    return "Locked";
+  }
+
+  if (getBuildingLevel(building) <= 0) {
+    return "Build Required";
+  }
+
+  return `Lv.${getBuildingLevel(building)}`;
+}
+
+function getBuildingActionText(building) {
+  if (!building) return "Unknown";
+
+  if (isBuildingLocked(building)) {
+    return "Locked";
+  }
+
+  if (getBuildingLevel(building) <= 0) {
+    return `Build ${building.name || "Building"}`;
+  }
+
+  return `Upgrade ${building.name || "Building"}`;
+}
+
+function getBuildingRequirementText(buildingId) {
+  const b = buildingsData?.buildings || {};
+
+  if (buildingId === "unit_factory") {
+    return "Requirement: Main Lab Lv.1";
+  }
+
+  if (buildingId === "radar_tower") {
+    return "Requirement: Main Lab Lv.1 dan Unit Factory Lv.1";
+  }
+
+  if (buildingId === "research_lab") {
+    return "Requirement: Main Lab Lv.2";
+  }
+
+  if (buildingId === "recovery_center") {
+    return "Requirement: Main Lab Lv.2";
+  }
+
+  if (buildingId === "ai_core") {
+    return "Requirement: Main Lab Lv.3";
+  }
+
+  if (buildingId === "guild_gate") {
+    return "Requirement: Main Lab Lv.5";
+  }
+
+  return "";
+}
+
+function getBeginnerMission() {
+  const buildings = buildingsData?.buildings || {};
+  const player = state?.player || {};
+  const units = player.unit_inventory || {};
+
+  const mainLab = buildings.main_lab || {};
+  const unitFactory = buildings.unit_factory || {};
+  const radarTower = buildings.radar_tower || {};
+
+  const mainLabLevel = getBuildingLevel(mainLab);
+  const factoryLevel = getBuildingLevel(unitFactory);
+  const radarLevel = getBuildingLevel(radarTower);
+
+  const breakerCount = Number(
+    units?.breaker?.["1"] ??
+    units?.breaker ??
+    0
+  );
+
+  if (mainLabLevel <= 0) {
+    return {
+      title: "Mission 1: Build Main Lab",
+      text: "Bangun Main Lab untuk memulai base dan membuka bangunan awal.",
+      action: "Build Main Lab",
+      buildingId: "main_lab",
+    };
+  }
+
+  if (factoryLevel <= 0) {
+    return {
+      title: "Mission 2: Build Unit Factory",
+      text: "Unit Factory sudah terbuka, tapi belum dibangun. Bangun dulu agar kamu bisa melatih pasukan.",
+      action: "Build Unit Factory",
+      buildingId: "unit_factory",
+    };
+  }
+
+  if (breakerCount < 10) {
+    return {
+      title: "Mission 3: Train Breaker",
+      text: "Latih minimal 10 Breaker Lv.1 sebagai pasukan awal untuk menyerang monster kecil.",
+      action: "Train Breaker",
+      buildingId: "unit_factory",
+    };
+  }
+
+  if (radarLevel <= 0) {
+    return {
+      title: "Mission 4: Build Radar Tower",
+      text: "Bangun Radar Tower agar kamu bisa mencari monster di sekitar base.",
+      action: "Build Radar Tower",
+      buildingId: "radar_tower",
+    };
+  }
+
+  return {
+    title: "Mission 5: Scan Area",
+    text: "Gunakan Radar untuk mencari monster kecil. Radar Lv.1 hanya menampilkan target sesuai kemampuan awal.",
+    action: "Open Radar",
+    buildingId: "radar_tower",
+  };
+}
+
+function renderBeginnerMissionCard() {
+  if (!buildingsData) return "";
+
+  const mission = getBeginnerMission();
+
+  return `
+    <div class="mission-card">
+      <div class="mission-title">${escapeHtml(mission.title)}</div>
+      <div class="mission-text">${escapeHtml(mission.text)}</div>
+      <button onclick="focusMissionBuilding('${mission.buildingId}')">
+        ${escapeHtml(mission.action)}
+      </button>
+    </div>
+  `;
+}
+
+function focusMissionBuilding(buildingId) {
+  const building = buildingsData?.buildings?.[buildingId];
+
+  if (!building) {
+    alert("Building belum tersedia.");
+    return;
+  }
+
+  if (buildingId === "radar_tower" && getBuildingLevel(building) > 0) {
+    switchPage("radarPage");
+    return;
+  }
+
+  openBuilding(buildingId);
+}
   return `<div class="row"><span>${label}</span><span>${Array.isArray(value) ? value.join(", ") : value}</span></div>`;
 }
 
@@ -1874,12 +2034,17 @@ function renderBaseBuildings() {
     "guild_gate"
   ];
 
-  baseGrid.innerHTML = order.map(id => {
+  const buildingCards = order.map(id => {
     const b = buildingsData.buildings[id];
     if (!b) return "";
 
-    const levelText = b.locked ? "Locked" : `Lv.${b.level}`;
-    const lockedClass = b.locked ? "locked-building" : "";
+    const levelText = getBuildingStatusText(b);
+
+    const lockedClass = b.locked
+      ? "locked-building"
+      : getBuildingLevel(b) <= 0
+        ? "needs-build-building"
+        : "";
 
     return `
       <div class="building-slot">
@@ -1891,6 +2056,11 @@ function renderBaseBuildings() {
       </div>
     `;
   }).join("");
+
+  baseGrid.innerHTML = `
+    ${renderBeginnerMissionCard()}
+    ${buildingCards}
+  `;
 }
 
 function showBuildingSheet(title, html) {
@@ -2193,82 +2363,107 @@ function openBuilding(buildingId) {
     showBuildingSheet("Unknown Building", "Building not found.");
     return;
   }
-  if (buildingId === "radar_tower") {
-    closeBuildingSheet();
-    switchPage("radarPage");
+
+  const level = getBuildingLevel(b);
+
+  if (b.locked) {
+    showBuildingSheet(
+      `${b.name} Locked`,
+      `
+        <p class="muted">${b.description || "Building masih terkunci."}</p>
+
+        ${row("Status", "Locked")}
+        ${row("Requirement", getBuildingRequirementText(buildingId) || "Requirement belum tersedia")}
+
+        <div class="sheet-actions">
+          <button disabled>Locked</button>
+          <button onclick="closeBuildingSheet()">Close</button>
+        </div>
+      `
+    );
     return;
   }
 
-  if (buildingId === "ai_core") {
-    renderAiCoreSheet("agents");
+  if (level <= 0) {
+    showBuildingSheet(
+      `Build ${b.name}`,
+      `
+        <p class="muted">
+          ${b.description || ""}
+        </p>
+
+        <p class="muted">
+          Bangunan ini sudah terbuka, tapi belum dibangun.
+          Tekan tombol Build untuk mengaktifkan fiturnya.
+        </p>
+
+        ${row("Status", "Build Required")}
+        ${row("Level", "0")}
+        ${row("Next", "Lv.1")}
+
+        <div class="sheet-actions">
+          <button onclick="upgradeBuilding('${buildingId}')">Build ${b.name}</button>
+          <button onclick="closeBuildingSheet()">Close</button>
+        </div>
+      `
+    );
     return;
   }
 
   if (buildingId === "unit_factory") {
-    renderUnitFactorySheet();
+    renderUnitFactorySheet(currentUnitFactoryTab || "train");
     return;
   }
 
   if (buildingId === "research_lab") {
-    renderResearchLabSheet();
+    renderResearchLabSheet("research");
     return;
   }
 
-  if (buildingId === "recovery_center") {
-    renderRecoveryCenterSheet();
+  if (buildingId === "radar_tower") {
+    showBuildingSheet(
+      `${b.name} Lv.${level}`,
+      `
+        <p class="muted">${b.description}</p>
+
+        ${row("Status", "Active")}
+        ${row("Level", `Lv.${level}`)}
+        ${row("Scan", "Monster dan target tersedia sesuai level Radar")}
+
+        <div class="sheet-actions">
+          <button onclick="closeBuildingSheet(); switchPage('radarPage')">Open Radar</button>
+          <button onclick="openRadarUpgradeSheet()">Upgrade Radar</button>
+          <button onclick="closeBuildingSheet()">Close</button>
+        </div>
+      `
+    );
     return;
   }
 
-  const levelText = b.locked ? "LOCKED" : `Lv.${b.level}`;
+  if (buildingId === "ai_core") {
+    if (typeof renderAiCoreSheet === "function") {
+      renderAiCoreSheet("agents");
+      return;
+    }
 
-  let actionHtml = "";
-
-    if (buildingId === "main_lab") {
-    actionHtml = `
-      <div class="sheet-actions">
-        <button onclick="upgradeBuilding('main_lab')">Upgrade Main Lab</button>
-        <button onclick="openDefenseSetupSheet()">Defense Setup</button>
-        <button disabled>Lab Stats Soon</button>
-      </div>
-    `;
-  } else if (buildingId === "radar_tower") {
-    actionHtml = `
-      <div class="sheet-actions">
-        <button onclick="closeBuildingSheet(); switchPage('radarPage')">Open Radar</button>
-        <button disabled>Upgrade Scanner Soon</button>
-      </div>
-    `;
-  } else if (buildingId === "ai_core") {
-    actionHtml = `
-      <div class="sheet-actions">
-        <button onclick="closeBuildingSheet(); switchPage('aiPage')">Open AI Core</button>
-        <button onclick="upgradeBuilding('ai_core')">Upgrade AI Core</button>
-      </div>
-    `;
-  } else if (buildingId === "guild_gate" && b.locked) {
-    actionHtml = `
-      <div class="sheet-actions">
-        <button disabled>Locked</button>
-      </div>
-    `;
-  } else {
-    actionHtml = `
-      <div class="sheet-actions">
-        <button onclick="upgradeBuilding('${buildingId}')">Upgrade</button>
-        <button disabled>View Stats Soon</button>
-      </div>
-    `;
+    switchPage("aiPage");
+    return;
   }
+
+  const levelText = getBuildingStatusText(b);
 
   showBuildingSheet(
     `${b.name} ${levelText}`,
     `
       <p class="muted">${b.description}</p>
 
-      <div class="row"><span>Status</span><span>${b.locked ? "Locked" : "Active"}</span></div>
-      <div class="row"><span>Level</span><span>${b.locked ? "-" : b.level}</span></div>
+      ${row("Status", "Active")}
+      ${row("Level", `Lv.${level}`)}
 
-      ${actionHtml}
+      <div class="sheet-actions">
+        <button onclick="upgradeBuilding('${buildingId}')">Upgrade ${b.name}</button>
+        <button onclick="closeBuildingSheet()">Close</button>
+      </div>
     `
   );
 }
@@ -2731,6 +2926,49 @@ function renderUnitFactorySheet(tab = "train") {
   currentUnitFactoryView = null;
 
   const factory = buildingsData.buildings.unit_factory;
+  const factoryLevel = getBuildingLevel(factory);
+
+  if (factory.locked) {
+    showBuildingSheet(
+      "Unit Factory Locked",
+      `
+        <p class="muted">
+          Unit Factory masih terkunci.
+        </p>
+
+        ${row("Status", "Locked")}
+        ${row("Requirement", getBuildingRequirementText("unit_factory"))}
+
+        <div class="sheet-actions">
+          <button disabled>Locked</button>
+          <button onclick="closeBuildingSheet()">Close</button>
+        </div>
+      `
+    );
+    return;
+  }
+
+  if (factoryLevel <= 0) {
+    showBuildingSheet(
+      "Build Unit Factory",
+      `
+        <p class="muted">
+          Unit Factory sudah terbuka, tapi belum dibangun.
+          Bangun Unit Factory dulu sebelum melatih pasukan.
+        </p>
+
+        ${row("Status", "Build Required")}
+        ${row("Level", "0")}
+        ${row("Next", "Train Breaker Lv.1")}
+
+        <div class="sheet-actions">
+          <button onclick="upgradeBuilding('unit_factory')">Build Unit Factory</button>
+          <button onclick="closeBuildingSheet()">Close</button>
+        </div>
+      `
+    );
+    return;
+  }
 
   let body = "";
 
@@ -5522,8 +5760,8 @@ async function completeOnboarding() {
           ${row("Referral Code", result.profile.referral_code)}
 
           <p class="muted" style="margin-top:12px;">
-            Base awal sudah aktif. Tutorial belum dibuka dulu; kamu bisa mulai dari Base,
-            Radar Tower, Unit Factory, dan Research Lab.
+            Base awal sudah dibuat. Ikuti Mission Card di halaman Base:
+            bangun Main Lab, bangun Unit Factory, latih Breaker, lalu bangun Radar Tower.
           </p>
 
           <div class="sheet-actions">

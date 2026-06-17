@@ -4374,3 +4374,33 @@ input[type=number] {
 .recovery-actions {
   margin-top: 10px;
 }
+.needs-build-building {
+  border-color: rgba(255, 210, 80, 0.65) !important;
+  box-shadow: 0 0 14px rgba(255, 210, 80, 0.18);
+}
+
+.needs-build-building .building-level {
+  color: #ffd35a;
+}
+
+.mission-card {
+  grid-column: 1 / -1;
+  padding: 12px;
+  border: 1px solid rgba(0, 255, 255, 0.25);
+  border-radius: 14px;
+  background: rgba(0, 20, 35, 0.78);
+  box-shadow: 0 0 18px rgba(0, 255, 255, 0.08);
+}
+
+.mission-title {
+  font-weight: 800;
+  color: #dffcff;
+  margin-bottom: 6px;
+}
+
+.mission-text {
+  font-size: 13px;
+  color: rgba(220, 245, 255, 0.78);
+  line-height: 1.4;
+  margin-bottom: 10px;
+}
