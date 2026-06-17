@@ -4403,10 +4403,6 @@ async def get_buildings(request: Request):
     profile = ensure_profile_unit_system(profile)
     profile = ensure_profile_ai_system(profile)
 
-    GAME_STATE["players"][player_id] = profile
-
-    await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
-
     return {
         "ai": {
             "owned_ai": profile["owned_ai"],
@@ -4686,10 +4682,6 @@ async def get_research(request: Request):
         "level": 1,
         "locked": False,
     })
-
-    GAME_STATE["players"][player_id] = profile
-
-    await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
 
     return {
         "player_id": player_id,
@@ -5442,20 +5434,15 @@ async def get_ai_core(request: Request):
 
     slot_limit = get_ai_slot_limit_for_profile(profile)
 
-    # kalau active_ai kebanyakan karena downgrade/reset, potong
-    profile["active_ai"] = profile["active_ai"][:slot_limit]
-
-    GAME_STATE["players"][player_id] = profile
-
-    await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
+    active_ai = profile.get("active_ai", [])[:slot_limit]
 
     return {
         "player_id": player_id,
         "ai_core_level": slot_limit,
         "owned_ai": profile["owned_ai"],
-        "active_ai": profile["active_ai"],
+        "active_ai": active_ai,
         "ai_agents": get_ai_agents_for_profile(profile),
-        "active_ai_buffs": get_effective_ai_buffs(profile["active_ai"]),
+        "active_ai_buffs": get_effective_ai_buffs(active_ai),
         "max_slot": slot_limit,
     }
 
