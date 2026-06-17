@@ -2960,6 +2960,8 @@ async def scan(request: Request):
     visible = []
 
     for t in all_targets:
+        if t.get("kind") == "enemy" and t.get("status") in ["depleted", "collapsed"]:
+            continue
         if t["distance"] <= radius:
             visible.append({
                 "id": t["id"],
@@ -3558,6 +3560,12 @@ async def attack(req: AttackRequest, request: Request):
 
     target = refresh_player_target_from_profile(target)
 
+    if target.get("kind") == "enemy" and target.get("status") in ["depleted", "collapsed"]:
+        raise HTTPException(
+            status_code=400,
+            detail="Target sudah dikalahkan dan tidak bisa diserang lagi."
+        )
+
     if target.get("kind") == "mining":
         raise HTTPException(
             status_code=400,
@@ -3827,6 +3835,10 @@ async def attack(req: AttackRequest, request: Request):
 
     battle_log.append("")
     battle_log.append(f"TRACE: +{trace_gain}. Current Trace: {attacker['trace']}%.")
+    if success and target.get("kind") == "enemy":
+        target["status"] = "depleted"
+        target["depleted_at"] = time.time()
+        target["defeated_by"] = attacker_id
 
     GAME_STATE["players"][attacker_id] = attacker
 
@@ -3845,6 +3857,7 @@ async def attack(req: AttackRequest, request: Request):
         "target_kind": target.get("kind", "enemy"),
         "target_player_id": target.get("player_id"),
         "target_name": target.get("name", "Unknown Target"),
+        "target_status": target.get("status", "active"),
 
         "success": success,
         "final_travel_seconds": final_travel,
