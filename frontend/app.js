@@ -912,7 +912,7 @@ function renderEnemyUnitVisual(unit) {
   const level = Number(unit.level || 1);
 
   if (id === "breaker") {
-    return `<img src="assets/units/breaker/lv${Math.max(1, Math.min(5, level))}.png" alt="Breaker">`;
+    return `<img src="assets/units/breaker/lv${Math.max(1, Math.min(5, level))}.webp" alt="Breaker">`;
   }
 
   const label = String(unit.name || "??").slice(0, 2).toUpperCase();
@@ -1740,7 +1740,7 @@ function row(label, value) {
 }
 
 function statusIcon(name) {
-  return `<img src="assets/icons/${name}.png" alt="${name}" onerror="this.style.display='none'">`;
+  return `<img src="assets/icons/${name}.webp" alt="${name}" onerror="this.style.display='none'">`;
 }
 
 function renderStatusChip(icon, label, value, className = "") {
@@ -2634,7 +2634,7 @@ function renderPlayerStatusText(p) {
 }
 
 function getUnitLevelAsset(unit, level) {
-  return `assets/units/${unit.id}_lv${level}.png`;
+  return `assets/units/${unit.id}_lv${level}.webp`;
 }
 
 function getBestDisplayLevel(unit) {
@@ -3864,8 +3864,8 @@ async function openProfileSheet() {
         <div class="cyber-profile-hero">
           <div class="profile-hero-top">
             <div class="profile-hero-avatar">
-              <img class="profile-hero-avatar-img" src="assets/profile/avatar.png" alt="Profile">
-              <img class="profile-hero-border-img" src="assets/borders/topup_basic.png" alt="">
+              <img class="profile-hero-avatar-img" src="assets/profile/avatar.webp" alt="Profile">
+              <img class="profile-hero-border-img" src="assets/borders/topup_basic.webp" alt="">
               <span class="profile-hero-level">Lv.${p.lab_level}</span>
             </div>
 
@@ -4376,30 +4376,30 @@ function getEnemyAsset(target) {
   if (target.kind === "mining") {
     const resource = String(target.resource_id || "").toLowerCase();
 
-    if (resource === "data_shard") return "assets/mining/data_cache.png";
-    if (resource === "nano_parts") return "assets/mining/nano_mine.png";
-    if (resource === "credits") return "assets/mining/credit_vault.png";
-    if (resource === "nexus_core") return "assets/mining/nexus_rift.png";
+    if (resource === "data_shard") return "assets/mining/data_cache.webp";
+    if (resource === "nano_parts") return "assets/mining/nano_mine.webp";
+    if (resource === "credits") return "assets/mining/credit_vault.webp";
+    if (resource === "nexus_core") return "assets/mining/nexus_rift.webp";
 
-    return "assets/mining/data_cache.png";
+    return "assets/mining/data_cache.webp";
   }
 
   const signal = String(target.signal_strength || "").toLowerCase();
   const type = String(target.type || "").toLowerCase();
 
   if (type.includes("nexus")) {
-    return "assets/enemies/enemy_nexus.png";
+    return "assets/enemies/enemy_nexus.webp";
   }
 
   if (signal.includes("strong")) {
-    return "assets/enemies/enemy_strong.png";
+    return "assets/enemies/enemy_strong.webp";
   }
 
   if (signal.includes("medium")) {
-    return "assets/enemies/enemy_medium.png";
+    return "assets/enemies/enemy_medium.webp";
   }
 
-  return "assets/enemies/enemy_weak.png";
+  return "assets/enemies/enemy_weak.webp";
 }
 
 function isRadarSpotFree(x, y, minGap) {
