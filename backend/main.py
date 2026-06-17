@@ -2964,23 +2964,25 @@ async def scan(request: Request):
             visible.append({
                 "id": t["id"],
                 "kind": t.get("kind", "enemy"),
+
+                # Data aman untuk hasil Scan.
                 "name": t["name"],
                 "x": t["x"],
                 "y": t["y"],
                 "distance": t["distance"],
                 "type": t.get("type", "Unknown"),
                 "level": t.get("level", 1),
-                "defense_power": t.get("defense_power", 500),
                 "signal_strength": t.get("signal_strength", "Unknown"),
                 "lab_tier": t.get("lab_tier", "Unknown"),
                 "vault_signal": t.get("vault_signal", "Unknown"),
-                "firewall": t.get("firewall", "Basic Firewall"),
                 "asset": t.get("asset"),
+
+                # Untuk membedakan player target di UI.
+                # Jangan kirim detail power/module/resource di sini.
                 "player_id": t.get("player_id"),
 
-                "enemy_army_power": t.get("enemy_army_power", 0),
-                "defense_modules": t.get("defense_modules", []),
-                "defense_stats": t.get("defense_stats", {}),
+                # Penanda agar UI tahu bahwa detail harus lewat Scout.
+                "intel_status": "scout_required",
             })
 
     visible_mining = []
@@ -2996,14 +2998,9 @@ async def scan(request: Request):
         "scanner_level": scanner_level,
         "radius": radius,
         "targets": visible + visible_mining,
-        "enemy_count": len([t for t in visible if t.get("kind") != "player"]),
+        "enemy_count": len([t for t in visible if t.get("kind") not in ["player", "mining"]]),
         "player_count": len([t for t in visible if t.get("kind") == "player"]),
         "mining_count": len(visible_mining),
-        "debug": {
-            "attacker_player_id": attacker_player_id,
-            "players_count": len(GAME_STATE.get("players", {})),
-            "player_target_count_before_radius": len(player_targets),
-        }
     }
 
 def apply_scout_noise_mask(report: dict):
