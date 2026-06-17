@@ -949,6 +949,109 @@ def get_defense_module_score(modules: list[str]):
         "module_anti_scout": total_anti_scout,
     }
 
+def ensure_recovery_system(profile: dict):
+    profile.setdefault("disabled_units", {})
+
+    for unit_id in UNITS.keys():
+        profile["disabled_units"].setdefault(unit_id, {})
+
+        for level in range(1, int(UNITS[unit_id].get("max_level", 5)) + 1):
+            profile["disabled_units"][unit_id].setdefault(str(level), 0)
+
+    return profile
+
+
+def add_disabled_units_to_recovery(profile: dict, disabled_units: dict):
+    profile = ensure_recovery_system(profile)
+
+    for unit_id, level_map in disabled_units.items():
+        if unit_id not in UNITS:
+            continue
+
+        profile["disabled_units"].setdefault(unit_id, {})
+
+        for level_text, amount in level_map.items():
+            amount = int(amount or 0)
+
+            if amount <= 0:
+                continue
+
+            level_text = str(level_text)
+            current = int(profile["disabled_units"][unit_id].get(level_text, 0))
+            profile["disabled_units"][unit_id][level_text] = current + amount
+
+    return profile
+
+def apply_npc_guard_damage(target: dict, final_attack_score: int, final_defense_score: int, success: bool):
+    if target.get("kind") != "enemy":
+        return {}
+
+    army = target.get("enemy_army", [])
+
+    if not isinstance(army, list) or not army:
+        return {}
+
+    pressure = final_attack_score / max(1, final_defense_score)
+
+    if success:
+        base_rate = random.uniform(0.35, 0.65)
+    else:
+        base_rate = random.uniform(0.08, 0.22)
+
+    casualty_rate = base_rate * min(1.4, max(0.25, pressure))
+    casualty_rate = max(0.02, min(0.85, casualty_rate))
+
+    enemy_destroyed = {}
+    new_guard_power = 0
+
+    for unit in army:
+        count = int(unit.get("count", 0) or 0)
+
+        if count <= 0:
+            continue
+
+        old_power = int(unit.get("power", 0) or 0)
+        per_unit_power = old_power / max(1, count)
+
+        killed = int(count * casualty_rate * random.uniform(0.75, 1.15))
+
+        if success and killed <= 0:
+            killed = 1
+
+        killed = max(0, min(count, killed))
+        new_count = count - killed
+
+        unit["count"] = new_count
+        unit["power"] = int(per_unit_power * new_count)
+
+        new_guard_power += int(unit["power"])
+
+        if killed > 0:
+            label = f"{unit.get('name', unit.get('id', 'Unknown Unit'))} Lv.{unit.get('level', 1)}"
+            enemy_destroyed[label] = enemy_destroyed.get(label, 0) + killed
+
+    target["enemy_army_power"] = int(new_guard_power)
+
+    defense_stats = target.get("defense_stats", {})
+
+    if isinstance(defense_stats, dict):
+        module_power = int(defense_stats.get("npc_module_power", 0) or 0)
+
+        defense_stats["npc_guard_power"] = int(new_guard_power)
+        defense_stats["defense_power"] = int(new_guard_power + module_power)
+
+        target["defense_stats"] = defense_stats
+        target["defense_power"] = defense_stats["defense_power"]
+        target["estimated_power"] = defense_stats["defense_power"]
+
+    if success:
+        target["status"] = "breached"
+    elif new_guard_power <= 0:
+        target["status"] = "collapsed"
+    else:
+        target["status"] = "damaged"
+
+    return enemy_destroyed
 
 def get_defense_stats_for_profile(profile: dict):
     profile = ensure_player_profile_schema(profile)
@@ -2107,6 +2210,7 @@ def apply_unit_losses(profile: dict, selected_units: dict, loss_rate: float):
 
             destroyed[unit_id][level_text] = des
             disabled[unit_id][level_text] = dis
+            profile = add_disabled_units_to_recovery(profile, disabled)
 
     return destroyed, disabled
 
@@ -3246,6 +3350,7 @@ async def attack(req: AttackRequest, request: Request):
     attacker = ensure_player_profile_schema(attacker)
     attacker = ensure_profile_unit_system(attacker)
     attacker = ensure_profile_ai_system(attacker)
+    attacker = ensure_recovery_system(attacker)
 
     target = GAME_STATE.get("targets", {}).get(req.target_id)
 
@@ -3258,7 +3363,10 @@ async def attack(req: AttackRequest, request: Request):
     target = refresh_player_target_from_profile(target)
 
     if target.get("kind") == "mining":
-        raise HTTPException(status_code=400, detail="Mining node belum bisa diserang dengan attack PvP.")
+        raise HTTPException(
+            status_code=400,
+            detail="Mining node belum bisa diserang dengan attack."
+        )
 
     if target.get("kind") == "player" and target.get("player_id") == attacker_id:
         raise HTTPException(status_code=400, detail="Tidak bisa menyerang base sendiri.")
@@ -3318,7 +3426,6 @@ async def attack(req: AttackRequest, request: Request):
     )
 
     distance_value = float(target.get("distance", 1))
-
     base_travel = max(5, int(distance_value * 1.2))
 
     total_travel_reduction = (
@@ -3336,6 +3443,7 @@ async def attack(req: AttackRequest, request: Request):
 
     defense_modules = target.get("defense_modules", [])
     defense_stats = target.get("defense_stats") or {}
+
     defense_score = int(
         defense_stats.get(
             "defense_power",
@@ -3343,26 +3451,20 @@ async def attack(req: AttackRequest, request: Request):
         )
     )
 
-    module_counter_log = []
-
-    # module defense memberi efek kecil langsung ke battle
+    # Defense module tetap memengaruhi battle,
+    # tapi detailnya tidak ditampilkan ke battle log agar Scout tetap berguna.
     if "Firewall Core" in defense_modules and "firewall_crusher" not in clean_modules:
         defense_score += 350
-        module_counter_log.append("DEFENSE: Firewall Core resisted breach. Bring Firewall Crusher.")
 
     if "Trap Net" in defense_modules and "trap_detector" not in clean_modules:
         defense_score += 280
-        module_counter_log.append("DEFENSE: Trap Net disrupted unit route. Bring Trap Detector.")
 
     if "Vault Guard" in defense_modules and "core_breaker" not in clean_modules:
         defense_score += 320
-        module_counter_log.append("DEFENSE: Vault Guard reduced breach pressure. Bring Core Breaker.")
 
     if "Repair Node" in defense_modules and "payload_booster" not in clean_modules:
         defense_score += 260
-        module_counter_log.append("DEFENSE: Repair Node extended defense sustain. Bring Payload Booster.")
 
-    # random kecil agar battle tidak terlalu kaku
     attack_roll = random.uniform(0.92, 1.08)
     defense_roll = random.uniform(0.95, 1.06)
 
@@ -3380,6 +3482,7 @@ async def attack(req: AttackRequest, request: Request):
             detail=f"Energy tidak cukup. Butuh {energy_cost}, punya {attacker.get('energy', 0)}"
         )
 
+    # Mulai dari sini baru boleh mengubah data permanen.
     attacker["energy"] = int(attacker.get("energy", 0)) - energy_cost
 
     loss_rate = 0.16 if success else 0.42
@@ -3391,12 +3494,22 @@ async def attack(req: AttackRequest, request: Request):
 
     destroyed, disabled = apply_unit_losses(attacker, req.units, loss_rate)
 
+    enemy_destroyed_units = apply_npc_guard_damage(
+        target=target,
+        final_attack_score=final_attack_score,
+        final_defense_score=final_defense_score,
+        success=success,
+    )
+
     trace_gain = 8 if success else 20
     trace_gain -= module_bonus["trace_reduction"]
     trace_gain += ai_bonus["trace_delta"]
     trace_gain = max(1, min(40, trace_gain))
 
-    attacker["trace"] = max(0, min(100, int(attacker.get("trace", 0)) + trace_gain))
+    attacker["trace"] = max(
+        0,
+        min(100, int(attacker.get("trace", 0)) + trace_gain)
+    )
 
     reward = {
         "credits": 0,
@@ -3422,65 +3535,102 @@ async def attack(req: AttackRequest, request: Request):
                 continue
 
             reward[key] = stolen
-
             attacker["resources"][key] = int(attacker["resources"].get(key, 0)) + stolen
+
+            target_resources[key] = max(0, available - stolen)
+            target["resources"] = target_resources
 
             if defender:
                 defender_resources = defender.get("resources", {})
                 defender_resources[key] = max(0, int(defender_resources.get(key, 0)) - stolen)
                 defender["resources"] = defender_resources
 
-        # kecil kemungkinan dapat nexus core dari target yang punya
         if int(target_resources.get("nexus_core", 0) or 0) > 0 and random.random() < 0.08:
             reward["nexus_core"] = 1
             attacker["resources"]["nexus_core"] = int(attacker["resources"].get("nexus_core", 0)) + 1
 
+            target_resources["nexus_core"] = max(
+                0,
+                int(target_resources.get("nexus_core", 0)) - 1
+            )
+            target["resources"] = target_resources
+
             if defender:
-                defender["resources"]["nexus_core"] = max(0, int(defender["resources"].get("nexus_core", 0)) - 1)
+                defender["resources"]["nexus_core"] = max(
+                    0,
+                    int(defender["resources"].get("nexus_core", 0)) - 1
+                )
 
     battle_log = []
-
-    ai_names = [
-        AI_AGENTS[ai_id]["name"]
-        for ai_id in req.ai_ids
-        if ai_id in AI_AGENTS
-    ]
 
     battle_log.append(f"Attack launched against {target.get('name', req.target_id)}.")
     battle_log.append(f"Distance: {int(distance_value)} Trace Unit.")
     battle_log.append(f"Travel Time: {final_travel}s.")
     battle_log.append(f"Energy Cost: {energy_cost}.")
     battle_log.append("")
-    battle_log.append("ATTACKER:")
-    battle_log.append(f"- Unit Power: {unit_power}")
-    battle_log.append(f"- Module Bonus: +{module_bonus['attack_flat']} flat / +{module_bonus['attack_percent']}%")
-    battle_log.append(f"- Research Bonus: +{research_bonus['attack_percent']}% attack / -{research_bonus['travel_reduction']}% travel")
-    battle_log.append(f"- AI Bonus: +{ai_bonus['attack_percent']}% attack")
-    if ai_names:
-        battle_log.append(f"- AI: {', '.join(ai_names)}")
-    battle_log.extend(unit_calc["lines"])
-
-    battle_log.append("")
-    battle_log.append("DEFENDER:")
-    battle_log.append(f"- Defense Power: {defense_score}")
-    battle_log.append(f"- Defense Modules: {', '.join(defense_modules) if defense_modules else 'Unknown'}")
-    if defense_stats:
-        battle_log.append(f"- AI Defense Power: {defense_stats.get('ai_power', 0)}")
-        battle_log.append(f"- Module Score: {defense_stats.get('module_score', 0)}")
-
-    battle_log.extend(module_counter_log)
-
-    battle_log.append("")
-    battle_log.append(f"Final Attack Score: {final_attack_score}")
-    battle_log.append(f"Final Defense Score: {final_defense_score}")
     battle_log.append("RESULT: SUCCESS" if success else "RESULT: FAILED")
 
-    if success:
-        battle_log.append(f"Loot gained: {reward}")
-    else:
-        battle_log.append("Attack failed. Route collapsed and units were lost.")
+    battle_log.append("")
+    battle_log.append("YOUR LOSSES:")
 
-    battle_log.append(f"Trace Exposure +{trace_gain}. Current Trace: {attacker['trace']}%.")
+    has_loss = False
+
+    for unit_id, level_map in destroyed.items():
+        unit_name = UNITS.get(unit_id, {}).get("name", unit_id)
+
+        for level_text, amount in level_map.items():
+            amount = int(amount or 0)
+
+            if amount > 0:
+                has_loss = True
+                battle_log.append(f"- {unit_name} Lv.{level_text} destroyed: {amount}")
+
+    for unit_id, level_map in disabled.items():
+        unit_name = UNITS.get(unit_id, {}).get("name", unit_id)
+
+        for level_text, amount in level_map.items():
+            amount = int(amount or 0)
+
+            if amount > 0:
+                has_loss = True
+                battle_log.append(f"- {unit_name} Lv.{level_text} disabled: {amount}")
+
+    if not has_loss:
+        battle_log.append("- No confirmed unit losses.")
+
+    has_disabled = any(
+        int(amount or 0) > 0
+        for level_map in disabled.values()
+        for amount in level_map.values()
+    )
+
+    if has_disabled:
+        battle_log.append("- Disabled units moved to Recovery Center.")
+
+    battle_log.append("")
+    battle_log.append("ENEMY DAMAGE:")
+
+    if enemy_destroyed_units:
+        for name, amount in enemy_destroyed_units.items():
+            battle_log.append(f"- {name} destroyed: {amount}")
+    else:
+        battle_log.append("- No confirmed enemy casualties.")
+
+    battle_log.append("")
+    battle_log.append("LOOT:")
+
+    if success:
+        battle_log.append(f"- Credits +{reward.get('credits', 0)}")
+        battle_log.append(f"- Data Shard +{reward.get('data_shard', 0)}")
+        battle_log.append(f"- Nano Parts +{reward.get('nano_parts', 0)}")
+
+        if reward.get("nexus_core", 0):
+            battle_log.append(f"- Nexus Core +{reward.get('nexus_core', 0)}")
+    else:
+        battle_log.append("- No loot secured.")
+
+    battle_log.append("")
+    battle_log.append(f"TRACE: +{trace_gain}. Current Trace: {attacker['trace']}%.")
 
     GAME_STATE["players"][attacker_id] = attacker
 
@@ -3488,8 +3638,6 @@ async def attack(req: AttackRequest, request: Request):
         GAME_STATE["players"][target["player_id"]] = defender
 
     GAME_STATE["targets"][req.target_id] = target
-
-    await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
 
     attack_id = f"atk_{int(time.time())}_{random.randint(1000, 9999)}"
 
@@ -3510,18 +3658,17 @@ async def attack(req: AttackRequest, request: Request):
 
         "destroyed_units": destroyed,
         "disabled_units": disabled,
+        "enemy_destroyed_units": enemy_destroyed_units,
         "reward": reward,
 
         "trace_exposure": attacker["trace"],
         "energy_cost": energy_cost,
-
-        "attack_score": final_attack_score,
-        "defense_score": final_defense_score,
-        "unit_power_score": unit_power,
     }
 
     GAME_STATE.setdefault("active_attacks", {})
     GAME_STATE["active_attacks"][attack_id] = result
+
+    await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
 
     return result
 
