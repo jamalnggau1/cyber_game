@@ -3091,8 +3091,67 @@ async function upgradeUnitTech(unitId) {
   }
 }
 
+function normalizeUnitLevel(level) {
+  const n = Number(level);
+
+  if (!Number.isFinite(n) || n < 1) {
+    return null;
+  }
+
+  return Math.floor(n);
+}
+
 function unitStackKey(unitId, level) {
-  return `${unitId}:${level}`;
+  const lv = normalizeUnitLevel(level);
+
+  if (!lv) {
+    console.warn("[ATTACK] Invalid unit level:", unitId, level);
+    return null;
+  }
+
+  return `${unitId}:${lv}`;
+}
+
+function cleanSelectedUnits() {
+  Object.keys(selectedUnits || {}).forEach(key => {
+    const [unitId, levelText] = String(key).split(":");
+    const level = normalizeUnitLevel(levelText);
+    const amount = Number(selectedUnits[key] || 0);
+
+    if (!unitId || !level || amount <= 0) {
+      delete selectedUnits[key];
+    }
+  });
+}
+
+function buildUnitPayload() {
+  cleanSelectedUnits();
+
+  const payload = {};
+
+  Object.entries(selectedUnits || {}).forEach(([key, amount]) => {
+    const qty = parseInt(amount || "0", 10);
+
+    if (!qty || qty <= 0) {
+      return;
+    }
+
+    const [unitId, levelText] = String(key).split(":");
+    const level = normalizeUnitLevel(levelText);
+
+    if (!unitId || !level) {
+      console.warn("[ATTACK] Skip invalid selected unit:", key, amount);
+      return;
+    }
+
+    if (!payload[unitId]) {
+      payload[unitId] = {};
+    }
+
+    payload[unitId][String(level)] = (payload[unitId][String(level)] || 0) + qty;
+  });
+
+  return payload;
 }
 
 function getUnitLevelInfo(unit, level) {
@@ -4731,28 +4790,66 @@ function clampAttackUnitAmount(unitId, level, value) {
   return amount;
 }
 
+function getAttackUnitLevelInfo(unitId, level) {
+  const unit = state?.units?.find(u => String(u.id) === String(unitId));
+  const lv = normalizeUnitLevel(level);
+
+  if (!unit || !lv) {
+    return null;
+  }
+
+  return (unit.levels || []).find(item => Number(item.level) === lv) || null;
+}
+
+function getAttackOwnedAmount(unitId, level) {
+  const lv = getAttackUnitLevelInfo(unitId, level);
+  return Number(lv?.owned || 0);
+}
+
+function clampAttackUnitAmount(unitId, level, value) {
+  const owned = getAttackOwnedAmount(unitId, level);
+  let amount = parseInt(value || "0", 10);
+
+  if (Number.isNaN(amount)) amount = 0;
+  if (amount < 0) amount = 0;
+  if (amount > owned) amount = owned;
+
+  return amount;
+}
+
 function changeAttackUnit(unitId, level, delta, targetId) {
   const key = unitStackKey(unitId, level);
-  const current = Number(selectedUnits[key] || 0);
-  const next = clampAttackUnitAmount(unitId, level, current + Number(delta || 0));
 
-  selectedUnits[key] = next;
+  if (!key) {
+    return;
+  }
+
+  const current = Number(selectedUnits[key] || 0);
+  selectedUnits[key] = clampAttackUnitAmount(unitId, level, current + Number(delta || 0));
 
   showAttackSetupSheetById(targetId);
 }
 
 function setAttackUnitPercent(unitId, level, percent, targetId) {
-  const owned = getAttackOwnedAmount(unitId, level);
-  const amount = Math.floor(owned * Number(percent || 0) / 100);
-
   const key = unitStackKey(unitId, level);
-  selectedUnits[key] = clampAttackUnitAmount(unitId, level, amount);
+
+  if (!key) {
+    return;
+  }
+
+  const owned = getAttackOwnedAmount(unitId, level);
+  selectedUnits[key] = clampAttackUnitAmount(unitId, level, Math.floor(owned * Number(percent || 0) / 100));
 
   showAttackSetupSheetById(targetId);
 }
 
 function setAttackUnitMax(unitId, level, targetId) {
   const key = unitStackKey(unitId, level);
+
+  if (!key) {
+    return;
+  }
+
   selectedUnits[key] = getAttackOwnedAmount(unitId, level);
 
   showAttackSetupSheetById(targetId);
@@ -4760,35 +4857,16 @@ function setAttackUnitMax(unitId, level, targetId) {
 
 function setAttackUnit(unitId, level, value, targetId = null) {
   const key = unitStackKey(unitId, level);
+
+  if (!key) {
+    return;
+  }
+
   selectedUnits[key] = clampAttackUnitAmount(unitId, level, value);
 
   if (targetId) {
     showAttackSetupSheetById(targetId);
   }
-}
-
-function setAttackUnitPercent(unitId, percent, targetId) {
-  const owned = state.player.unit_inventory[unitId] || 0;
-  selectedUnits[unitId] = Math.floor(owned * percent / 100);
-
-  showAttackSetupSheetById(targetId);
-}
-
-function setAttackUnitMax(unitId, targetId) {
-  const owned = state.player.unit_inventory[unitId] || 0;
-  selectedUnits[unitId] = owned;
-
-  showAttackSetupSheetById(targetId);
-}
-
-function setAttackUnit(unitId, value) {
-  const owned = state.player.unit_inventory[unitId] || 0;
-  let amount = parseInt(value || "0", 10);
-
-  if (amount < 0) amount = 0;
-  if (amount > owned) amount = owned;
-
-  selectedUnits[unitId] = amount;
 }
 
 function toggleModuleFromSheet(moduleId, targetId) {
