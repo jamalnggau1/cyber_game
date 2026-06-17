@@ -88,14 +88,14 @@ def make_reset_player_profile(player_id: str, old_profile: dict | None = None):
         "x": old_profile.get("x", 120),
         "y": old_profile.get("y", 450),
 
-        "lab_level": 1,
-        "scanner_level": 1,
-        "scout_level": 1,
+        "lab_level": 0,
+        "scanner_level": 0,
+        "scout_level": 0,
 
         "energy": 100,
         "trace": 0,
 
-        "jammer_level": 1,
+        "jammer_level": 0,
         "defense_ai_level": 1,
         "trace_monitor_level": 1,
 
@@ -105,26 +105,12 @@ def make_reset_player_profile(player_id: str, old_profile: dict | None = None):
             "modules": ["Firewall Core", "Trace Monitor", "Sentinel"],
         },
 
-        "defense_units": [
-            {
-                "id": "breaker",
-                "name": "Breaker",
-                "role": "Frontline",
-                "level": 1,
-                "count": 30,
-                "hp": 120,
-                "attack": 35,
-                "defense": 18,
-                "speed": 7,
-                "cargo": 3,
-                "power": 1950,
-            }
-        ],
+        "defense_units": [],
 
         "resources": {
             "credits": 5000,
             "data_shard": 0,
-            "nano_parts": 0,
+            "nano_parts": 1200,
             "nexus_core": 0,
         },
 
@@ -134,7 +120,7 @@ def make_reset_player_profile(player_id: str, old_profile: dict | None = None):
         "active_ai": [],
 
         "unit_inventory": {
-            "breaker": 30,
+            "breaker": 0,
             "ghost": 0,
             "probe": 0,
             "payload": 0,
@@ -143,8 +129,12 @@ def make_reset_player_profile(player_id: str, old_profile: dict | None = None):
         },
 
         "research": {
-            "level": 1,
+            "level": 0,
             "unit_tech": {},
+        },
+        "tutorial": {
+            "step": "build_main_lab",
+            "completed": [],
         },
     }
 
@@ -1411,61 +1401,158 @@ def make_enemy_resources(target_level: int, signal_strength: str):
         "nexus_core": 1 if target_level >= 8 and random.random() < 0.22 else 0,
     }
 
+BUILDING_UNLOCK_RULES = {
+    "unit_factory": {
+        "main_lab": 1,
+    },
+    "radar_tower": {
+        "main_lab": 1,
+        "unit_factory": 1,
+    },
+    "recovery_center": {
+        "main_lab": 2,
+    },
+    "research_lab": {
+        "main_lab": 2,
+    },
+    "ai_core": {
+        "main_lab": 3,
+    },
+    "guild_gate": {
+        "main_lab": 5,
+    },
+}
+
+
+def get_profile_building_level(profile: dict, building_id: str):
+    building = profile.get("buildings", {}).get(building_id, {})
+    return int(building.get("level", 0) or 0)
+
+
+def is_building_requirement_met(profile: dict, requirements: dict):
+    for req_building_id, req_level in requirements.items():
+        if get_profile_building_level(profile, req_building_id) < int(req_level):
+            return False
+
+    return True
+
+
+def apply_building_unlocks(profile: dict):
+    buildings = profile.setdefault("buildings", make_default_player_buildings())
+
+    for building_id, building in buildings.items():
+        if building_id == "main_lab":
+            building["locked"] = False
+            continue
+
+        requirements = BUILDING_UNLOCK_RULES.get(building_id, {})
+
+        if not requirements:
+            continue
+
+        building["locked"] = not is_building_requirement_met(profile, requirements)
+
+    # sync level profile utama
+    profile["lab_level"] = get_profile_building_level(profile, "main_lab")
+    profile["scanner_level"] = get_profile_building_level(profile, "radar_tower")
+    profile["scout_level"] = get_profile_building_level(profile, "radar_tower")
+    profile["ai_core_level"] = get_profile_building_level(profile, "ai_core")
+
+    return profile
+
+
+def get_radar_scan_rule(radar_level: int):
+    radar_level = int(radar_level or 0)
+
+    if radar_level <= 0:
+        return {
+            "radius": 0,
+            "enemy_limit": 0,
+            "mining_limit": 0,
+        }
+
+    if radar_level == 1:
+        return {
+            "radius": 45,
+            "enemy_limit": 2,
+            "mining_limit": 0,
+        }
+
+    if radar_level == 2:
+        return {
+            "radius": 60,
+            "enemy_limit": 3,
+            "mining_limit": 1,
+        }
+
+    if radar_level == 3:
+        return {
+            "radius": 75,
+            "enemy_limit": 5,
+            "mining_limit": 2,
+        }
+
+    return {
+        "radius": 75 + ((radar_level - 3) * 15),
+        "enemy_limit": min(12, 5 + ((radar_level - 3) * 2)),
+        "mining_limit": min(5, 2 + ((radar_level - 3) // 2)),
+    }
+
 def make_default_player_buildings():
     return {
         "main_lab": {
             "id": "main_lab",
             "name": "Main Lab",
-            "level": 1,
+            "level": 0,
             "locked": False,
             "asset": "assets/base.webp",
-            "description": "Level utama akun, membuka bangunan baru, kapasitas dasar, dan syarat upgrade fitur besar.",
-            "actions": ["Upgrade Main Lab", "View Lab Stats"],
-        },
-        "radar_tower": {
-            "id": "radar_tower",
-            "name": "Radar Tower",
-            "level": 1,
-            "locked": False,
-            "asset": "assets/radar.webp",
-            "description": "Untuk Scan area, Scout target, dan membuka informasi musuh berdasarkan Scout level.",
-            "actions": ["Open Radar", "Upgrade Scanner", "Upgrade Scout"],
-        },
-        "ai_core": {
-            "id": "ai_core",
-            "name": "AI Core",
-            "level": 1,
-            "locked": False,
-            "asset": "assets/ai_core.webp",
-            "description": "Mengatur AI Agent, slot AI aktif, fragment, training AI, dan buff aktif.",
-            "actions": ["Open AI Agent", "Upgrade AI Core"],
+            "description": "Pusat base. Bangun Main Lab untuk membuka bangunan awal.",
+            "actions": ["Build Main Lab"],
         },
         "unit_factory": {
             "id": "unit_factory",
             "name": "Unit Factory",
-            "level": 1,
-            "locked": False,
+            "level": 0,
+            "locked": True,
             "asset": "assets/unit_factory.webp",
-            "description": "Tempat membuat pasukan cyber untuk menyerang. Unit bisa mati/disabled saat gagal menyerang.",
-            "actions": ["Train Unit", "Upgrade Unit Factory"],
+            "description": "Tempat melatih pasukan. Terbuka setelah Main Lab Lv.1.",
+            "actions": ["Build Unit Factory"],
         },
-        "research_lab": {
-            "id": "research_lab",
-            "name": "Research Lab",
-            "level": 1,
-            "locked": False,
-            "asset": "assets/research_lab.webp",
-            "description": "Tempat riset Network Speed, Scout Signal, Unit Capacity, AI Sync, dan Attack Routing.",
-            "actions": ["Start Research", "Upgrade Research Lab"],
+        "radar_tower": {
+            "id": "radar_tower",
+            "name": "Radar Tower",
+            "level": 0,
+            "locked": True,
+            "asset": "assets/radar.webp",
+            "description": "Untuk scan monster, mining, dan target di sekitar base. Terbuka setelah Unit Factory Lv.1.",
+            "actions": ["Build Radar Tower"],
         },
         "recovery_center": {
             "id": "recovery_center",
             "name": "Recovery Center",
-            "level": 1,
-            "locked": False,
+            "level": 0,
+            "locked": True,
             "asset": "assets/recovery_center.webp",
-            "description": "Memulihkan unit disabled, energy, cooldown, dan recovery setelah battle.",
-            "actions": ["Recover Units", "Upgrade Recovery Center"],
+            "description": "Memulihkan unit disabled setelah battle. Terbuka setelah Main Lab Lv.2.",
+            "actions": ["Build Recovery Center"],
+        },
+        "research_lab": {
+            "id": "research_lab",
+            "name": "Research Lab",
+            "level": 0,
+            "locked": True,
+            "asset": "assets/research_lab.webp",
+            "description": "Riset teknologi base, unit, radar, dan AI. Terbuka setelah Main Lab Lv.2.",
+            "actions": ["Build Research Lab"],
+        },
+        "ai_core": {
+            "id": "ai_core",
+            "name": "AI Core",
+            "level": 0,
+            "locked": True,
+            "asset": "assets/ai_core.webp",
+            "description": "Mengatur AI Agent. Terbuka setelah Main Lab Lv.3.",
+            "actions": ["Build AI Core"],
         },
         "guild_gate": {
             "id": "guild_gate",
@@ -1473,7 +1560,7 @@ def make_default_player_buildings():
             "level": 0,
             "locked": True,
             "asset": "assets/guild_gate.webp",
-            "description": "Membuka guild, rally, guild building, guild war, dan territory.",
+            "description": "Membuka guild, rally, guild war, dan territory. Terbuka setelah Main Lab Lv.5.",
             "actions": ["Locked"],
         },
     }
@@ -1482,22 +1569,18 @@ def ensure_player_profile_schema(profile: dict):
     if "resources" not in profile or not isinstance(profile["resources"], dict):
         profile["resources"] = {}
 
-    profile["resources"].setdefault("credits", 5000)
+    profile["resources"].setdefault("credits", 2500)
     profile["resources"].setdefault("data_shard", 0)
-    profile["resources"].setdefault("nano_parts", 0)
+    profile["resources"].setdefault("nano_parts", 1200)
     profile["resources"].setdefault("nexus_core", 0)
 
-    profile.setdefault("energy", 100)
+    profile.setdefault("energy", 80)
     profile.setdefault("trace", 0)
 
-    profile.setdefault("lab_level", 1)
-    profile.setdefault("scanner_level", 1)
-    profile.setdefault("scout_level", 1)
-    profile.setdefault("ai_core_level", 1)
-
-    profile.setdefault("jammer_level", 1)
-    profile.setdefault("defense_ai_level", 1)
-    profile.setdefault("trace_monitor_level", 1)
+    profile.setdefault("lab_level", 0)
+    profile.setdefault("scanner_level", 0)
+    profile.setdefault("scout_level", 0)
+    profile.setdefault("ai_core_level", 0)
 
     if "buildings" not in profile or not isinstance(profile["buildings"], dict):
         profile["buildings"] = make_default_player_buildings()
@@ -1507,7 +1590,7 @@ def ensure_player_profile_schema(profile: dict):
 
     if "unit_inventory" not in profile or not isinstance(profile["unit_inventory"], dict):
         profile["unit_inventory"] = {
-            "breaker": 30,
+            "breaker": 0,
             "ghost": 0,
             "probe": 0,
             "payload": 0,
@@ -1549,6 +1632,7 @@ def ensure_player_profile_schema(profile: dict):
     profile.setdefault("referral_by", None)
     profile.setdefault("referral_code", f"CC{str(profile.get('telegram_id') or profile.get('player_id') or '000000')[-6:]}")
     profile = ensure_profile_ai_system(profile)
+    profile = apply_building_unlocks(profile)
 
     return profile
 
@@ -3029,21 +3113,51 @@ async def scan(request: Request):
     await sync_state_from_db()
     apply_energy_regen()
 
-    p = GAME_STATE["player"]
+    player_id, profile = get_or_create_active_player_profile(request)
+    profile = ensure_player_profile_schema(profile)
+    profile = ensure_profile_unit_system(profile)
+    profile = apply_building_unlocks(profile)
 
-    attacker_player_id = (
-        request.headers.get("X-Player-Id")
-        or p.get("player_id")
-        or "dev_player"
-    )
+    radar_level = get_profile_building_level(profile, "radar_tower")
+    scan_rule = get_radar_scan_rule(radar_level)
 
+    scanner_level = radar_level
+    radius = scan_rule["radius"]
+    enemy_limit = scan_rule["enemy_limit"]
+    mining_limit = scan_rule["mining_limit"]
+
+    # Radar Lv.0 tidak boleh scan monster/mining.
+    if radar_level <= 0:
+        return {
+            "scan_id": GAME_STATE.get("scan_counter", 0),
+            "scanner_level": 0,
+            "radar_level": 0,
+            "radius": 0,
+            "enemy_limit": 0,
+            "mining_limit": 0,
+            "targets": [],
+            "enemy_count": 0,
+            "player_count": 0,
+            "mining_count": 0,
+            "message": "Radar Tower belum dibangun.",
+        }
+
+    # Sync legacy GAME_STATE["player"] agar generate_targets()
+    # tetap memakai posisi dan level radar player aktif.
+    GAME_STATE.setdefault("player", {})
+    GAME_STATE["player"]["player_id"] = player_id
+    GAME_STATE["player"]["x"] = profile.get("x", 120)
+    GAME_STATE["player"]["y"] = profile.get("y", 450)
+    GAME_STATE["player"]["scanner_level"] = scanner_level
+    GAME_STATE["player"]["scout_level"] = scanner_level
+
+    GAME_STATE["players"][player_id] = profile
     GAME_STATE["scan_counter"] = GAME_STATE.get("scan_counter", 0) + 1
 
     fresh_targets = generate_targets()
-    player_targets = make_player_scan_targets(attacker_player_id)
+    player_targets = make_player_scan_targets(player_id)
 
     all_targets = fresh_targets + player_targets
-
     fresh_mining_nodes = generate_mining_nodes(fresh_targets)
 
     GAME_STATE["targets"] = {
@@ -3054,15 +3168,13 @@ async def scan(request: Request):
         n["id"]: n for n in fresh_mining_nodes
     }
 
-    scanner_level = p["scanner_level"]
-    radius = 45 + (scanner_level * 15)
-
     visible = []
 
     for t in all_targets:
         if t.get("kind") == "enemy" and t.get("status") in ["depleted", "collapsed"]:
             continue
-        if t["distance"] <= radius:
+
+        if int(t.get("distance", 9999)) <= radius:
             visible.append({
                 "id": t["id"],
                 "kind": t.get("kind", "enemy"),
@@ -3083,22 +3195,39 @@ async def scan(request: Request):
                 # Jangan kirim detail power/module/resource di sini.
                 "player_id": t.get("player_id"),
 
-                # Penanda agar UI tahu bahwa detail harus lewat Scout.
+                # Detail tetap harus lewat Scout.
                 "intel_status": "scout_required",
             })
+
+    # Batasi jumlah target tempur sesuai level Radar.
+    # Radar Lv.1 = max 2 target terdekat.
+    visible = sorted(
+        visible,
+        key=lambda t: int(t.get("distance", 9999))
+    )[:enemy_limit]
 
     visible_mining = []
 
     for node in fresh_mining_nodes:
-        if node["distance"] <= radius:
+        if int(node.get("distance", 9999)) <= radius:
             visible_mining.append(node)
+
+    # Batasi jumlah mining sesuai level Radar.
+    # Radar Lv.1 = 0 mining.
+    visible_mining = sorted(
+        visible_mining,
+        key=lambda n: int(n.get("distance", 9999))
+    )[:mining_limit]
 
     await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
 
     return {
         "scan_id": GAME_STATE["scan_counter"],
         "scanner_level": scanner_level,
+        "radar_level": radar_level,
         "radius": radius,
+        "enemy_limit": enemy_limit,
+        "mining_limit": mining_limit,
         "targets": visible + visible_mining,
         "enemy_count": len([t for t in visible if t.get("kind") not in ["player", "mining"]]),
         "player_count": len([t for t in visible if t.get("kind") == "player"]),
@@ -4436,6 +4565,11 @@ async def train_unit(req: TrainUnitRequest, request: Request):
     player_id, profile = get_or_create_active_player_profile(request)
     profile = ensure_player_profile_schema(profile)
     profile = ensure_profile_unit_system(profile)
+    if get_profile_building_level(profile, "unit_factory") < 1:
+        raise HTTPException(
+            status_code=400,
+            detail="Bangun Unit Factory dulu sebelum melatih pasukan."
+        )
 
     unit = get_unit_config(req.unit_id)
 
@@ -5355,13 +5489,15 @@ async def upgrade_building(building_id: str, request: Request):
 
     profile["resources"] = resources
     profile["buildings"][building_id] = building
+    profile = apply_building_unlocks(profile)
     GAME_STATE["players"][player_id] = profile
 
     await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
+    action_text = "dibangun" if current_level == 0 else f"naik ke Lv.{next_level}"
 
     return {
         "success": True,
-        "message": f"{building['name']} berhasil naik ke Lv.{next_level}",
+        "message": f"{building['name']} berhasil {action_text}",
         "player_id": player_id,
         "building_id": building_id,
         "building": building,
