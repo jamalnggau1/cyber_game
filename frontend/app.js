@@ -4615,7 +4615,14 @@ function showAttackSetupSheet(target) {
               <small>Selected Power: ${selectedPower}</small>
             </div>
 
-            <div class="unit-amount">${selected}</div>
+            <input
+              class="unit-amount attack-unit-input"
+              type="number"
+              min="0"
+              max="${lv.owned}"
+              value="${selected}"
+              onchange="setAttackUnit('${u.id}', ${lv.level}, this.value, '${target.id}')"
+            />
           </div>
 
           <div class="unit-pick-actions">
@@ -4701,17 +4708,63 @@ function showAttackSetupSheetById(targetId) {
   if (target) showAttackSetupSheet(target);
 }
 
-function changeAttackUnit(unitId, delta, targetId) {
-  const owned = state.player.unit_inventory[unitId] || 0;
-  const current = Number(selectedUnits[unitId] || 0);
+function getAttackUnitLevelInfo(unitId, level) {
+  const unit = state?.units?.find(u => String(u.id) === String(unitId));
+  if (!unit) return null;
 
-  let next = current + delta;
-  if (next < 0) next = 0;
-  if (next > owned) next = owned;
+  return (unit.levels || []).find(lv => Number(lv.level) === Number(level)) || null;
+}
 
-  selectedUnits[unitId] = next;
+function getAttackOwnedAmount(unitId, level) {
+  const lv = getAttackUnitLevelInfo(unitId, level);
+  return Number(lv?.owned || 0);
+}
+
+function clampAttackUnitAmount(unitId, level, value) {
+  const owned = getAttackOwnedAmount(unitId, level);
+  let amount = parseInt(value || "0", 10);
+
+  if (Number.isNaN(amount)) amount = 0;
+  if (amount < 0) amount = 0;
+  if (amount > owned) amount = owned;
+
+  return amount;
+}
+
+function changeAttackUnit(unitId, level, delta, targetId) {
+  const key = unitStackKey(unitId, level);
+  const current = Number(selectedUnits[key] || 0);
+  const next = clampAttackUnitAmount(unitId, level, current + Number(delta || 0));
+
+  selectedUnits[key] = next;
 
   showAttackSetupSheetById(targetId);
+}
+
+function setAttackUnitPercent(unitId, level, percent, targetId) {
+  const owned = getAttackOwnedAmount(unitId, level);
+  const amount = Math.floor(owned * Number(percent || 0) / 100);
+
+  const key = unitStackKey(unitId, level);
+  selectedUnits[key] = clampAttackUnitAmount(unitId, level, amount);
+
+  showAttackSetupSheetById(targetId);
+}
+
+function setAttackUnitMax(unitId, level, targetId) {
+  const key = unitStackKey(unitId, level);
+  selectedUnits[key] = getAttackOwnedAmount(unitId, level);
+
+  showAttackSetupSheetById(targetId);
+}
+
+function setAttackUnit(unitId, level, value, targetId = null) {
+  const key = unitStackKey(unitId, level);
+  selectedUnits[key] = clampAttackUnitAmount(unitId, level, value);
+
+  if (targetId) {
+    showAttackSetupSheetById(targetId);
+  }
 }
 
 function setAttackUnitPercent(unitId, percent, targetId) {

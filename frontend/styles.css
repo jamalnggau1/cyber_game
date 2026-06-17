@@ -4304,3 +4304,18 @@ input[type=number] {
   gap: 2px;
   margin-top: 8px;
 }
+.attack-unit-input {
+  width: 58px;
+  text-align: center;
+  border-radius: 12px;
+  padding: 8px 6px;
+  color: white;
+  background: rgba(3, 8, 18, .92);
+  border: 1px solid rgba(57, 243, 255, .2);
+  font-weight: 900;
+}
+
+.attack-unit-input:focus {
+  outline: none;
+  border-color: rgba(57, 243, 255, .75);
+}

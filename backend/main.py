@@ -4169,7 +4169,15 @@ def get_units_for_profile(profile: dict):
 
             train_cost = stats.get("train_cost", {})
 
+            power = int(
+                (stats["hp"] * 0.06)
+                + (stats["attack"] * 2.1)
+                + (stats["defense"] * 0.65)
+                + (stats["speed"] * 7)
+                + (stats["cargo"] * 3)
+            )
             levels.append({
+                "power": power,
                 "promote_to_next_unlocked": promote_to_next_unlocked,
                 "level": level,
                 "unlocked": level <= unlocked_level,
