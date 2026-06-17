@@ -1646,17 +1646,33 @@ def generate_targets():
         enemy_army = make_enemy_army(enemy_level, signal_strength)
         enemy_build = make_enemy_build(enemy_level, signal_strength)
 
-        target["enemy_army"] = enemy_army["units"]
-        target["enemy_army_power"] = enemy_army["total_power"]
+        npc_defense_stats = calculate_npc_defense_stats(
+            enemy_army=enemy_army,
+            enemy_build=enemy_build,
+            target_level=enemy_level,
+            target_type=signal_strength,
+        )
 
+        # Pasukan penjaga NPC
+        target["enemy_army"] = enemy_army["units"]
+        target["enemy_army_power"] = npc_defense_stats["npc_guard_power"]
+
+        # Build/module pertahanan NPC
         target["enemy_build"] = enemy_build
-        target["defense_style"] = enemy_build["defense_style"]
         target["defense_modules"] = enemy_build["modules"]
+
+        # defense_style tetap boleh ada untuk tampilan/scout,
+        # tapi jangan dipakai sebagai battle stat.
+        target["defense_style"] = enemy_build.get("defense_style", "Unknown")
+
         target["weakness_hint"] = enemy_build["weakness_hint"]
         target["counter_risk"] = enemy_build["counter_risk"]
 
-        target["defense_power"] = enemy_army["total_power"] + enemy_build["power"]
-        target["estimated_power"] = target["defense_power"]
+        # Defense resmi NPC
+        target["defense_stats"] = npc_defense_stats
+        target["defense_power"] = npc_defense_stats["defense_power"]
+        target["estimated_power"] = npc_defense_stats["defense_power"]
+
         target["resources"] = make_enemy_resources(enemy_level, signal_strength)
 
         targets.append(target)
@@ -1823,21 +1839,57 @@ def make_enemy_army(target_level: int, target_type: str):
         "total_power": total_power,
     }
 
+def get_npc_module_power(modules: list[str], target_level: int, target_type: str):
+    module_stats = get_defense_module_score(modules)
+
+    base_module_power = int(module_stats.get("module_score", 0))
+
+    target_level = max(1, int(target_level or 1))
+    level_scale = 1 + ((target_level - 1) * 0.08)
+
+    threat_scale = threat_multiplier(target_type)
+
+    return int(base_module_power * level_scale * threat_scale)
+
+
+def calculate_npc_defense_stats(enemy_army: dict, enemy_build: dict, target_level: int, target_type: str):
+    guard_power = int(enemy_army.get("total_power", 0) or 0)
+
+    modules = enemy_build.get("modules", [])
+    module_power = get_npc_module_power(modules, target_level, target_type)
+
+    total_defense_power = guard_power + module_power
+
+    return {
+        "defense_power": int(total_defense_power),
+
+        "npc_guard_power": int(guard_power),
+        "npc_module_power": int(module_power),
+
+        "module_count": len(modules),
+        "modules": modules,
+
+        # NPC tidak punya AI Guard.
+        "ai_power": 0,
+        "base_guard_ai_power": 0,
+
+        # Ini khusus scout, bukan battle.
+        "anti_scout_score": 0,
+    }
 
 def make_enemy_build(target_level: int, target_type: str):
     build = random.choice(ENEMY_BUILD_ARCHETYPES)
-    mult = threat_multiplier(target_type)
-
-    module_power = int((target_level * 120) * mult)
 
     return {
         "id": build["id"],
         "name": build["name"],
+
+        # Ini hanya label/tampilan/scout, bukan battle stat langsung.
         "defense_style": build["defense_style"],
+
         "modules": build["modules"],
         "weakness_hint": build["weakness_hint"],
         "counter_risk": build["counter_risk"],
-        "power": module_power,
     }
 
 def get_enemy_asset_by_level(level: int, signal_strength: str):
