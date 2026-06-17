@@ -1736,7 +1736,15 @@ function fmtBuffs(buffs) {
 }
 
 function row(label, value) {
-  function getBuildingLevel(building) {
+  return `
+    <div class="row">
+      <span>${label}</span>
+      <b>${value}</b>
+    </div>
+  `;
+}
+
+function getBuildingLevel(building) {
   return Number(building?.level ?? 0);
 }
 
@@ -1773,30 +1781,28 @@ function getBuildingActionText(building) {
 }
 
 function getBuildingRequirementText(buildingId) {
-  const b = buildingsData?.buildings || {};
-
   if (buildingId === "unit_factory") {
-    return "Requirement: Main Lab Lv.1";
+    return "Main Lab Lv.1";
   }
 
   if (buildingId === "radar_tower") {
-    return "Requirement: Main Lab Lv.1 dan Unit Factory Lv.1";
+    return "Main Lab Lv.1 dan Unit Factory Lv.1";
   }
 
   if (buildingId === "research_lab") {
-    return "Requirement: Main Lab Lv.2";
+    return "Main Lab Lv.2";
   }
 
   if (buildingId === "recovery_center") {
-    return "Requirement: Main Lab Lv.2";
+    return "Main Lab Lv.2";
   }
 
   if (buildingId === "ai_core") {
-    return "Requirement: Main Lab Lv.3";
+    return "Main Lab Lv.3";
   }
 
   if (buildingId === "guild_gate") {
-    return "Requirement: Main Lab Lv.5";
+    return "Main Lab Lv.5";
   }
 
   return "";
@@ -1895,8 +1901,6 @@ function focusMissionBuilding(buildingId) {
   }
 
   openBuilding(buildingId);
-}
-  return `<div class="row"><span>${label}</span><span>${Array.isArray(value) ? value.join(", ") : value}</span></div>`;
 }
 
 function statusIcon(name) {
@@ -2051,7 +2055,7 @@ function renderBaseBuildings() {
         <div class="building ${id} ${lockedClass}" onclick="openBuilding('${id}')">
           <img src="${b.asset}" alt="${b.name}">
           <div class="building-name">${b.name}</div>
-          <div class="building-level">${levelText}</div>
+          <div class="building-level">${getBuildingStatusText(b)}</div>
         </div>
       </div>
     `;
