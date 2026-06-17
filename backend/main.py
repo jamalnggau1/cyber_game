@@ -2778,9 +2778,6 @@ async def get_recovery(request: Request):
     profile = ensure_profile_unit_system(profile)
     profile = ensure_recovery_system(profile)
 
-    GAME_STATE["players"][player_id] = profile
-    await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
-
     items = build_recovery_items(profile)
 
     return {
@@ -5586,6 +5583,17 @@ async def save_defense_setup(req: DefenseSetupRequest, request: Request):
             "stats": get_defense_stats_for_profile(profile),
         }
     }
+
+@app.middleware("http")
+async def add_cache_headers(request: Request, call_next):
+    response = await call_next(request)
+
+    path = request.url.path.lower()
+
+    if path.endswith((".webp", ".png", ".jpg", ".jpeg", ".svg", ".css", ".js", ".ico")):
+        response.headers["Cache-Control"] = "public, max-age=604800"
+
+    return response
 
 # WAJIB PALING BAWAH
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
