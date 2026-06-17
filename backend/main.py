@@ -1436,6 +1436,42 @@ def is_building_requirement_met(profile: dict, requirements: dict):
 
     return True
 
+BUILT_BUILDING_ACTIONS = {
+    "main_lab": ["Upgrade Main Lab", "Stats"],
+    "unit_factory": ["Train", "Upgrade Factory"],
+    "radar_tower": ["Open Radar", "Upgrade Radar"],
+    "recovery_center": ["Recover", "Upgrade Recovery"],
+    "research_lab": ["Research", "Upgrade Lab"],
+    "ai_core": ["Open AI Agent", "Upgrade AI Core"],
+    "guild_gate": ["Open Guild", "Upgrade Guild Gate"],
+}
+
+
+def get_build_action_text(building: dict):
+    return f"Build {building.get('name', 'Building')}"
+
+
+def refresh_building_actions(profile: dict):
+    buildings = profile.setdefault("buildings", make_default_player_buildings())
+
+    for building_id, building in buildings.items():
+        level = int(building.get("level", 0) or 0)
+        locked = bool(building.get("locked", False))
+
+        if locked:
+            building["actions"] = ["Locked"]
+            continue
+
+        if level <= 0:
+            building["actions"] = [get_build_action_text(building)]
+            continue
+
+        building["actions"] = BUILT_BUILDING_ACTIONS.get(
+            building_id,
+            ["Upgrade"]
+        )
+
+    return profile
 
 def apply_building_unlocks(profile: dict):
     buildings = profile.setdefault("buildings", make_default_player_buildings())
@@ -1457,7 +1493,7 @@ def apply_building_unlocks(profile: dict):
     profile["scanner_level"] = get_profile_building_level(profile, "radar_tower")
     profile["scout_level"] = get_profile_building_level(profile, "radar_tower")
     profile["ai_core_level"] = get_profile_building_level(profile, "ai_core")
-
+    profile = refresh_building_actions(profile)
     return profile
 
 

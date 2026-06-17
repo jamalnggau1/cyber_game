@@ -1917,22 +1917,55 @@ function closeBuildingSheet() {
 }
 
 function openRadarUpgradeSheet() {
-  const radar = buildingsData?.buildings?.radar_tower;
+  const radar = buildingsData?.buildings?.radar_tower || {};
   const player = state?.player || {};
 
+  const radarLevel = Number(
+    radar.level ?? player.scanner_level ?? player.radar_level ?? 0
+  );
+
+  const isLocked = Boolean(radar.locked);
+
+  const title = radarLevel <= 0
+    ? "Build Radar Tower"
+    : "Radar Tower Upgrade";
+
+  const actionText = radarLevel <= 0
+    ? "Build Radar Tower"
+    : "Upgrade Radar Tower";
+
+  const description = isLocked
+    ? "Radar Tower masih terkunci. Bangun Main Lab dan Unit Factory dulu."
+    : radarLevel <= 0
+      ? "Bangun Radar Tower untuk membuka scan monster dan target di sekitar base."
+      : "Upgrade Radar meningkatkan radius scan dan jumlah target yang bisa ditemukan.";
+
+  const nextInfo = radarLevel <= 0
+    ? "Setelah dibangun, Radar Lv.1 bisa menemukan max 2 enemy dan 0 mining."
+    : "Level lebih tinggi membuka radius scan lebih jauh, lebih banyak enemy, dan mining node.";
+
   showBuildingSheet(
-    "Radar Tower Upgrade",
+    title,
     `
       <p class="muted">
-        Upgrade Radar meningkatkan radius scan dan membuka informasi target yang lebih detail.
+        ${description}
       </p>
 
-      ${row("Current Radar", radar ? `Lv.${radar.level}` : "Unknown")}
-      ${row("Scanner", `Lv.${player.scanner_level || 1}`)}
-      ${row("Scout", `Lv.${player.scout_level || 1}`)}
+      ${row("Current Radar", `Lv.${radarLevel}`)}
+      ${row("Scanner", `Lv.${radarLevel}`)}
+      ${row("Scout", `Lv.${radarLevel}`)}
+      ${row("Next", nextInfo)}
+
+      ${
+        isLocked
+          ? `<p class="muted">Requirement: Main Lab Lv.1 dan Unit Factory Lv.1</p>`
+          : ``
+      }
 
       <div class="sheet-actions">
-        <button onclick="upgradeBuilding('radar_tower')">Upgrade Radar Tower</button>
+        <button ${isLocked ? "disabled" : ""} onclick="upgradeBuilding('radar_tower')">
+          ${isLocked ? "Locked" : actionText}
+        </button>
         <button disabled>Split Scanner/Scout Later</button>
         <button onclick="closeBuildingSheet()">Close</button>
       </div>
@@ -4284,6 +4317,21 @@ async function scan() {
 
   try {
     const data = await api("/api/scan");
+    if (data.message) {
+      const radarTargetInfo = el("radarTargetInfo");
+
+      if (radarTargetInfo) {
+        radarTargetInfo.innerText = data.message;
+      }
+
+      addGameMessage(
+        "system",
+        "Radar Offline",
+        data.message
+      );
+
+      return;
+    }
 
     if (runId !== radarScanRunId) return;
 
