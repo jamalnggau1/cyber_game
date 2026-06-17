@@ -1,6 +1,6 @@
 let state = null;
 let buildingsData = null;
-let radarTargets = [];
+const clearedTargetIds = new Set();
 let gameMessages = [];
 let currentUnitFactoryView = null;
 let contestedNodes = [];
@@ -204,6 +204,31 @@ function renderContestedNodes() {
 function resetRadarPlacement() {
   placedRadarPoints = [];
   placedRadarSlots = [];
+}
+
+function markTargetCleared(targetId) {
+  if (!targetId) return;
+
+  const id = String(targetId);
+
+  clearedTargetIds.add(id);
+
+  radarTargets = (radarTargets || []).filter(t => String(t.id) !== id);
+
+  document.querySelectorAll(`.enemy-marker[data-target-id="${id}"]`).forEach(marker => {
+    marker.remove();
+  });
+
+  if (String(selectedTarget) === id) {
+    selectedTarget = null;
+  }
+
+  const radarTargetInfo = el("radarTargetInfo");
+  if (radarTargetInfo) {
+    radarTargetInfo.innerText = "Target cleared. Signal removed from current radar.";
+  }
+
+  closeBuildingSheet();
 }
 
 function clearRadarMarkers() {
@@ -4064,10 +4089,12 @@ async function scan() {
   const scanBtn = el("scanBtn");
 
   const runId = ++radarScanRunId;
+  const clearedTargetIds = new Set();
 
   selectedTarget = null;
   selectedUnits = {};
   selectedModules = new Set();
+  
 
   clearRadarMarkers();
   radarTargets = [];
@@ -4089,7 +4116,9 @@ async function scan() {
     if (runId !== radarScanRunId) return;
 
     clearRadarMarkers();
-    radarTargets = data.targets || [];
+    radarTargets = (data.targets || []).filter(t => {
+      return !clearedTargetIds.has(String(t.id));
+    });
 
     const enemyCount = data.enemy_count ?? radarTargets.filter(t => t.kind !== "mining").length;
     const miningCount = data.mining_count ?? radarTargets.filter(t => t.kind === "mining").length;
@@ -4418,6 +4447,7 @@ function createEnemyMarker(target, index, total, radius) {
 
   const marker = document.createElement("button");
   marker.className = `enemy-marker enemy-image-marker ${markerTypeClass} ${signalClass}`;
+  marker.dataset.targetId = String(target.id);
 
   marker.style.left = fixedPos.left;
   marker.style.top = fixedPos.top;
@@ -4465,12 +4495,11 @@ function selectRadarSignal(targetId) {
   const targetAsset = getEnemyAsset(target);
 
   document.querySelectorAll(".enemy-marker").forEach(marker => {
-    marker.classList.remove("selected");
+    marker.classList.toggle(
+      "selected",
+      marker.dataset.targetId === String(targetId)
+    );
   });
-
-  const index = radarTargets.findIndex(t => t.id === targetId);
-  const marker = document.querySelectorAll(".enemy-marker")[index];
-  if (marker) marker.classList.add("selected");
 
   showBuildingSheet(
     target.name,
@@ -5086,6 +5115,12 @@ async function launchAttack() {
       method: "POST",
       body: JSON.stringify(payload)
     });
+    if (
+      res.target_kind === "enemy" &&
+      (res.success || res.target_status === "depleted" || res.target_depleted)
+    ) {
+      markTargetCleared(targetId);
+    }
 
     // Kalau server bilang target sudah habis/depleted,
     // hapus dari radar lokal dan jangan tampilkan travel attack.
