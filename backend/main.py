@@ -2674,6 +2674,10 @@ async def scan(request: Request):
                 "firewall": t.get("firewall", "Basic Firewall"),
                 "asset": t.get("asset"),
                 "player_id": t.get("player_id"),
+
+                "enemy_army_power": t.get("enemy_army_power", 0),
+                "defense_modules": t.get("defense_modules", []),
+                "defense_stats": t.get("defense_stats", {}),
             })
 
     visible_mining = []
