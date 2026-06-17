@@ -362,7 +362,7 @@ MINING_RESOURCES = [
         "id": "data_shard",
         "name": "Data Shard",
         "node_name": "Data Cache",
-        "asset": "assets/mining/data_cache.png",
+        "asset": "assets/mining/data_cache.webp",
         "base_rate": 8,
         "capacity": 1200,
         "weight": 35,
@@ -371,7 +371,7 @@ MINING_RESOURCES = [
         "id": "nano_parts",
         "name": "Nano Parts",
         "node_name": "Nano Mine",
-        "asset": "assets/mining/nano_mine.png",
+        "asset": "assets/mining/nano_mine.webp",
         "base_rate": 6,
         "capacity": 900,
         "weight": 35,
@@ -380,7 +380,7 @@ MINING_RESOURCES = [
         "id": "credits",
         "name": "Credits",
         "node_name": "Credit Vault",
-        "asset": "assets/mining/credit_vault.png",
+        "asset": "assets/mining/credit_vault.webp",
         "base_rate": 20,
         "capacity": 3000,
         "weight": 25,
@@ -389,7 +389,7 @@ MINING_RESOURCES = [
         "id": "nexus_core",
         "name": "Nexus Core",
         "node_name": "Nexus Rift",
-        "asset": "assets/mining/nexus_rift.png",
+        "asset": "assets/mining/nexus_rift.webp",
         "base_rate": 0.05,
         "capacity": 5,
         "weight": 5,
@@ -517,7 +517,7 @@ GAME_STATE: Dict[str, Any] = {
             "name": "Main Lab",
             "level": 7,
             "locked": False,
-            "asset": "assets/base.png",
+            "asset": "assets/base.webp",
             "description": "Level utama akun, membuka bangunan baru, kapasitas dasar, dan syarat upgrade fitur besar.",
             "actions": ["Upgrade Main Lab", "View Lab Stats"],
         },
@@ -526,7 +526,7 @@ GAME_STATE: Dict[str, Any] = {
             "name": "Radar Tower",
             "level": 3,
             "locked": False,
-            "asset": "assets/radar.png",
+            "asset": "assets/radar.webp",
             "description": "Untuk Scan area, Scout target, dan membuka informasi musuh berdasarkan Scout level.",
             "actions": ["Open Radar", "Upgrade Scanner", "Upgrade Scout"],
         },
@@ -535,7 +535,7 @@ GAME_STATE: Dict[str, Any] = {
             "name": "AI Core",
             "level": 2,
             "locked": False,
-            "asset": "assets/ai_core.png",
+            "asset": "assets/ai_core.webp",
             "description": "Mengatur AI Agent, slot AI aktif, fragment, training AI, dan buff aktif.",
             "actions": ["Open AI Agent", "Upgrade AI Core"],
         },
@@ -544,7 +544,7 @@ GAME_STATE: Dict[str, Any] = {
             "name": "Unit Factory",
             "level": 2,
             "locked": False,
-            "asset": "assets/unit_factory.png",
+            "asset": "assets/unit_factory.webp",
             "description": "Tempat membuat pasukan cyber untuk menyerang. Unit bisa mati/disabled saat gagal menyerang.",
             "actions": ["Train Unit", "Upgrade Unit Factory"],
         },
@@ -553,7 +553,7 @@ GAME_STATE: Dict[str, Any] = {
             "name": "Research Lab",
             "level": 1,
             "locked": False,
-            "asset": "assets/research_lab.png",
+            "asset": "assets/research_lab.webp",
             "description": "Tempat riset Network Speed, Scout Signal, Unit Capacity, AI Sync, dan Attack Routing.",
             "actions": ["Start Research", "Upgrade Research Lab"],
         },
@@ -562,7 +562,7 @@ GAME_STATE: Dict[str, Any] = {
             "name": "Recovery Center",
             "level": 1,
             "locked": False,
-            "asset": "assets/recovery_center.png",
+            "asset": "assets/recovery_center.webp",
             "description": "Memulihkan unit disabled, energy, cooldown, dan recovery setelah battle.",
             "actions": ["Recover Units", "Upgrade Recovery Center"],
         },
@@ -571,7 +571,7 @@ GAME_STATE: Dict[str, Any] = {
             "name": "Guild Gate",
             "level": 0,
             "locked": True,
-            "asset": "assets/guild_gate.png",
+            "asset": "assets/guild_gate.webp",
             "description": "Membuka guild, rally, guild building, guild war, dan territory.",
             "actions": ["Locked"],
         },
@@ -1418,7 +1418,7 @@ def make_default_player_buildings():
             "name": "Main Lab",
             "level": 1,
             "locked": False,
-            "asset": "assets/base.png",
+            "asset": "assets/base.webp",
             "description": "Level utama akun, membuka bangunan baru, kapasitas dasar, dan syarat upgrade fitur besar.",
             "actions": ["Upgrade Main Lab", "View Lab Stats"],
         },
@@ -1427,7 +1427,7 @@ def make_default_player_buildings():
             "name": "Radar Tower",
             "level": 1,
             "locked": False,
-            "asset": "assets/radar.png",
+            "asset": "assets/radar.webp",
             "description": "Untuk Scan area, Scout target, dan membuka informasi musuh berdasarkan Scout level.",
             "actions": ["Open Radar", "Upgrade Scanner", "Upgrade Scout"],
         },
@@ -1436,7 +1436,7 @@ def make_default_player_buildings():
             "name": "AI Core",
             "level": 1,
             "locked": False,
-            "asset": "assets/ai_core.png",
+            "asset": "assets/ai_core.webp",
             "description": "Mengatur AI Agent, slot AI aktif, fragment, training AI, dan buff aktif.",
             "actions": ["Open AI Agent", "Upgrade AI Core"],
         },
@@ -1445,7 +1445,7 @@ def make_default_player_buildings():
             "name": "Unit Factory",
             "level": 1,
             "locked": False,
-            "asset": "assets/unit_factory.png",
+            "asset": "assets/unit_factory.webp",
             "description": "Tempat membuat pasukan cyber untuk menyerang. Unit bisa mati/disabled saat gagal menyerang.",
             "actions": ["Train Unit", "Upgrade Unit Factory"],
         },
@@ -1454,7 +1454,7 @@ def make_default_player_buildings():
             "name": "Research Lab",
             "level": 1,
             "locked": False,
-            "asset": "assets/research_lab.png",
+            "asset": "assets/research_lab.webp",
             "description": "Tempat riset Network Speed, Scout Signal, Unit Capacity, AI Sync, dan Attack Routing.",
             "actions": ["Start Research", "Upgrade Research Lab"],
         },
@@ -1463,7 +1463,7 @@ def make_default_player_buildings():
             "name": "Recovery Center",
             "level": 1,
             "locked": False,
-            "asset": "assets/recovery_center.png",
+            "asset": "assets/recovery_center.webp",
             "description": "Memulihkan unit disabled, energy, cooldown, dan recovery setelah battle.",
             "actions": ["Recover Units", "Upgrade Recovery Center"],
         },
@@ -1472,7 +1472,7 @@ def make_default_player_buildings():
             "name": "Guild Gate",
             "level": 0,
             "locked": True,
-            "asset": "assets/guild_gate.png",
+            "asset": "assets/guild_gate.webp",
             "description": "Membuka guild, rally, guild building, guild war, dan territory.",
             "actions": ["Locked"],
         },
@@ -1966,15 +1966,15 @@ def get_enemy_asset_by_level(level: int, signal_strength: str):
     signal = str(signal_strength).lower()
 
     if level >= 10:
-        return "assets/enemies/enemy_boss.png"
+        return "assets/enemies/enemy_boss.webp"
 
     if "strong" in signal:
-        return "assets/enemies/enemy_strong.png"
+        return "assets/enemies/enemy_strong.webp"
 
     if "medium" in signal:
-        return "assets/enemies/enemy_medium.png"
+        return "assets/enemies/enemy_medium.webp"
 
-    return "assets/enemies/enemy_weak.png"
+    return "assets/enemies/enemy_weak.webp"
 
 
 generate_targets()
@@ -4917,7 +4917,7 @@ async def auth_telegram(payload: dict = Body(...)):
     }
 
 def get_player_target_asset():
-    return "assets/base.png"
+    return "assets/base.webp"
 
 
 def ensure_multiplayer_system():
