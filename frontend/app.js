@@ -480,6 +480,26 @@ function getOperationPhaseText(op) {
     return "Report delivered";
   }
 
+  if (op.type === "attack") {
+    if (op.phase === "outbound") {
+      return "Going to target";
+    }
+
+    if (op.phase === "returning") {
+      return "Returning to base";
+    }
+
+    if (op.phase === "completed") {
+      return "Completed";
+    }
+
+    if (op.phase === "ignored") {
+      return "Target already cleared";
+    }
+
+    return "Attack running";
+  }
+
   return "Travelling";
 }
 
@@ -488,22 +508,54 @@ function addAttackOperation(attackResult, finalLogText, targetId) {
     radarTargets.find(t => t.id === targetId) ||
     radarTargets.find(t => t.id === attackResult.target_id);
 
-  const total = Math.max(1, Number(attackResult.final_travel_seconds || 1));
+  if (attackResult.ignored || attackResult.target_depleted) {
+    markTargetCleared(targetId || attackResult.target_id);
+
+    addGameMessage(
+      "system",
+      "Target Cleared",
+      "Target ini sudah dikalahkan dan sinyalnya dihapus dari radar."
+    );
+
+    return;
+  }
+
+  const outbound = Math.max(
+    1,
+    Number(attackResult.outbound_seconds || attackResult.final_travel_seconds || 1)
+  );
+
+  const returnSeconds = Math.max(
+    1,
+    Number(attackResult.return_seconds || outbound)
+  );
+
   const now = Date.now();
 
   const op = {
-    id: attackResult.id || `op_${now}`,
+    id: attackResult.id || `atk_${now}`,
     type: "attack",
+    phase: attackResult.phase || "outbound",
     status: "running",
-    title: `Attacking ${target?.name || targetId || "Unknown Target"}`,
+
+    title: `Attacking ${target?.name || attackResult.target_name || targetId || "Unknown Target"}`,
     targetId: targetId || attackResult.target_id,
-    targetName: target?.name || targetId || "Unknown Target",
-    distance: target?.distance || "?",
-    totalSeconds: total,
+    targetName: target?.name || attackResult.target_name || "Unknown Target",
+    distance: target?.distance || attackResult.distance || "?",
+
+    outboundSeconds: outbound,
+    returnSeconds: returnSeconds,
+
+    // Untuk fase pertama, timer hanya sampai target.
+    totalSeconds: outbound,
     startedAt: now,
-    endsAt: now + total * 1000,
+    reachedAt: now + outbound * 1000,
+    endsAt: now + outbound * 1000,
+
     result: attackResult,
-    finalLog: finalLogText
+    finalLog: Array.isArray(attackResult.battle_log)
+      ? attackResult.battle_log.join("\n")
+      : (finalLogText || "")
   };
 
   activeOperations.unshift(op);
@@ -513,8 +565,9 @@ function addAttackOperation(attackResult, finalLogText, targetId) {
     "Attack Launched",
     `${op.title}
 Distance: ${op.distance} Trace Unit
-Travel Time: ${formatSeconds(total)}
-Status: Units are travelling through the network route.`
+Outbound Time: ${formatSeconds(outbound)}
+Return Time: ${formatSeconds(returnSeconds)}
+Status: Units are going to target.`
   );
 
   updateOperationQueueWidget();
@@ -1197,24 +1250,6 @@ function renderOperationQueueList() {
   `;
 }
 
-function getOperationPhaseText(op) {
-  const now = Date.now();
-
-  if (op.type === "scout") {
-    if (now < Number(op.reachedAt || 0)) {
-      return "Going to target";
-    }
-
-    if (now < Number(op.endsAt || 0)) {
-      return "Returning to base";
-    }
-
-    return "Report delivered";
-  }
-
-  return "Travelling";
-}
-
 function renderOperationCard(op) {
   const remaining = getOperationRemaining(op);
   const progress = getOperationProgress(op);
@@ -1222,21 +1257,19 @@ function renderOperationCard(op) {
   return `
     <div class="operation-card" data-op-id="${op.id}">
       <div class="operation-type">${op.type.toUpperCase()}</div>
-      <h3>${op.title}</h3>
+      <h3>${escapeHtml(op.title || "Operation")}</h3>
 
-      ${
-        op.type === "scout"
-          ? `<small id="opPhase_${op.id}" class="muted">${getOperationPhaseText(op)}</small>`
-          : ""
-      }
+      <small id="opPhase_${op.id}" class="muted">
+        ${escapeHtml(getOperationPhaseText(op))}
+      </small>
 
       <small>
         <span id="opRemain_${op.id}" class="operation-status-running">
-          ${formatSeconds(remaining)} remaining
+          ${op.status === "completed" ? "Completed" : `${formatSeconds(remaining)} remaining`}
         </span>
       </small>
 
-      <small>Distance: ${op.distance} Trace Unit</small>
+      <small>Distance: ${escapeHtml(String(op.distance || "?"))} Trace Unit</small>
 
       <div class="operation-progress">
         <div id="opProgress_${op.id}" style="width:${progress}%"></div>
@@ -1252,8 +1285,6 @@ function renderOperationCard(op) {
 function updateOperationQueueSheetLive() {
   if (!el("operationQueueList")) return;
 
-  finalizeExpiredOperations();
-
   const running = getRunningOperations();
 
   running.forEach(op => {
@@ -1262,10 +1293,12 @@ function updateOperationQueueSheetLive() {
     const phaseBox = el(`opPhase_${op.id}`);
 
     if (remainBox) {
-      remainBox.innerText = `${formatSeconds(getOperationRemaining(op))} remaining`;
+      remainBox.innerText = op.status === "completed"
+        ? "Completed"
+        : `${formatSeconds(getOperationRemaining(op))} remaining`;
     }
 
-    if (phaseBox && op.type === "scout") {
+    if (phaseBox) {
       phaseBox.innerText = getOperationPhaseText(op);
     }
 
@@ -1279,14 +1312,149 @@ function updateOperationQueueSheetLive() {
   }
 }
 
-function finalizeExpiredOperations() {
+function getAttackOperationLog(data) {
+  if (Array.isArray(data?.battle_log)) {
+    return data.battle_log.join("\n");
+  }
+
+  return String(data?.battle_log || data?.message || "No battle log available.");
+}
+
+async function resolveAttackImpact(op) {
+  if (!op || op.resolving) return;
+
+  op.resolving = true;
+
+  try {
+    const data = await api(`/api/attack/${op.id}/impact`, {
+      method: "POST"
+    });
+
+    op.resolving = false;
+
+    if (data.not_ready) {
+      const remain = Math.max(1, Number(data.remaining_seconds || 1));
+      op.endsAt = Date.now() + remain * 1000;
+      op.totalSeconds = remain;
+      renderOperationQueueList();
+      return;
+    }
+
+    op.result = data;
+    op.finalLog = getAttackOperationLog(data);
+
+    if (
+      data.target_kind === "enemy" &&
+      (data.success || data.target_depleted || data.target_status === "depleted")
+    ) {
+      markTargetCleared(data.target_id || op.targetId);
+    }
+
+    if (data.phase === "returning") {
+      const returnSeconds = Math.max(1, Number(data.return_seconds || op.returnSeconds || 1));
+      const now = Date.now();
+
+      let returnEnd = now + returnSeconds * 1000;
+
+      if (data.return_at) {
+        const serverReturnEnd = Number(data.return_at) * 1000;
+
+        if (Number.isFinite(serverReturnEnd) && serverReturnEnd > now) {
+          returnEnd = serverReturnEnd;
+        }
+      }
+
+      op.phase = "returning";
+      op.status = "running";
+      op.title = `Returning from ${data.target_name || op.targetName || "Target"}`;
+      op.returnSeconds = returnSeconds;
+      op.startedAt = now;
+      op.endsAt = returnEnd;
+      op.totalSeconds = Math.max(1, Math.ceil((returnEnd - now) / 1000));
+
+      addGameMessage(
+        "battle",
+        "Attack Impact",
+        `${data.target_name || op.targetName || "Target"}
+${op.finalLog}
+
+Units are returning to base.`
+      );
+
+      await loadState();
+
+      renderOperationQueueList();
+      updateOperationQueueWidget();
+      return;
+    }
+
+    renderOperationQueueList();
+  } catch (err) {
+    op.resolving = false;
+    console.warn("Attack impact failed:", err);
+  }
+}
+
+async function resolveAttackReturn(op) {
+  if (!op || op.resolving) return;
+
+  op.resolving = true;
+
+  try {
+    const data = await api(`/api/attack/${op.id}/return`, {
+      method: "POST"
+    });
+
+    op.resolving = false;
+
+    if (data.not_ready) {
+      const remain = Math.max(1, Number(data.remaining_seconds || 1));
+      op.endsAt = Date.now() + remain * 1000;
+      op.totalSeconds = remain;
+      renderOperationQueueList();
+      return;
+    }
+
+    op.result = data;
+    op.finalLog = getAttackOperationLog(data);
+    op.phase = "completed";
+    op.status = "completed";
+    op.endsAt = Date.now();
+    op.totalSeconds = 1;
+
+    addGameMessage(
+      "battle",
+      "Battle Completed",
+      `${data.target_name || op.targetName || "Target"}
+Target: ${data.target_name || op.targetName || "Unknown"}
+Distance: ${op.distance} Trace Unit
+
+${op.finalLog}`
+    );
+
+    if (currentOperationViewId === op.id) {
+      currentOperationViewId = null;
+      showBattleResultSheet(op.finalLog, false);
+    }
+
+    await loadState();
+
+    renderOperationQueueList();
+    updateOperationQueueWidget();
+  } catch (err) {
+    op.resolving = false;
+    console.warn("Attack return failed:", err);
+  }
+}
+
+async function finalizeExpiredOperations() {
   const expired = activeOperations.filter(op => {
     return op.status === "running" && getOperationRemaining(op) <= 0;
   });
 
   if (!expired.length) return;
 
-  expired.forEach(op => {
+  for (const op of expired) {
     if (op.type === "scout") {
       addGameMessage(
         "scout",
@@ -1311,32 +1479,38 @@ ${op.finalLog}`,
         closeBuildingSheet();
       }
 
-      return;
+      op.status = "completed";
+      op.phase = "completed";
+      continue;
     }
 
-    addGameMessage(
-      "battle",
-      "Battle Completed",
-      `${op.title}
-Target: ${op.targetName || "Unknown"}
-Distance: ${op.distance} Trace Unit
+    if (op.type === "attack") {
+      if (op.phase === "outbound") {
+        await resolveAttackImpact(op);
+        continue;
+      }
 
-${op.finalLog}`
-    );
+      if (op.phase === "returning") {
+        await resolveAttackReturn(op);
+        continue;
+      }
 
-    if (currentOperationViewId === op.id) {
-      currentOperationViewId = null;
-      showBattleResultSheet(op.finalLog, false);
+      continue;
     }
-  });
 
+    op.status = "completed";
+  }
+
+  // Hapus scout completed lama dari running queue,
+  // tapi attack completed tetap boleh tampil di Completed list.
   activeOperations = activeOperations.filter(op => {
-    return !expired.some(done => done.id === op.id);
+    if (op.type === "scout" && op.status === "completed") return false;
+    return true;
   });
 }
 
-function updateOperations() {
-  finalizeExpiredOperations();
+async function updateOperations() {
+  await finalizeExpiredOperations();
 
   updateOperationQueueWidget();
   updateOperationQueueSheetLive();
@@ -1349,10 +1523,12 @@ function openOperationDetail(opId) {
 
   currentOperationViewId = op.id;
 
+  const phase = getOperationPhaseText(op);
+
   showBuildingSheet(
-    op.type === "scout" ? "Scout Drone Travelling" : "Attack Travelling",
+    op.type === "attack" ? "Attack Operation" : "Operation",
     `
-      <div class="attack-visual">
+      <div class="attack-visual ${op.phase === "returning" ? "returning" : ""}">
         <div class="attack-line"></div>
         <div class="attack-node home">Your<br>Lab</div>
         <div class="attack-node target">Target<br>Lab</div>
@@ -1360,19 +1536,15 @@ function openOperationDetail(opId) {
       </div>
 
       <p class="muted">
-        ${op.type === "scout"
-          ? `Phase: ${getOperationPhaseText(op)}
-        Scout drone harus pergi ke target, membaca signal, lalu kembali ke base sebelum report tersedia.`
-          : "Unit sedang bergerak melalui network route. Battle result akan tersedia saat sampai target."
-        }
+        ${escapeHtml(phase)}
       </p>
 
-      <div class="row"><span>Target</span><span>${op.targetName}</span></div>
-      <div class="row"><span>Distance</span><span>${op.distance} Trace Unit</span></div>
-      <div class="row"><span>Total Travel</span><span>${formatSeconds(op.totalSeconds)}</span></div>
+      <div class="row"><span>Target</span><span>${escapeHtml(op.targetName || "Unknown")}</span></div>
+      <div class="row"><span>Distance</span><span>${escapeHtml(String(op.distance || "?"))} Trace Unit</span></div>
+      <div class="row"><span>Phase</span><span>${escapeHtml(phase)}</span></div>
 
       <div id="operationDetailCountdown" class="travel-countdown">
-        ${formatSeconds(getOperationRemaining(op))}
+        ${op.status === "completed" ? "Completed" : formatSeconds(getOperationRemaining(op))}
       </div>
 
       <div class="travel-bar">
@@ -5115,58 +5287,39 @@ async function launchAttack() {
       method: "POST",
       body: JSON.stringify(payload)
     });
-    if (
-      res.target_kind === "enemy" &&
-      (res.success || res.target_status === "depleted" || res.target_depleted)
-    ) {
-      markTargetCleared(targetId);
-    }
 
     // Kalau server bilang target sudah habis/depleted,
-    // hapus dari radar lokal dan jangan tampilkan travel attack.
+    // hapus dari radar lokal dan jangan mulai travel.
     if (
       res.target_depleted ||
       res.ignored ||
+      res.phase === "ignored" ||
       res.target_status === "depleted" ||
       res.target_status === "collapsed"
     ) {
-      removeTargetFromLocalRadar(targetId);
+      markTargetCleared(targetId);
 
       addGameMessage(
         "system",
         "Target Cleared",
-        "Target ini sudah dikalahkan dan tidak bisa diserang lagi."
+        "Target ini sudah dikalahkan dan sinyalnya dihapus dari radar."
       );
 
       alert("Target sudah dikalahkan dan dihapus dari radar.");
       return;
     }
 
-    const log = [
-      ...res.battle_log,
-      "",
-      `Travel Time: ${res.final_travel_seconds}s`,
-      `Energy Cost: ${res.energy_cost}`,
-      `Trace Exposure Now: ${res.trace_exposure}%`,
-      "",
-      `Reward: ${JSON.stringify(res.reward, null, 2)}`
-    ].join("\n");
+    // Attack sekarang baru START.
+    // Battle, reward, trace, dan NPC hilang nanti terjadi saat impact/return.
+    const log = Array.isArray(res.battle_log)
+      ? res.battle_log.join("\n")
+      : "Attack started. Units are moving to target.";
 
     addGameMessage(
       "system",
-      res.success ? "Attack Successful" : "Attack Failed",
-      res.success
-        ? "Target breached. Battle result recorded."
-        : "Attack failed. Battle result recorded."
+      "Attack Launched",
+      "Pasukan sudah berangkat menuju target. Battle belum terjadi."
     );
-
-    // Kalau NPC berhasil dikalahkan, hapus dari radar lokal.
-    if (
-      res.target_kind === "enemy" &&
-      (res.success || res.target_status === "depleted")
-    ) {
-      removeTargetFromLocalRadar(targetId);
-    }
 
     await loadState();
 
