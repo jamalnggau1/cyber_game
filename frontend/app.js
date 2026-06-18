@@ -2886,19 +2886,6 @@ function multiplyCost(cost, amount) {
   return total;
 }
 
-function getTrainCostText(trainCost) {
-  if (!trainCost) return "Research required";
-  return getCostText(trainCost);
-}
-
-function getTotalTrainCostText(amount, trainCost) {
-  return getCostText(multiplyCost(trainCost, amount));
-}
-
-function getTotalTrainCostText(amount, nanoCost) {
-  return `Nano Parts ${amount * nanoCost}`;
-}
-
 function getUnitVisualHtml(unit, className = "") {
   if (unit.asset) {
     return `<img class="unit-detail-visual-img ${className}" src="${unit.asset}" alt="${unit.name}">`;
