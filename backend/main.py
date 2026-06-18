@@ -1796,35 +1796,34 @@ def get_radar_scan_rule(radar_level: int):
     if radar_level <= 0:
         return {
             "radius": 0,
+            "total_limit": 0,
             "enemy_limit": 0,
             "mining_limit": 0,
+            "max_npc_level": 0,
+            "max_mining_level": 0,
         }
 
-    if radar_level == 1:
-        return {
-            "radius": 45,
-            "enemy_limit": 2,
-            "mining_limit": 0,
-        }
-
-    if radar_level == 2:
-        return {
-            "radius": 60,
-            "enemy_limit": 3,
-            "mining_limit": 1,
-        }
-
-    if radar_level == 3:
-        return {
-            "radius": 75,
-            "enemy_limit": 5,
-            "mining_limit": 2,
-        }
-
+    # Radar level menentukan:
+    # 1. radius scan
+    # 2. jumlah total hasil scan non-player
+    # 3. level maksimal NPC/mining yang boleh muncul
     return {
-        "radius": 75 + ((radar_level - 3) * 15),
-        "enemy_limit": min(12, 5 + ((radar_level - 3) * 2)),
-        "mining_limit": min(5, 2 + ((radar_level - 3) // 2)),
+        "radius": 40 + (radar_level * 12),
+
+        # Lv.1 = 1 hasil
+        # Lv.2 = 2 hasil
+        # Lv.3 = 3 hasil
+        # dst, maksimal 10 hasil non-player
+        "total_limit": min(10, radar_level),
+
+        # field lama tetap ada agar tidak merusak response lama
+        "enemy_limit": min(10, radar_level),
+        "mining_limit": min(10, radar_level),
+
+        # Inilah rule penting:
+        # Radar Lv.5 boleh melihat NPC/mining Lv.1 sampai Lv.5
+        "max_npc_level": radar_level,
+        "max_mining_level": radar_level,
     }
 
 def make_default_player_buildings():
@@ -2047,7 +2046,7 @@ def get_unit_tech_list_for_profile(profile: dict):
 
     return result
 
-def generate_targets():
+def generate_targets(max_level: int = 1):
     p = GAME_STATE["player"]
 
     names = [
@@ -2091,7 +2090,8 @@ def generate_targets():
         ty = p["y"] + dy
 
         distance = int((dx ** 2 + dy ** 2) ** 0.5)
-        enemy_level = random.randint(1, 12)
+        max_level = max(1, int(max_level or 1))
+        enemy_level = random.randint(1, max_level)
         defense_power = 800 + (enemy_level * 180) + random.randint(0, 350)
         
 
@@ -2176,7 +2176,7 @@ def is_too_close_to_any(point, points, min_distance):
             return True
     return False
 
-def generate_mining_nodes(enemy_targets=None):
+def generate_mining_nodes(enemy_targets=None, max_level: int = 1):
     p = GAME_STATE["player"]
     scan_counter = GAME_STATE.get("scan_counter", 0)
 
@@ -2238,7 +2238,8 @@ def generate_mining_nodes(enemy_targets=None):
 
         distance = int((dx ** 2 + dy ** 2) ** 0.5)
 
-        guardian_level = random.randint(1, 10)
+        max_level = max(1, int(max_level or 1))
+        guardian_level = random.randint(1, max_level)
         guardian_power = 700 + (guardian_level * 170) + random.randint(0, 420)
 
         if res["id"] == "nexus_core":
@@ -3507,11 +3508,14 @@ async def scan(request: Request):
     GAME_STATE["players"][player_id] = profile
     GAME_STATE["scan_counter"] = GAME_STATE.get("scan_counter", 0) + 1
 
-    fresh_targets = generate_targets()
+    fresh_targets = generate_targets(max_level=scan_rule["max_npc_level"])
     player_targets = make_player_scan_targets(player_id)
 
     all_targets = fresh_targets + player_targets
-    fresh_mining_nodes = generate_mining_nodes(fresh_targets)
+    fresh_mining_nodes = generate_mining_nodes(
+        fresh_targets,
+        max_level=scan_rule["max_mining_level"]
+    )
 
     GAME_STATE["targets"] = {
         t["id"]: t for t in all_targets
@@ -3521,56 +3525,68 @@ async def scan(request: Request):
         n["id"]: n for n in fresh_mining_nodes
     }
 
-    visible = []
+    visible_players = []
+    visible_non_player = []
 
+    # NPC + Player Base
     for t in all_targets:
         if t.get("kind") == "enemy" and t.get("status") in ["depleted", "collapsed"]:
             continue
 
-        if int(t.get("distance", 9999)) <= radius:
-            visible.append({
-                "id": t["id"],
-                "kind": t.get("kind", "enemy"),
+        if int(t.get("distance", 9999)) > radius:
+            continue
 
-                # Data aman untuk hasil Scan.
-                "name": t["name"],
-                "x": t["x"],
-                "y": t["y"],
-                "distance": t["distance"],
-                "type": t.get("type", "Unknown"),
-                "level": t.get("level", 1),
-                "signal_strength": t.get("signal_strength", "Unknown"),
-                "lab_tier": t.get("lab_tier", "Unknown"),
-                "vault_signal": t.get("vault_signal", "Unknown"),
-                "asset": t.get("asset"),
+        safe_target = {
+            "id": t["id"],
+            "kind": t.get("kind", "enemy"),
+            "name": t["name"],
+            "x": t["x"],
+            "y": t["y"],
+            "distance": t["distance"],
+            "type": t.get("type", "Unknown"),
+            "level": t.get("level", 1),
+            "signal_strength": t.get("signal_strength", "Unknown"),
+            "lab_tier": t.get("lab_tier", "Unknown"),
+            "vault_signal": t.get("vault_signal", "Unknown"),
+            "asset": t.get("asset"),
+            "player_id": t.get("player_id"),
+            "intel_status": "scout_required",
+        }
 
-                # Untuk membedakan player target di UI.
-                # Jangan kirim detail power/module/resource di sini.
-                "player_id": t.get("player_id"),
+        # Player Base tidak dibatasi level radar.
+        # Dia juga tidak memakan slot scan NPC/mining.
+        if t.get("kind") == "player":
+            visible_players.append(safe_target)
+            continue
 
-                # Detail tetap harus lewat Scout.
-                "intel_status": "scout_required",
-            })
+        # NPC dibatasi oleh max_npc_level.
+        if int(t.get("level", 1)) <= scan_rule["max_npc_level"]:
+            visible_non_player.append(safe_target)
 
-    # Batasi jumlah target tempur sesuai level Radar.
-    # Radar Lv.1 = max 2 target terdekat.
-    visible = sorted(
-        visible,
-        key=lambda t: int(t.get("distance", 9999))
-    )[:enemy_limit]
-
-    visible_mining = []
-
+    # Mining nodes
     for node in fresh_mining_nodes:
-        if int(node.get("distance", 9999)) <= radius:
-            visible_mining.append(node)
+        if int(node.get("distance", 9999)) > radius:
+            continue
 
-    # Batasi jumlah mining sesuai level Radar.
-    # Radar Lv.1 = 0 mining.
-    visible_mining = sorted(
-        visible_mining,
-        key=lambda n: int(n.get("distance", 9999))
-    )[:mining_limit]
+        if int(node.get("level", 1)) > scan_rule["max_mining_level"]:
+            continue
+
+        visible_non_player.append(node)
+
+    # Radar Lv.1:
+    # visible_non_player akan diacak dari NPC Lv.1 + Mining Lv.1
+    # lalu diambil total_limit = 1
+    random.shuffle(visible_non_player)
+
+    visible_non_player = visible_non_player[:scan_rule["total_limit"]]
+
+    # Player base muncul terpisah dan tidak memakan kuota scan.
+    visible_players = sorted(
+        visible_players,
+        key=lambda t: int(t.get("distance", 9999))
+    )
+
+    visible = visible_players + visible_non_player
 
     await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
 
@@ -3579,12 +3595,18 @@ async def scan(request: Request):
         "scanner_level": scanner_level,
         "radar_level": radar_level,
         "radius": radius,
-        "enemy_limit": enemy_limit,
-        "mining_limit": mining_limit,
-        "targets": visible + visible_mining,
+        "total_limit": scan_rule["total_limit"],
+        "max_npc_level": scan_rule["max_npc_level"],
+        "max_mining_level": scan_rule["max_mining_level"],
+
+        # field lama tetap dikirim supaya frontend lama tidak rusak
+        "enemy_limit": scan_rule["enemy_limit"],
+        "mining_limit": scan_rule["mining_limit"],
+
+        "targets": visible,
         "enemy_count": len([t for t in visible if t.get("kind") not in ["player", "mining"]]),
         "player_count": len([t for t in visible if t.get("kind") == "player"]),
-        "mining_count": len(visible_mining),
+        "mining_count": len([t for t in visible if t.get("kind") == "mining"]),
     }
 
 def apply_scout_noise_mask(report: dict):
