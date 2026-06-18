@@ -807,6 +807,137 @@ BUILDING_MAX_LEVEL = {
     "ai_core": 10,
     "guild_gate": 10,
 }
+MAIN_LAB_UPGRADE_REQUIREMENTS = {
+    # Untuk naik ke Main Lab Lv.2
+    2: {
+        "unit_factory": 1,
+    },
+
+    # Untuk naik ke Main Lab Lv.3
+    3: {
+        "unit_factory": 2,
+        "radar_tower": 1,
+    },
+
+    # Untuk naik ke Main Lab Lv.4
+    4: {
+        "unit_factory": 3,
+        "radar_tower": 2,
+        "recovery_center": 1,
+    },
+
+    # Untuk naik ke Main Lab Lv.5
+    5: {
+        "unit_factory": 3,
+        "radar_tower": 3,
+        "recovery_center": 2,
+        "research_lab": 1,
+    },
+
+    # Untuk naik ke Main Lab Lv.6
+    6: {
+        "unit_factory": 4,
+        "radar_tower": 3,
+        "research_lab": 2,
+        "ai_core": 1,
+    },
+
+    # Untuk naik ke Main Lab Lv.7
+    7: {
+        "unit_factory": 5,
+        "radar_tower": 4,
+        "research_lab": 3,
+        "ai_core": 2,
+        "recovery_center": 3,
+    },
+
+    # Untuk naik ke Main Lab Lv.8
+    8: {
+        "unit_factory": 6,
+        "radar_tower": 5,
+        "research_lab": 4,
+        "ai_core": 3,
+        "recovery_center": 4,
+    },
+
+    # Untuk naik ke Main Lab Lv.9
+    9: {
+        "unit_factory": 7,
+        "radar_tower": 6,
+        "research_lab": 5,
+        "ai_core": 4,
+        "recovery_center": 5,
+    },
+
+    # Untuk naik ke Main Lab Lv.10
+    10: {
+        "unit_factory": 8,
+        "radar_tower": 7,
+        "research_lab": 6,
+        "ai_core": 5,
+        "recovery_center": 6,
+    },
+}
+
+def get_building_display_name(profile: dict, building_id: str):
+    building = profile.get("buildings", {}).get(building_id, {})
+    return building.get("name", building_id)
+
+
+def validate_building_upgrade_requirements(
+    profile: dict,
+    building_id: str,
+    current_level: int,
+    next_level: int,
+):
+    """
+    Mengatur keseimbangan upgrade bangunan.
+
+    Rule:
+    1. Bangunan selain Main Lab tidak boleh melebihi level Main Lab.
+    2. Main Lab tidak boleh naik kalau bangunan penting belum memenuhi syarat.
+    """
+
+    main_lab_level = get_profile_building_level(profile, "main_lab")
+
+    # Rule 1:
+    # Bangunan selain Main Lab tidak boleh lebih tinggi dari Main Lab.
+    if building_id != "main_lab":
+        if next_level > main_lab_level:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"{get_building_display_name(profile, building_id)} tidak bisa naik ke Lv.{next_level}. "
+                    f"Upgrade Main Lab ke Lv.{next_level} dulu."
+                )
+            )
+
+        return True
+
+    # Rule 2:
+    # Main Lab harus menunggu bangunan penting ikut naik.
+    requirements = MAIN_LAB_UPGRADE_REQUIREMENTS.get(next_level, {})
+
+    missing = []
+
+    for req_building_id, req_level in requirements.items():
+        owned_level = get_profile_building_level(profile, req_building_id)
+
+        if owned_level < int(req_level):
+            missing.append(
+                f"{get_building_display_name(profile, req_building_id)} Lv.{req_level}"
+            )
+
+    if missing:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Sebelum upgrade Main Lab ke Lv.{next_level}, penuhi dulu: "
+                + ", ".join(missing)
+            )
+        )
+
+    return True
 
 def get_building_upgrade_cost(building_id: str, level: int):
     """
@@ -5778,6 +5909,13 @@ async def upgrade_building(building_id: str, request: Request):
 
     if current_level >= max_level:
         raise HTTPException(status_code=400, detail="Building sudah max level")
+
+    validate_building_upgrade_requirements(
+        profile=profile,
+        building_id=building_id,
+        current_level=current_level,
+        next_level=next_level,
+    )
 
     cost = get_building_upgrade_cost(building_id, current_level)
 
