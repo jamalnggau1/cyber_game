@@ -2351,7 +2351,7 @@ def generate_mining_nodes(
             "capacity": res["capacity"] + (guardian_level * 120),
             "owner": None,
             "status": "Unoccupied",
-            "signal_strength": signal_strength,
+            "signal_strength": "Strong" if res["id"] == "nexus_core" else random.choice(allowed_signals),
             "asset": res["asset"],
         })
 
