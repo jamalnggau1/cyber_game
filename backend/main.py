@@ -2748,27 +2748,29 @@ UNIT_TRAIN_BATCH_BASE_BY_LEVEL = {
 def get_unit_factory_training_multiplier(profile: dict):
     """
     Bonus dari level Unit Factory.
-    Lv.1 = 1.00x
-    Lv.2 = 1.05x
-    Lv.3 = 1.10x
-    Lv.4 = 1.15x
-    Lv.5 = 1.20x
-    dst.
+    Lv.1 = x1.00
+    Lv.2 = x1.05
+    Lv.3 = x1.10
+    Lv.4 = x1.15
+    Lv.5 = x1.20
     """
     factory_level = get_profile_building_level(profile, "unit_factory")
 
     if factory_level <= 0:
         return 0
 
-    return 1 + (max(0, factory_level - 1) * 0.05)
+    bonus_steps = max(0, factory_level - 1)
+
+    return 1 + (bonus_steps * UNIT_FACTORY_TRAIN_BONUS_PER_LEVEL)
 
 
 def get_unit_train_batch_limit(profile: dict, unit_id: str, unit_level: int):
     """
     Batas train per batch.
-    Tidak membatasi total owned.
-    Berlaku untuk semua jenis pasukan.
-    Nanti research per jenis pasukan bisa ditambahkan di sini.
+    Total owned unit tidak dibatasi.
+
+    Base limit ditentukan oleh level pasukan.
+    Unit Factory level menaikkan base limit dengan multiplier.
     """
     factory_level = get_profile_building_level(profile, "unit_factory")
 
@@ -2777,11 +2779,7 @@ def get_unit_train_batch_limit(profile: dict, unit_id: str, unit_level: int):
 
     unit_level = int(unit_level or 1)
 
-    base_limit = UNIT_TRAIN_BATCH_BASE_BY_LEVEL.get(
-        unit_level,
-        max(5, 50 - ((unit_level - 1) * 10))
-    )
-
+    base_limit = UNIT_TRAIN_BATCH_BASE_BY_LEVEL.get(unit_level, 10)
     multiplier = get_unit_factory_training_multiplier(profile)
 
     return max(1, int(math.ceil(base_limit * multiplier)))

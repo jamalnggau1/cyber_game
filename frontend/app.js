@@ -3394,7 +3394,7 @@ function getTrainBatchLimitForLevel(levelInfo) {
     return fromServer;
   }
 
-  // fallback kalau server belum mengirim train_batch_limit
+  // Fallback kalau server belum mengirim train_batch_limit
   const factory = buildingsData?.buildings?.unit_factory || {};
   const factoryLevel = Number(factory.level ?? 0);
   const unitLevel = Number(levelInfo?.level ?? 1);
@@ -3409,7 +3409,7 @@ function getTrainBatchLimitForLevel(levelInfo) {
     5: 10,
   };
 
-  const base = baseByLevel[unitLevel] || Math.max(5, 50 - ((unitLevel - 1) * 10));
+  const base = baseByLevel[unitLevel] || 10;
   const multiplier = 1 + (Math.max(0, factoryLevel - 1) * 0.05);
 
   return Math.max(1, Math.ceil(base * multiplier));
