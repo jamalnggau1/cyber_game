@@ -2736,15 +2736,6 @@ def get_unit_train_cost(unit_id: str, level: int):
     stats = get_unit_stats(unit_id, level)
     return stats.get("train_cost", {"credits": 100, "nano_parts": 10})
 
-UNIT_TRAIN_BATCH_BASE_BY_LEVEL = {
-    1: 50,
-    2: 40,
-    3: 30,
-    4: 20,
-    5: 10,
-}
-
-
 def get_unit_factory_training_multiplier(profile: dict):
     """
     Bonus dari level Unit Factory.
@@ -5350,6 +5341,39 @@ def ensure_profile_unit_system(profile: dict):
             profile["unit_inventory"][unit_id].setdefault(str(level), 0)
 
     return profile
+
+UNIT_TRAIN_BATCH_BASE_BY_LEVEL = {
+    1: 50,
+    2: 40,
+    3: 30,
+    4: 20,
+    5: 50,
+}
+
+UNIT_FACTORY_TRAIN_BONUS_PER_LEVEL = 0.05
+
+
+def get_unit_factory_training_multiplier(profile: dict):
+    factory_level = get_profile_building_level(profile, "unit_factory")
+
+    if factory_level <= 0:
+        return 0
+
+    return 1 + (max(0, factory_level - 1) * UNIT_FACTORY_TRAIN_BONUS_PER_LEVEL)
+
+
+def get_unit_train_batch_limit(profile: dict, unit_id: str, unit_level: int):
+    factory_level = get_profile_building_level(profile, "unit_factory")
+
+    if factory_level <= 0:
+        return 0
+
+    unit_level = int(unit_level or 1)
+
+    base_limit = UNIT_TRAIN_BATCH_BASE_BY_LEVEL.get(unit_level, 10)
+    multiplier = get_unit_factory_training_multiplier(profile)
+
+    return max(1, int(math.ceil(base_limit * multiplier)))
 
 def get_units_for_profile(profile: dict):
     profile = ensure_profile_unit_system(profile)
