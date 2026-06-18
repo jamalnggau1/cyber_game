@@ -1424,33 +1424,6 @@ def refresh_player_target_from_profile(target: dict):
 
     return target
 
-def get_units_for_player():
-    p = GAME_STATE["player"]
-    p.setdefault("unit_levels", {})
-
-    result = []
-
-    for unit_id, unit in UNITS.items():
-        level = get_unit_level(unit_id)
-        power = get_unit_power(unit_id)
-        owned = p["unit_inventory"].get(unit_id, 0)
-        next_cost = get_unit_upgrade_cost(unit_id)
-
-        item = {
-            **unit,
-            "level": level,
-            "power": power,
-            "owned": owned,
-            "total_power": owned * power,
-            "next_upgrade_cost": next_cost,
-            "maxed": next_cost is None,
-        }
-
-        result.append(item)
-
-    return result
-
-
 def calculate_unit_power_score(units: Dict[str, int]) -> tuple[int, List[str]]:
     total_power = 0
     lines = []
@@ -3097,57 +3070,21 @@ def get_unit_tech_cost(unit_id: str) -> Dict[str, int] | None:
         "energy": 18 + (next_level * 6),
     }
 
-
 def get_units_for_player():
-    ensure_unit_system()
+    """
+    Legacy wrapper untuk kode lama yang masih membaca GAME_STATE["player"].
+    Logic unit utama tetap memakai get_units_for_profile().
+    """
+    p = GAME_STATE.get("player", {})
 
-    p = GAME_STATE["player"]
-    result = []
+    legacy_profile = {
+        "buildings": GAME_STATE.get("buildings", {}),
+        "unit_inventory": p.get("unit_inventory", {}),
+        "unit_tech": p.get("unit_tech", {}),
+        "resources": p.get("resources", {}),
+    }
 
-    for unit_id, unit in UNITS.items():
-        unlocked_level = int(p["unit_tech"].get(unit_id, 1))
-        inventory = p["unit_inventory"].get(unit_id, {})
-
-        levels = []
-
-        for level in range(1, unit["max_level"] + 1):
-            stats = get_unit_stats(unit_id, level)
-            owned = int(inventory.get(str(level), 0))
-            next_level = level + 1
-            promote_to_next_unlocked = next_level <= unlocked_level and next_level <= unit["max_level"]
-
-            levels.append({
-                "promote_to_next_unlocked": promote_to_next_unlocked,
-                "level": level,
-                "unlocked": level <= unlocked_level,
-                "owned": owned,
-
-                "hp": stats["hp"],
-                "attack": stats["attack"],
-                "defense": stats["defense"],
-                "speed": stats["speed"],
-                "cargo": stats["cargo"],
-
-                "train_cost": stats["train_cost"],
-            })
-
-        result.append({
-            "id": unit_id,
-            "name": unit["name"],
-            "type": unit_profile.get("type", "Unit"),
-            "factory_unlocked": factory_unlocked,
-            "unlock_factory_level": factory_unlock_level,
-            "batch_factor": unit_profile.get("batch_factor", 1.0),
-            "role": unit.get("role", ""),
-            "description": unit.get("description", ""),
-            "max_level": unit["max_level"],
-            "unlocked_level": unlocked_level,
-            "total_owned": sum(int(v or 0) for v in inventory.values()),
-            "levels": levels,
-        })
-
-    return result
-
+    return get_units_for_profile(legacy_profile)
 
 def get_unit_tech_list():
     ensure_unit_system()
@@ -5499,44 +5436,16 @@ def update_settings(req: UpdateSettingsRequest):
         "settings": s
     }
 
+class UpgradeUnitRequest(BaseModel):
+    unit_id: str
+
+
 @app.post("/api/units/upgrade")
 def upgrade_unit(req: UpgradeUnitRequest):
-    p = GAME_STATE["player"]
-    p.setdefault("unit_levels", {})
-
-    if req.unit_id not in p["unit_inventory"]:
-        raise HTTPException(status_code=400, detail="Unknown unit")
-
-    unit = get_unit_config(req.unit_id)
-    current_level = get_unit_level(req.unit_id)
-
-    if current_level >= unit["max_level"]:
-        raise HTTPException(status_code=400, detail="Unit already max level")
-
-    cost = get_unit_upgrade_cost(req.unit_id)
-
-    if p["credits"] < cost["credits"]:
-        raise HTTPException(status_code=400, detail="Not enough credits")
-
-    if p["energy"] < cost["energy"]:
-        raise HTTPException(status_code=400, detail="Not enough energy")
-
-    p["credits"] -= cost["credits"]
-    p["energy"] -= cost["energy"]
-    p["unit_levels"][req.unit_id] = current_level + 1
-
-    new_level = p["unit_levels"][req.unit_id]
-    new_power = get_unit_power(req.unit_id)
-
-    return {
-        "success": True,
-        "message": f"{unit['name']} upgraded to Lv.{new_level}",
-        "unit_id": req.unit_id,
-        "level": new_level,
-        "power": new_power,
-        "credits_left": p["credits"],
-        "energy_left": p["energy"],
-    }
+    raise HTTPException(
+        status_code=410,
+        detail="Endpoint lama sudah dinonaktifkan. Gunakan Train, Promote, atau Unit Tech Research."
+    )
 
 @app.post("/api/auth/telegram")
 async def auth_telegram(payload: dict = Body(...)):
