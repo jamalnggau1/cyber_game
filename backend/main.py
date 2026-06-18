@@ -309,7 +309,7 @@ UNITS = {
                 "defense": 18,
                 "speed": 7,
                 "cargo": 3,
-                "train_cost": {"nano_parts": 80},
+                "train_cost": {"credits": 60, "nano_parts": 10},
             },
             2: {
                 "hp": 155,
@@ -317,7 +317,7 @@ UNITS = {
                 "defense": 24,
                 "speed": 7,
                 "cargo": 4,
-                "train_cost": {"nano_parts": 130},
+                "train_cost": {"credits": 120, "nano_parts": 25},
             },
             3: {
                 "hp": 200,
@@ -325,7 +325,7 @@ UNITS = {
                 "defense": 32,
                 "speed": 6,
                 "cargo": 5,
-                "train_cost": {"nano_parts": 210},
+                "train_cost": {"credits": 220, "nano_parts": 55},
             },
             4: {
                 "hp": 260,
@@ -333,7 +333,7 @@ UNITS = {
                 "defense": 43,
                 "speed": 6,
                 "cargo": 6,
-                "train_cost": {"credits": 340, "energy": 13},
+                "train_cost": {"credits": 380, "nano_parts": 100, "data_shard": 5},
             },
             5: {
                 "hp": 340,
@@ -341,7 +341,7 @@ UNITS = {
                 "defense": 58,
                 "speed": 5,
                 "cargo": 8,
-                "train_cost": {"credits": 550, "energy": 18},
+                "train_cost": {"credits": 650, "nano_parts": 180, "data_shard": 15},
             },
         },
     },
@@ -736,23 +736,123 @@ def get_unit_power(unit_id: str) -> int:
 
     return int(unit["base_power"] + ((level - 1) * unit["power_growth"]))
 
+BUILDING_MAX_LEVEL = {
+    "main_lab": 10,
+    "unit_factory": 10,
+    "radar_tower": 10,
+    "recovery_center": 10,
+    "research_lab": 10,
+    "ai_core": 10,
+    "guild_gate": 10,
+}
+
 def get_building_upgrade_cost(building_id: str, level: int):
+    """
+    level = level saat ini.
+    Jika level 0, berarti biaya build pertama kali.
+    Tidak memakai energy.
+    """
+
+    current_level = int(level or 0)
+    next_level = current_level + 1
+
+    # Main Lab adalah gate utama game.
+    # Biayanya dibuat manual supaya progression lebih terkontrol.
+    if building_id == "main_lab":
+        main_lab_costs = {
+            1: {"credits": 400},
+            2: {"credits": 700, "nano_parts": 80},
+            3: {"credits": 1200, "nano_parts": 160},
+            4: {"credits": 2200, "nano_parts": 300, "data_shard": 50},
+            5: {"credits": 4000, "nano_parts": 600, "data_shard": 150},
+            6: {"credits": 7000, "nano_parts": 1000, "data_shard": 300, "nexus_core": 1},
+            7: {"credits": 12000, "nano_parts": 1800, "data_shard": 600, "nexus_core": 2},
+            8: {"credits": 20000, "nano_parts": 3000, "data_shard": 1000, "nexus_core": 4},
+            9: {"credits": 35000, "nano_parts": 5000, "data_shard": 1800, "nexus_core": 7},
+            10: {"credits": 60000, "nano_parts": 8000, "data_shard": 3000, "nexus_core": 12},
+        }
+
+        return main_lab_costs.get(next_level, {
+            "credits": 999999,
+            "nano_parts": 999999,
+            "data_shard": 999999,
+            "nexus_core": 999,
+        })
+
+    # Biaya build pertama kali untuk bangunan selain Main Lab.
+    build_costs = {
+        "unit_factory": {"credits": 500, "nano_parts": 50},
+        "radar_tower": {"credits": 600, "nano_parts": 80},
+        "recovery_center": {"credits": 900, "nano_parts": 120},
+        "research_lab": {"credits": 1200, "nano_parts": 180, "data_shard": 30},
+        "ai_core": {"credits": 1800, "nano_parts": 250, "data_shard": 80},
+        "guild_gate": {"credits": 6000, "nano_parts": 1200, "data_shard": 500, "nexus_core": 2},
+    }
+
+    if current_level <= 0:
+        return build_costs.get(building_id, {"credits": 800})
+
+    # Biaya upgrade setelah bangunan aktif.
     base_costs = {
-        "main_lab": 1200,
-        "radar_tower": 900,
-        "ai_core": 1000,
-        "unit_factory": 850,
-        "research_lab": 1100,
-        "recovery_center": 750,
-        "guild_gate": 2500,
+        "unit_factory": {"credits": 900, "nano_parts": 120},
+        "radar_tower": {"credits": 1000, "nano_parts": 140},
+        "recovery_center": {"credits": 1300, "nano_parts": 180},
+        "research_lab": {"credits": 1600, "nano_parts": 240, "data_shard": 40},
+        "ai_core": {"credits": 2200, "nano_parts": 320, "data_shard": 90},
+        "guild_gate": {"credits": 7000, "nano_parts": 1400, "data_shard": 600, "nexus_core": 2},
     }
 
-    base = base_costs.get(building_id, 1000)
+    base = base_costs.get(building_id, {"credits": 1000})
 
-    return {
-        "credits": int(base * (1.45 ** max(0, level - 1))),
-        "energy": 5 + level,
-    }
+    multiplier = 1.55 ** max(0, current_level - 1)
+
+    cost = {}
+
+    for resource_id, amount in base.items():
+        cost[resource_id] = int(amount * multiplier)
+
+    # Nexus Core mulai lebih berat di level tinggi.
+    if next_level >= 6 and building_id in ["ai_core", "research_lab", "guild_gate"]:
+        cost["nexus_core"] = cost.get("nexus_core", 0) + max(1, next_level - 5)
+
+    return cost
+
+RESOURCE_LABELS = {
+    "credits": "Credits",
+    "nano_parts": "Nano Parts",
+    "data_shard": "Data Shard",
+    "nexus_core": "Nexus Core",
+}
+
+
+def require_and_pay_resources(profile: dict, cost: dict):
+    resources = profile.setdefault("resources", {})
+
+    for resource_id, amount in cost.items():
+        amount = int(amount or 0)
+
+        if amount <= 0:
+            continue
+
+        owned = int(resources.get(resource_id, 0) or 0)
+
+        if owned < amount:
+            label = RESOURCE_LABELS.get(resource_id, resource_id)
+            raise HTTPException(
+                status_code=400,
+                detail=f"{label} tidak cukup. Butuh {amount}, punya {owned}"
+            )
+
+    for resource_id, amount in cost.items():
+        amount = int(amount or 0)
+
+        if amount <= 0:
+            continue
+
+        resources[resource_id] = int(resources.get(resource_id, 0) or 0) - amount
+
+    profile["resources"] = resources
+    return profile
 
 def get_unit_upgrade_cost(unit_id: str):
     unit = get_unit_config(unit_id)
@@ -2634,7 +2734,27 @@ def get_unit_power(unit_id: str, level: int) -> int:
 
 def get_unit_train_cost(unit_id: str, level: int):
     stats = get_unit_stats(unit_id, level)
-    return stats.get("train_cost", {"credits": 100, "energy": 5})
+    return stats.get("train_cost", {"credits": 100, "nano_parts": 10})
+
+def get_train_batch_limit(profile: dict):
+    factory_level = get_profile_building_level(profile, "unit_factory")
+
+    if factory_level <= 0:
+        return 0
+
+    if factory_level == 1:
+        return 5
+
+    if factory_level == 2:
+        return 10
+
+    if factory_level == 3:
+        return 20
+
+    if factory_level == 4:
+        return 35
+
+    return 50
 
 
 def get_unit_promote_cost(unit_id: str, from_level: int, amount: int) -> Dict[str, int]:
@@ -2750,25 +2870,6 @@ def get_unit_tech_list():
         })
 
     return items
-
-def get_building_upgrade_cost(building_id: str, current_level: int):
-    base_costs = {
-        "main_lab": 1200,
-        "radar_tower": 900,
-        "ai_core": 1000,
-        "unit_factory": 850,
-        "research_lab": 1100,
-        "recovery_center": 750,
-        "guild_gate": 2500,
-    }
-
-    base = base_costs.get(building_id, 1000)
-    level = max(1, int(current_level or 1))
-
-    return {
-        "credits": int(base * (1.45 ** (level - 1))),
-        "energy": 5 + level,
-    }
 
 def normalize_unit_payload(units: Dict[str, Any]) -> Dict[str, Dict[str, int]]:
     """
@@ -4601,10 +4702,21 @@ async def train_unit(req: TrainUnitRequest, request: Request):
     player_id, profile = get_or_create_active_player_profile(request)
     profile = ensure_player_profile_schema(profile)
     profile = ensure_profile_unit_system(profile)
-    if get_profile_building_level(profile, "unit_factory") < 1:
+
+    factory_level = get_profile_building_level(profile, "unit_factory")
+
+    if factory_level < 1:
         raise HTTPException(
             status_code=400,
             detail="Bangun Unit Factory dulu sebelum melatih pasukan."
+        )
+
+    batch_limit = get_train_batch_limit(profile)
+
+    if int(req.amount) > batch_limit:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unit Factory Lv.{factory_level} hanya bisa train max {batch_limit} unit per batch."
         )
 
     unit = get_unit_config(req.unit_id)
@@ -4622,36 +4734,27 @@ async def train_unit(req: TrainUnitRequest, request: Request):
 
     cost = get_unit_train_cost(req.unit_id, req.level)
 
-    total_nano = int(cost.get("nano_parts", 0)) * req.amount
-    total_credits = int(cost.get("credits", 0)) * req.amount
-    total_energy = int(cost.get("energy", 0)) * req.amount
+    total_cost = {}
 
-    resources = profile["resources"]
+    for resource_id, amount in cost.items():
+        amount = int(amount or 0)
 
-    if resources.get("nano_parts", 0) < total_nano:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Nano Parts tidak cukup. Butuh {total_nano}, punya {resources.get('nano_parts', 0)}"
-        )
+        if amount <= 0:
+            continue
 
-    if resources.get("credits", 0) < total_credits:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Credits tidak cukup. Butuh {total_credits}, punya {resources.get('credits', 0)}"
-        )
+        # Energy tidak boleh jadi biaya train.
+        if resource_id == "energy":
+            continue
 
-    if profile.get("energy", 0) < total_energy:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Energy tidak cukup. Butuh {total_energy}, punya {profile.get('energy', 0)}"
-        )
+        total_cost[resource_id] = amount * int(req.amount)
 
-    resources["nano_parts"] = resources.get("nano_parts", 0) - total_nano
-    resources["credits"] = resources.get("credits", 0) - total_credits
-    profile["energy"] = profile.get("energy", 0) - total_energy
+    profile = require_and_pay_resources(profile, total_cost)
 
     level_key = str(req.level)
-    profile["unit_inventory"][req.unit_id][level_key] += req.amount
+
+    profile["unit_inventory"].setdefault(req.unit_id, {})
+    profile["unit_inventory"][req.unit_id].setdefault(level_key, 0)
+    profile["unit_inventory"][req.unit_id][level_key] += int(req.amount)
 
     GAME_STATE["players"][player_id] = profile
 
@@ -4662,9 +4765,10 @@ async def train_unit(req: TrainUnitRequest, request: Request):
         "message": f"Trained {req.amount} {unit['name']} Lv.{req.level}",
         "player_id": player_id,
         "resources": profile["resources"],
-        "energy_left": profile["energy"],
+        "energy": profile.get("energy", 0),
         "unit_inventory": profile["unit_inventory"],
         "units": get_units_for_profile(profile),
+        "train_batch_limit": batch_limit,
     }
 
 def ensure_resource_system():
@@ -5487,29 +5591,15 @@ async def upgrade_building(building_id: str, request: Request):
     current_level = int(building.get("level", 0))
     next_level = current_level + 1
 
-    if current_level >= 30:
+    max_level = int(BUILDING_MAX_LEVEL.get(building_id, 10))
+
+    if current_level >= max_level:
         raise HTTPException(status_code=400, detail="Building sudah max level")
 
     cost = get_building_upgrade_cost(building_id, current_level)
 
-    resources = profile.get("resources", {})
-    credits = int(resources.get("credits", 0))
-    energy = int(profile.get("energy", 0))
-
-    if credits < cost["credits"]:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Credits tidak cukup. Butuh {cost['credits']}, punya {credits}"
-        )
-
-    if energy < cost["energy"]:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Energy tidak cukup. Butuh {cost['energy']}, punya {energy}"
-        )
-
-    resources["credits"] = credits - cost["credits"]
-    profile["energy"] = energy - cost["energy"]
+    profile = require_and_pay_resources(profile, cost)
+    resources = profile["resources"]
 
     building["level"] = next_level
 

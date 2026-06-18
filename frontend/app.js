@@ -2825,12 +2825,74 @@ function getLevelStat(lv, key) {
   return num(lv?.[key] ?? lv?.stats?.[key]);
 }
 
+function getResourceLabel(resourceId) {
+  const labels = {
+    credits: "Credits",
+    nano_parts: "Nano Parts",
+    data_shard: "Data Shard",
+    nexus_core: "Nexus Core",
+  };
+
+  return labels[resourceId] || resourceId;
+}
+
+function getResourceAmount(resourceId) {
+  const r = getResourceBag();
+  const p = state?.player || buildingsData?.player || {};
+
+  if (resourceId === "credits") {
+    return num(r.credits ?? p.credits ?? 0);
+  }
+
+  return num(r[resourceId] ?? 0);
+}
+
+function cleanEconomyCost(cost) {
+  const clean = {};
+
+  Object.entries(cost || {}).forEach(([resourceId, amount]) => {
+    amount = num(amount);
+
+    if (amount <= 0) return;
+
+    // Energy bukan resource ekonomi untuk train.
+    if (resourceId === "energy") return;
+
+    clean[resourceId] = amount;
+  });
+
+  return clean;
+}
+
+function getCostText(cost) {
+  const clean = cleanEconomyCost(cost);
+  const order = ["credits", "nano_parts", "data_shard", "nexus_core"];
+
+  const parts = order
+    .filter(resourceId => clean[resourceId] > 0)
+    .map(resourceId => `${getResourceLabel(resourceId)} ${clean[resourceId]}`);
+
+  return parts.length ? parts.join(" + ") : "Free";
+}
+
+function multiplyCost(cost, amount) {
+  const clean = cleanEconomyCost(cost);
+  const total = {};
+
+  Object.entries(clean).forEach(([resourceId, value]) => {
+    total[resourceId] = num(value) * num(amount);
+  });
+
+  return total;
+}
+
 function getTrainCostText(trainCost) {
   if (!trainCost) return "Research required";
+  return getCostText(trainCost);
+}
 
-  const nano = num(trainCost.nano_parts);
-
-  return `Nano Parts ${nano}`;
+function getTotalTrainCostText(amount, trainCost) {
+  return getCostText(multiplyCost(trainCost, amount));
 }
 
 function getTotalTrainCostText(amount, nanoCost) {
@@ -3251,14 +3313,34 @@ function trainAmountKey(unitId, level) {
 }
 
 function getTrainAffordableMax(trainCost) {
-  const r = getResourceBag();
+  const clean = cleanEconomyCost(trainCost);
+  const limits = [];
 
-  const nanoCost = Number(trainCost?.nano_parts || 0);
-  const ownedNano = Number(r.nano_parts || 0);
+  Object.entries(clean).forEach(([resourceId, amount]) => {
+    amount = num(amount);
 
-  if (nanoCost <= 0) return 999;
+    if (amount <= 0) return;
 
-  return Math.floor(ownedNano / nanoCost);
+    const owned = getResourceAmount(resourceId);
+    limits.push(Math.floor(owned / amount));
+  });
+
+  if (!limits.length) return 999;
+
+  return Math.max(0, Math.min(...limits));
+}
+
+function getTrainBatchLimit() {
+  const factory = buildingsData?.buildings?.unit_factory || {};
+  const level = Number(factory.level ?? 0);
+
+  if (level <= 0) return 0;
+  if (level === 1) return 5;
+  if (level === 2) return 10;
+  if (level === 3) return 20;
+  if (level === 4) return 35;
+
+  return 50;
 }
 
 function getTrainSliderAmount(unitId, level) {
@@ -3268,9 +3350,18 @@ function getTrainSliderAmount(unitId, level) {
   return Math.max(1, Number(input?.value || trainAmountDraft[key] || 1));
 }
 
-function setTrainSliderAmount(unitId, level, value, nanoCost) {
+function getUnitTrainCost(unitId, level) {
+  const unit = (buildingsData?.units || []).find(u => u.id === unitId);
+  const lv = (unit?.levels || []).find(x => Number(x.level) === Number(level));
+
+  return lv?.train_cost || {};
+}
+
+function setTrainSliderAmount(unitId, level, value) {
   const key = trainAmountKey(unitId, level);
   const input = el(`trainRange_${key}`);
+
+  const trainCost = getUnitTrainCost(unitId, level);
 
   const max = Number(input?.max || 1);
   const amount = Math.max(1, Math.min(max, Number(value || 1)));
@@ -3281,7 +3372,7 @@ function setTrainSliderAmount(unitId, level, value, nanoCost) {
 
   setText(`trainAmount_${key}`, amount);
   setText(`trainButtonAmount_${key}`, amount);
-  setText(`trainTotalCost_${key}`, getTotalTrainCostText(amount, nanoCost));
+  setText(`trainTotalCost_${key}`, getTotalTrainCostText(amount, trainCost));
 }
 
 function trainFromSlider(unitId, level) {
@@ -3307,13 +3398,26 @@ function openUnitFactoryDetail(unitId) {
     const speed = getLevelStat(lv, "speed");
     const cargo = getLevelStat(lv, "cargo");
 
-    const nanoCost = num(trainCost.nano_parts);
-
     const key = trainAmountKey(unit.id, lv.level);
-    const maxTrain = lv.unlocked ? getTrainAffordableMax(trainCost) : 1;
-    const currentAmount = Math.min(maxTrain, num(trainAmountDraft[key] || 1));
 
-    const trainPanel = lv.unlocked
+    const batchLimit = getTrainBatchLimit();
+    const affordableMax = getTrainAffordableMax(trainCost);
+
+    const canTrain = lv.unlocked && batchLimit > 0 && affordableMax > 0;
+    const maxTrain = canTrain ? Math.max(1, Math.min(batchLimit, affordableMax)) : 1;
+    const currentAmount = canTrain
+      ? Math.min(maxTrain, Math.max(1, num(trainAmountDraft[key] || 1)))
+      : 1;
+
+    const trainLockedReason = !lv.unlocked
+      ? "Locked by Research"
+      : batchLimit <= 0
+        ? "Build Unit Factory first"
+        : affordableMax <= 0
+          ? "Not enough resources"
+          : "";
+
+    const trainPanel = canTrain
       ? `
         <div class="train-slider-panel">
           <div class="train-slider-top">
@@ -3324,7 +3428,7 @@ function openUnitFactoryDetail(unitId) {
 
             <div>
               <small>Total Cost</small>
-              <b id="trainTotalCost_${key}">${getTotalTrainCostText(currentAmount, nanoCost)}</b>
+              <b id="trainTotalCost_${key}">${getTotalTrainCostText(currentAmount, trainCost)}</b>
             </div>
           </div>
 
@@ -3335,12 +3439,12 @@ function openUnitFactoryDetail(unitId) {
             min="1"
             max="${maxTrain}"
             value="${currentAmount}"
-            oninput="setTrainSliderAmount('${unit.id}', ${lv.level}, this.value, ${nanoCost})"
+            oninput="setTrainSliderAmount('${unit.id}', ${lv.level}, this.value)"
           />
 
           <div class="train-slider-bottom">
             <span>1</span>
-            <span>Max ${maxTrain}</span>
+            <span>Batch Max ${maxTrain}</span>
           </div>
 
           <button class="train-main-btn" onclick="trainFromSlider('${unit.id}', ${lv.level})">
@@ -3350,7 +3454,7 @@ function openUnitFactoryDetail(unitId) {
       `
       : `
         <div class="train-slider-panel locked-panel">
-          <button disabled>Locked by Research</button>
+          <button disabled>${trainLockedReason}</button>
         </div>
       `;
 
@@ -3389,7 +3493,7 @@ function openUnitFactoryDetail(unitId) {
               <span>Cargo ${cargo}</span>
             </div>
 
-            <p class="premium-cost-note">Base Cost: Nano Parts ${nanoCost} / unit</p>
+            <p class="premium-cost-note">Base Cost: ${getTrainCostText(trainCost)} / unit</p>
           </div>
         </div>
 
