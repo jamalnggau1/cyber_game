@@ -975,7 +975,7 @@ def get_building_upgrade_cost(building_id: str, level: int):
     # Biaya build pertama kali untuk bangunan selain Main Lab.
     build_costs = {
         "unit_factory": {"credits": 500, "nano_parts": 50},
-        "radar_tower": {"credits": 600, "nano_parts": 80},
+        "radar_tower": {"credits": 900, "nano_parts": 120},
         "recovery_center": {"credits": 900, "nano_parts": 120},
         "research_lab": {"credits": 1200, "nano_parts": 180, "data_shard": 30},
         "ai_core": {"credits": 1800, "nano_parts": 250, "data_shard": 80},
@@ -988,7 +988,7 @@ def get_building_upgrade_cost(building_id: str, level: int):
     # Biaya upgrade setelah bangunan aktif.
     base_costs = {
         "unit_factory": {"credits": 900, "nano_parts": 120},
-        "radar_tower": {"credits": 1000, "nano_parts": 140},
+        "radar_tower": {"credits": 1600, "nano_parts": 260, "data_shard": 40},
         "recovery_center": {"credits": 1300, "nano_parts": 180},
         "research_lab": {"credits": 1600, "nano_parts": 240, "data_shard": 40},
         "ai_core": {"credits": 2200, "nano_parts": 320, "data_shard": 90},
@@ -1004,9 +1004,18 @@ def get_building_upgrade_cost(building_id: str, level: int):
     for resource_id, amount in base.items():
         cost[resource_id] = int(amount * multiplier)
 
-    # Nexus Core mulai lebih berat di level tinggi.
+    # Nexus Core mulai lebih berat di level tinggi untuk bangunan high-tech.
     if next_level >= 6 and building_id in ["ai_core", "research_lab", "guild_gate"]:
         cost["nexus_core"] = cost.get("nexus_core", 0) + max(1, next_level - 5)
+
+    # Radar adalah gerbang reward besar, fragment, mining, dan target elite.
+    # Jadi upgrade radar harus lebih mahal daripada bangunan biasa.
+    if building_id == "radar_tower":
+        if next_level >= 5:
+            cost["data_shard"] = cost.get("data_shard", 0) + (next_level * 80)
+
+        if next_level >= 7:
+            cost["nexus_core"] = cost.get("nexus_core", 0) + max(1, next_level - 6)
 
     return cost
 
@@ -1789,6 +1798,30 @@ def apply_building_unlocks(profile: dict):
     profile = refresh_building_actions(profile)
     return profile
 
+RADAR_ALLOWED_TIERS = {
+    1: ["Low"],
+    2: ["Low"],
+    3: ["Low", "Standard"],
+    4: ["Low", "Standard"],
+    5: ["Low", "Standard", "Advanced"],
+    6: ["Low", "Standard", "Advanced"],
+    7: ["Low", "Standard", "Advanced"],
+    8: ["Low", "Standard", "Advanced", "Elite"],
+    9: ["Low", "Standard", "Advanced", "Elite"],
+    10: ["Low", "Standard", "Advanced", "Elite"],
+}
+
+
+def get_allowed_tiers_for_radar(radar_level: int):
+    radar_level = int(radar_level or 0)
+
+    if radar_level <= 0:
+        return []
+
+    if radar_level >= 10:
+        return RADAR_ALLOWED_TIERS[10]
+
+    return RADAR_ALLOWED_TIERS.get(radar_level, ["Low"])
 
 def get_radar_scan_rule(radar_level: int):
     radar_level = int(radar_level or 0)
@@ -1801,29 +1834,26 @@ def get_radar_scan_rule(radar_level: int):
             "mining_limit": 0,
             "max_npc_level": 0,
             "max_mining_level": 0,
+            "allowed_tiers": [],
         }
 
-    # Radar level menentukan:
-    # 1. radius scan
-    # 2. jumlah total hasil scan non-player
-    # 3. level maksimal NPC/mining yang boleh muncul
     return {
         "radius": 40 + (radar_level * 12),
 
-        # Lv.1 = 1 hasil
-        # Lv.2 = 2 hasil
-        # Lv.3 = 3 hasil
-        # dst, maksimal 10 hasil non-player
+        # Radar Lv.1 hanya 1 hasil non-player.
+        # Semakin tinggi radar, jumlah hasil bertambah.
         "total_limit": min(10, radar_level),
 
-        # field lama tetap ada agar tidak merusak response lama
+        # field lama agar frontend lama tidak rusak
         "enemy_limit": min(10, radar_level),
         "mining_limit": min(10, radar_level),
 
-        # Inilah rule penting:
-        # Radar Lv.5 boleh melihat NPC/mining Lv.1 sampai Lv.5
+        # Radar Lv.5 berarti boleh Lv.1 sampai Lv.5, bukan semua Lv.5.
         "max_npc_level": radar_level,
         "max_mining_level": radar_level,
+
+        # Ini filter penting supaya Elite tidak muncul di early game.
+        "allowed_tiers": get_allowed_tiers_for_radar(radar_level),
     }
 
 def make_default_player_buildings():
@@ -2046,8 +2076,10 @@ def get_unit_tech_list_for_profile(profile: dict):
 
     return result
 
-def generate_targets(max_level: int = 1):
+def generate_targets(max_level: int = 1, allowed_tiers: list[str] | None = None):
     p = GAME_STATE["player"]
+    max_level = max(1, int(max_level or 1))
+    allowed_tiers = allowed_tiers or ["Low"]
 
     names = [
         "Ghost Relay Lab",
@@ -2113,7 +2145,7 @@ def generate_targets(max_level: int = 1):
             "lab_level": enemy_level,
             "defense_power": defense_power,
             "signal_strength": signal_strength,
-            "lab_tier": random.choice(["Low", "Standard", "Advanced", "Elite"]),
+            "lab_tier": random.choice(allowed_tiers),
             "vault_signal": random.choice(["Small", "Medium", "Large", "Encrypted"]),
 
             "firewall": random.choice([
@@ -3508,7 +3540,10 @@ async def scan(request: Request):
     GAME_STATE["players"][player_id] = profile
     GAME_STATE["scan_counter"] = GAME_STATE.get("scan_counter", 0) + 1
 
-    fresh_targets = generate_targets(max_level=scan_rule["max_npc_level"])
+    fresh_targets = generate_targets(
+        max_level=scan_rule["max_npc_level"],
+        allowed_tiers=scan_rule["allowed_tiers"],
+    )
     player_targets = make_player_scan_targets(player_id)
 
     all_targets = fresh_targets + player_targets
@@ -3559,9 +3594,17 @@ async def scan(request: Request):
             visible_players.append(safe_target)
             continue
 
-        # NPC dibatasi oleh max_npc_level.
-        if int(t.get("level", 1)) <= scan_rule["max_npc_level"]:
-            visible_non_player.append(safe_target)
+        # NPC dibatasi oleh max_npc_level DAN allowed_tiers.
+        target_level = int(t.get("level", 1))
+        target_tier = t.get("lab_tier", "Low")
+
+        if target_level > scan_rule["max_npc_level"]:
+            continue
+
+        if target_tier not in scan_rule["allowed_tiers"]:
+            continue
+
+        visible_non_player.append(safe_target)
 
     # Mining nodes
     for node in fresh_mining_nodes:
@@ -3598,6 +3641,7 @@ async def scan(request: Request):
         "total_limit": scan_rule["total_limit"],
         "max_npc_level": scan_rule["max_npc_level"],
         "max_mining_level": scan_rule["max_mining_level"],
+        "allowed_tiers": scan_rule["allowed_tiers"],
 
         # field lama tetap dikirim supaya frontend lama tidak rusak
         "enemy_limit": scan_rule["enemy_limit"],
