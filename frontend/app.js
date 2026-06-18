@@ -3312,6 +3312,76 @@ function trainAmountKey(unitId, level) {
   return `${unitId}_${level}`;
 }
 
+function getResourceLabel(resourceId) {
+  const labels = {
+    credits: "Credits",
+    nano_parts: "Nano Parts",
+    data_shard: "Data Shard",
+    nexus_core: "Nexus Core",
+  };
+
+  return labels[resourceId] || resourceId;
+}
+
+function getResourceAmount(resourceId) {
+  const r = getResourceBag();
+  const p = state?.player || buildingsData?.player || {};
+
+  if (resourceId === "credits") {
+    return num(r.credits ?? p.credits ?? 0);
+  }
+
+  return num(r[resourceId] ?? 0);
+}
+
+function cleanEconomyCost(cost) {
+  const clean = {};
+
+  Object.entries(cost || {}).forEach(([resourceId, amount]) => {
+    amount = num(amount);
+
+    if (amount <= 0) return;
+
+    // Energy bukan biaya train.
+    if (resourceId === "energy") return;
+
+    clean[resourceId] = amount;
+  });
+
+  return clean;
+}
+
+function getCostText(cost) {
+  const clean = cleanEconomyCost(cost);
+  const order = ["credits", "nano_parts", "data_shard", "nexus_core"];
+
+  const parts = order
+    .filter(resourceId => clean[resourceId] > 0)
+    .map(resourceId => `${getResourceLabel(resourceId)} ${clean[resourceId]}`);
+
+  return parts.length ? parts.join(" + ") : "Free";
+}
+
+function multiplyCost(cost, amount) {
+  const clean = cleanEconomyCost(cost);
+  const total = {};
+
+  Object.entries(clean).forEach(([resourceId, value]) => {
+    total[resourceId] = num(value) * num(amount);
+  });
+
+  return total;
+}
+
+function getTrainCostText(trainCost) {
+  if (!trainCost) return "Research required";
+  return getCostText(trainCost);
+}
+
+function getTotalTrainCostText(amount, trainCost) {
+  return getCostText(multiplyCost(trainCost, amount));
+}
+
 function getTrainAffordableMax(trainCost) {
   const clean = cleanEconomyCost(trainCost);
   const limits = [];
@@ -3378,143 +3448,6 @@ function setTrainSliderAmount(unitId, level, value) {
 function trainFromSlider(unitId, level) {
   const amount = getTrainSliderAmount(unitId, level);
   trainUnit(unitId, level, amount);
-}
-
-function openUnitFactoryDetail(unitId) {
-  if (!buildingsData) return;
-
-  currentUnitFactoryView = unitId;
-
-  const unit = (buildingsData.units || []).find(u => u.id === unitId);
-  if (!unit) return;
-
-  const levelRows = (unit.levels || []).map(lv => {
-    const trainCost = lv.train_cost || {};
-    const owned = num(lv.owned);
-
-    const hp = getLevelStat(lv, "hp");
-    const attack = getLevelStat(lv, "attack");
-    const defense = getLevelStat(lv, "defense");
-    const speed = getLevelStat(lv, "speed");
-    const cargo = getLevelStat(lv, "cargo");
-
-    const key = trainAmountKey(unit.id, lv.level);
-
-    const batchLimit = getTrainBatchLimit();
-    const affordableMax = getTrainAffordableMax(trainCost);
-
-    const canTrain = lv.unlocked && batchLimit > 0 && affordableMax > 0;
-    const maxTrain = canTrain ? Math.max(1, Math.min(batchLimit, affordableMax)) : 1;
-    const currentAmount = canTrain
-      ? Math.min(maxTrain, Math.max(1, num(trainAmountDraft[key] || 1)))
-      : 1;
-
-    const trainLockedReason = !lv.unlocked
-      ? "Locked by Research"
-      : batchLimit <= 0
-        ? "Build Unit Factory first"
-        : affordableMax <= 0
-          ? "Not enough resources"
-          : "";
-
-    const trainPanel = canTrain
-      ? `
-        <div class="train-slider-panel">
-          <div class="train-slider-top">
-            <div>
-              <small>Train Amount</small>
-              <b>x<span id="trainAmount_${key}">${currentAmount}</span></b>
-            </div>
-
-            <div>
-              <small>Total Cost</small>
-              <b id="trainTotalCost_${key}">${getTotalTrainCostText(currentAmount, trainCost)}</b>
-            </div>
-          </div>
-
-          <input
-            id="trainRange_${key}"
-            class="train-range"
-            type="range"
-            min="1"
-            max="${maxTrain}"
-            value="${currentAmount}"
-            oninput="setTrainSliderAmount('${unit.id}', ${lv.level}, this.value)"
-          />
-
-          <div class="train-slider-bottom">
-            <span>1</span>
-            <span>Batch Max ${maxTrain}</span>
-          </div>
-
-          <button class="train-main-btn" onclick="trainFromSlider('${unit.id}', ${lv.level})">
-            Train x<span id="trainButtonAmount_${key}">${currentAmount}</span>
-          </button>
-        </div>
-      `
-      : `
-        <div class="train-slider-panel locked-panel">
-          <button disabled>${trainLockedReason}</button>
-        </div>
-      `;
-
-    const promoteButtons = lv.promote_to_next_unlocked && owned > 0
-      ? `
-        <div class="promote-mini-actions">
-          <button onclick="promoteUnit('${unit.id}', ${lv.level}, 1)">Promote +1</button>
-          <button onclick="promoteUnit('${unit.id}', ${lv.level}, 5)">+5</button>
-          <button onclick="promoteUnit('${unit.id}', ${lv.level}, 10)">+10</button>
-        </div>
-      `
-      : "";
-
-    return `
-      <div class="unit-level-row premium-train-card ${lv.unlocked ? "" : "locked"}">
-        <div class="premium-train-top">
-          <div class="premium-unit-art">
-            ${getUnitVisualHtmlByAsset(getUnitLevelAsset(unit, lv.level), `${unit.name} Lv.${lv.level}`)}
-          </div>
-
-          <div class="premium-unit-info">
-            <div class="premium-unit-head">
-              <div>
-                <h3>Lv.${lv.level}</h3>
-                <p>Owned: ${owned}</p>
-              </div>
-
-              ${lv.unlocked ? "" : `<span class="compact-lock">Locked</span>`}
-            </div>
-
-            <div class="premium-stat-chips">
-              <span>HP ${hp}</span>
-              <span>ATK ${attack}</span>
-              <span>DEF ${defense}</span>
-              <span>SPD ${speed}</span>
-              <span>Cargo ${cargo}</span>
-            </div>
-
-            <p class="premium-cost-note">Base Cost: ${getTrainCostText(trainCost)} / unit</p>
-          </div>
-        </div>
-
-        ${trainPanel}
-        ${promoteButtons}
-      </div>
-    `;
-  }).join("");
-
-  showBuildingSheet(
-    unit.name,
-    `
-      <div class="unit-level-list premium-train-list">
-        ${levelRows}
-      </div>
-
-      <div class="sheet-actions">
-        <button onclick="renderUnitFactorySheet()">Back to Unit List</button>
-      </div>
-    `
-  );
 }
 
 function openUnitDetail(unitId) {
