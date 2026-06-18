@@ -1798,6 +1798,31 @@ def apply_building_unlocks(profile: dict):
     profile = refresh_building_actions(profile)
     return profile
 
+RADAR_ALLOWED_SIGNALS = {
+    1: ["Weak"],
+    2: ["Weak"],
+    3: ["Weak", "Medium"],
+    4: ["Weak", "Medium"],
+    5: ["Weak", "Medium"],
+    6: ["Weak", "Medium", "Strong"],
+    7: ["Weak", "Medium", "Strong"],
+    8: ["Weak", "Medium", "Strong"],
+    9: ["Weak", "Medium", "Strong"],
+    10: ["Weak", "Medium", "Strong"],
+}
+
+
+def get_allowed_signals_for_radar(radar_level: int):
+    radar_level = int(radar_level or 0)
+
+    if radar_level <= 0:
+        return []
+
+    if radar_level >= 10:
+        return RADAR_ALLOWED_SIGNALS[10]
+
+    return RADAR_ALLOWED_SIGNALS.get(radar_level, ["Weak"])
+
 RADAR_ALLOWED_TIERS = {
     1: ["Low"],
     2: ["Low"],
@@ -1828,13 +1853,15 @@ def get_radar_scan_rule(radar_level: int):
 
     if radar_level <= 0:
         return {
-            "radius": 0,
-            "total_limit": 0,
-            "enemy_limit": 0,
-            "mining_limit": 0,
-            "max_npc_level": 0,
-            "max_mining_level": 0,
-            "allowed_tiers": [],
+            "radius": 40 + (radar_level * 12),
+            "total_limit": min(10, radar_level),
+            "enemy_limit": min(10, radar_level),
+            "mining_limit": min(10, radar_level),
+            "max_npc_level": radar_level,
+            "max_mining_level": radar_level,
+            "allowed_tiers": get_allowed_tiers_for_radar(radar_level),
+            "allowed_signals": get_allowed_signals_for_radar(radar_level),
+            "allowed_signals": [],
         }
 
     return {
@@ -2076,10 +2103,15 @@ def get_unit_tech_list_for_profile(profile: dict):
 
     return result
 
-def generate_targets(max_level: int = 1, allowed_tiers: list[str] | None = None):
+def generate_targets(
+    max_level: int = 1,
+    allowed_tiers: list[str] | None = None,
+    allowed_signals: list[str] | None = None,
+):
     p = GAME_STATE["player"]
     max_level = max(1, int(max_level or 1))
     allowed_tiers = allowed_tiers or ["Low"]
+    allowed_signals = allowed_signals or ["Weak"]
 
     names = [
         "Ghost Relay Lab",
@@ -2101,8 +2133,6 @@ def generate_targets(max_level: int = 1, allowed_tiers: list[str] | None = None)
         "Proxy Nest",
         "Signal Relay",
     ]
-
-    signal_pool = ["Weak", "Medium", "Strong"]
 
     targets = []
 
@@ -2127,10 +2157,7 @@ def generate_targets(max_level: int = 1, allowed_tiers: list[str] | None = None)
         defense_power = 800 + (enemy_level * 180) + random.randint(0, 350)
         
 
-        signal_strength = random.choice(signal_pool)
-
-        if enemy_level >= 9:
-            signal_strength = random.choice(["Medium", "Strong"])
+        signal_strength = random.choice(allowed_signals)
 
         target_id = f"scan_{scan_counter}_{i}_{random.randint(1000, 9999)}"
 
@@ -3543,6 +3570,7 @@ async def scan(request: Request):
     fresh_targets = generate_targets(
         max_level=scan_rule["max_npc_level"],
         allowed_tiers=scan_rule["allowed_tiers"],
+        allowed_signals=scan_rule["allowed_signals"],
     )
     player_targets = make_player_scan_targets(player_id)
 
@@ -3594,14 +3622,18 @@ async def scan(request: Request):
             visible_players.append(safe_target)
             continue
 
-        # NPC dibatasi oleh max_npc_level DAN allowed_tiers.
+        # NPC dibatasi oleh max_npc_level, allowed_tiers, dan allowed_signals.
         target_level = int(t.get("level", 1))
         target_tier = t.get("lab_tier", "Low")
+        target_signal = t.get("signal_strength", "Weak")
 
         if target_level > scan_rule["max_npc_level"]:
             continue
 
         if target_tier not in scan_rule["allowed_tiers"]:
+            continue
+
+        if target_signal not in scan_rule["allowed_signals"]:
             continue
 
         visible_non_player.append(safe_target)
@@ -3612,6 +3644,11 @@ async def scan(request: Request):
             continue
 
         if int(node.get("level", 1)) > scan_rule["max_mining_level"]:
+            continue
+
+        node_signal = node.get("signal_strength", "Weak")
+
+        if node_signal not in scan_rule["allowed_signals"]:
             continue
 
         visible_non_player.append(node)
@@ -3642,6 +3679,7 @@ async def scan(request: Request):
         "max_npc_level": scan_rule["max_npc_level"],
         "max_mining_level": scan_rule["max_mining_level"],
         "allowed_tiers": scan_rule["allowed_tiers"],
+        "allowed_signals": scan_rule["allowed_signals"],
 
         # field lama tetap dikirim supaya frontend lama tidak rusak
         "enemy_limit": scan_rule["enemy_limit"],
