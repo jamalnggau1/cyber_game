@@ -122,9 +122,6 @@ def make_reset_player_profile(player_id: str, old_profile: dict | None = None):
         "unit_inventory": {
             "breaker": 0,
             "ghost": 0,
-            "probe": 0,
-            "payload": 0,
-            "relay": 0,
             "extractor": 0,
         },
 
@@ -258,49 +255,15 @@ ATTACK_MODULES = [
     {"id": "anti_jammer_chip", "name": "Anti-Jammer Chip", "tags": ["anti_jammer"], "effect": "Counters Signal Jammer"},
     {"id": "payload_booster", "name": "Payload Booster", "tags": ["burst"], "effect": "Better burst pressure"},
 ]
-BREAKER_LEVELS = {
-    1: {
-        "hp": 120,
-        "attack": 35,
-        "defense": 18,
-        "speed": 7,
-        "cargo": 3,
-    },
-    2: {
-        "hp": 155,
-        "attack": 48,
-        "defense": 24,
-        "speed": 7,
-        "cargo": 4,
-    },
-    3: {
-        "hp": 200,
-        "attack": 65,
-        "defense": 32,
-        "speed": 6,
-        "cargo": 5,
-    },
-    4: {
-        "hp": 260,
-        "attack": 88,
-        "defense": 43,
-        "speed": 6,
-        "cargo": 6,
-    },
-    5: {
-        "hp": 340,
-        "attack": 120,
-        "defense": 58,
-        "speed": 5,
-        "cargo": 8,
-    },
-}
+
+
 UNITS = {
     "breaker": {
         "id": "breaker",
         "name": "Breaker",
-        "role": "Heavy assault unit",
-        "description": "Pasukan penyerang berat dengan attack dan HP tinggi, tapi speed lambat dan cargo kecil.",
+        "type": "Infantry",
+        "role": "Balanced assault unit",
+        "description": "Pasukan utama yang seimbang. Cocok untuk serangan normal karena punya HP dan attack stabil.",
         "max_level": 5,
         "levels": {
             1: {
@@ -342,6 +305,108 @@ UNITS = {
                 "speed": 5,
                 "cargo": 8,
                 "train_cost": {"credits": 650, "nano_parts": 180, "data_shard": 15},
+            },
+        },
+    },
+
+    "ghost": {
+        "id": "ghost",
+        "name": "Ghost",
+        "type": "Cavalry",
+        "role": "Fast raider unit",
+        "description": "Pasukan cepat untuk serangan kilat. Speed tinggi, tapi HP, defense, dan cargo lebih kecil.",
+        "max_level": 5,
+        "levels": {
+            1: {
+                "hp": 75,
+                "attack": 28,
+                "defense": 8,
+                "speed": 14,
+                "cargo": 2,
+                "train_cost": {"credits": 85, "nano_parts": 14},
+            },
+            2: {
+                "hp": 98,
+                "attack": 39,
+                "defense": 11,
+                "speed": 15,
+                "cargo": 2,
+                "train_cost": {"credits": 165, "nano_parts": 34},
+            },
+            3: {
+                "hp": 128,
+                "attack": 54,
+                "defense": 15,
+                "speed": 16,
+                "cargo": 3,
+                "train_cost": {"credits": 300, "nano_parts": 75},
+            },
+            4: {
+                "hp": 168,
+                "attack": 74,
+                "defense": 20,
+                "speed": 17,
+                "cargo": 3,
+                "train_cost": {"credits": 520, "nano_parts": 135, "data_shard": 8},
+            },
+            5: {
+                "hp": 220,
+                "attack": 102,
+                "defense": 27,
+                "speed": 18,
+                "cargo": 4,
+                "train_cost": {"credits": 900, "nano_parts": 240, "data_shard": 25},
+            },
+        },
+    },
+
+    "extractor": {
+        "id": "extractor",
+        "name": "Extractor",
+        "type": "Carrier",
+        "role": "High cargo farming unit",
+        "description": "Pasukan pembawa resource. Cargo dan HP besar, tapi speed dan attack lebih rendah.",
+        "max_level": 5,
+        "levels": {
+            1: {
+                "hp": 170,
+                "attack": 18,
+                "defense": 28,
+                "speed": 4,
+                "cargo": 12,
+                "train_cost": {"credits": 120, "nano_parts": 22},
+            },
+            2: {
+                "hp": 230,
+                "attack": 25,
+                "defense": 38,
+                "speed": 4,
+                "cargo": 18,
+                "train_cost": {"credits": 230, "nano_parts": 55},
+            },
+            3: {
+                "hp": 310,
+                "attack": 35,
+                "defense": 52,
+                "speed": 4,
+                "cargo": 26,
+                "train_cost": {"credits": 420, "nano_parts": 120},
+            },
+            4: {
+                "hp": 420,
+                "attack": 49,
+                "defense": 72,
+                "speed": 3,
+                "cargo": 38,
+                "train_cost": {"credits": 720, "nano_parts": 210, "data_shard": 10},
+            },
+            5: {
+                "hp": 570,
+                "attack": 68,
+                "defense": 98,
+                "speed": 3,
+                "cargo": 55,
+                "train_cost": {"credits": 1250, "nano_parts": 380, "data_shard": 35},
             },
         },
     },
@@ -487,9 +552,6 @@ GAME_STATE: Dict[str, Any] = {
         "unit_tech": {
             "breaker": 1,
             "ghost": 1,
-            "probe": 1,
-            "payload": 1,
-            "relay": 1,
             "extractor": 1,
         },
     },
@@ -2856,6 +2918,10 @@ def get_units_for_player():
         result.append({
             "id": unit_id,
             "name": unit["name"],
+            "type": unit_profile.get("type", "Unit"),
+            "factory_unlocked": factory_unlocked,
+            "unlock_factory_level": factory_unlock_level,
+            "batch_factor": unit_profile.get("batch_factor", 1.0),
             "role": unit.get("role", ""),
             "description": unit.get("description", ""),
             "max_level": unit["max_level"],
@@ -4734,6 +4800,13 @@ async def train_unit(req: TrainUnitRequest, request: Request):
 
     if not unit:
         raise HTTPException(status_code=400, detail="Unknown unit")
+    required_factory_level = get_unit_factory_unlock_level(req.unit_id)
+
+    if not is_unit_type_unlocked_by_factory(profile, req.unit_id):
+        raise HTTPException(
+            status_code=400,
+            detail=f"{unit['name']} membutuhkan Unit Factory Lv.{required_factory_level}."
+        )
 
     batch_limit = get_unit_train_batch_limit(profile, req.unit_id, req.level)
 
@@ -5351,37 +5424,36 @@ UNIT_TRAIN_BATCH_BASE_BY_LEVEL = {
 }
 
 UNIT_TRAIN_PROFILE = {
-    "probe": {
-        "batch_factor": 1.20,
-        "type": "Scout",
-        "role": "Cheap utility and recon unit",
-    },
     "breaker": {
         "batch_factor": 1.00,
-        "type": "Assault",
-        "role": "Balanced heavy attacker",
-    },
-    "relay": {
-        "batch_factor": 0.85,
-        "type": "Support",
-        "role": "Routing and speed support",
+        "type": "Infantry",
+        "role": "Balanced assault unit",
+        "unlock_factory_level": 1,
     },
     "ghost": {
         "batch_factor": 0.75,
-        "type": "Stealth",
-        "role": "Fast low-trace attacker",
+        "type": "Cavalry",
+        "role": "Fast raider unit",
+        "unlock_factory_level": 2,
     },
     "extractor": {
         "batch_factor": 0.60,
-        "type": "Loot",
-        "role": "High cargo resource carrier",
-    },
-    "payload": {
-        "batch_factor": 0.45,
-        "type": "Burst",
-        "role": "High damage limited unit",
+        "type": "Carrier",
+        "role": "High cargo farming unit",
+        "unlock_factory_level": 3,
     },
 }
+
+def get_unit_factory_unlock_level(unit_id: str):
+    profile_config = UNIT_TRAIN_PROFILE.get(unit_id, {})
+    return int(profile_config.get("unlock_factory_level", 1))
+
+
+def is_unit_type_unlocked_by_factory(profile: dict, unit_id: str):
+    factory_level = get_profile_building_level(profile, "unit_factory")
+    required_level = get_unit_factory_unlock_level(unit_id)
+
+    return factory_level >= required_level
 
 UNIT_FACTORY_TRAIN_BONUS_PER_LEVEL = 0.05
 
@@ -5404,10 +5476,14 @@ def get_unit_train_batch_limit(profile: dict, unit_id: str, unit_level: int):
     - level unit
     - level Unit Factory
     - jenis pasukan
+    - unlock jenis unit dari Unit Factory
     """
     factory_level = get_profile_building_level(profile, "unit_factory")
 
     if factory_level <= 0:
+        return 0
+
+    if not is_unit_type_unlocked_by_factory(profile, unit_id):
         return 0
 
     unit_level = int(unit_level or 1)
@@ -5430,6 +5506,10 @@ def get_units_for_profile(profile: dict):
     for unit_id, unit in UNITS.items():
         unlocked_level = int(profile["unit_tech"].get(unit_id, 1))
         inventory = profile["unit_inventory"].get(unit_id, {})
+
+        factory_unlock_level = get_unit_factory_unlock_level(unit_id)
+        factory_unlocked = is_unit_type_unlocked_by_factory(profile, unit_id)
+        unit_profile = UNIT_TRAIN_PROFILE.get(unit_id, {})
 
         levels = []
 
@@ -5455,7 +5535,9 @@ def get_units_for_profile(profile: dict):
                 "power": power,
                 "promote_to_next_unlocked": promote_to_next_unlocked,
                 "level": level,
-                "unlocked": level <= unlocked_level,
+                "unlocked": factory_unlocked and level <= unlocked_level,
+                "factory_unlocked": factory_unlocked,
+                "unlock_factory_level": factory_unlock_level,
                 "owned": owned,
 
                 "hp": stats["hp"],
