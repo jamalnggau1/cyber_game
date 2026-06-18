@@ -2351,7 +2351,7 @@ def generate_mining_nodes(
             "capacity": res["capacity"] + (guardian_level * 120),
             "owner": None,
             "status": "Unoccupied",
-            "signal_strength": "Strong" if res["id"] == "nexus_core" else random.choice(allowed_signals),
+            "signal_strength": signal_strength,
             "asset": res["asset"],
         })
 
@@ -3735,36 +3735,6 @@ async def scan(request: Request):
     )
 
     visible = visible_players + selected_non_player
-
-    # Mining nodes
-    for node in fresh_mining_nodes:
-        if int(node.get("distance", 9999)) > radius:
-            continue
-
-        if int(node.get("level", 1)) > scan_rule["max_mining_level"]:
-            continue
-
-        node_signal = node.get("signal_strength", "Weak")
-
-        if node_signal not in scan_rule["allowed_signals"]:
-            continue
-
-        visible_non_player.append(node)
-
-    # Radar Lv.1:
-    # visible_non_player akan diacak dari NPC Lv.1 + Mining Lv.1
-    # lalu diambil total_limit = 1
-    random.shuffle(visible_non_player)
-
-    visible_non_player = visible_non_player[:scan_rule["total_limit"]]
-
-    # Player base muncul terpisah dan tidak memakan kuota scan.
-    visible_players = sorted(
-        visible_players,
-        key=lambda t: int(t.get("distance", 9999))
-    )
-
-    visible = visible_players + visible_non_player
 
     await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
 
