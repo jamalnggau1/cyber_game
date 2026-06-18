@@ -2235,19 +2235,43 @@ def is_too_close_to_any(point, points, min_distance):
             return True
     return False
 
-def generate_mining_nodes(enemy_targets=None, max_level: int = 1):
+def generate_mining_nodes(
+    enemy_targets=None,
+    max_level: int = 1,
+    allowed_signals: list[str] | None = None,
+):
     p = GAME_STATE["player"]
     scan_counter = GAME_STATE.get("scan_counter", 0)
 
     enemy_targets = enemy_targets or []
+
+    max_level = max(1, int(max_level or 1))
+    allowed_signals = allowed_signals or ["Weak"]
 
     nodes = []
 
     MIN_DISTANCE_FROM_ENEMY = 26
     MIN_DISTANCE_FROM_MINING = 18
 
+    # Early radar tidak boleh menemukan Nexus Core.
+    # Nexus Core nanti masuk radar tinggi karena reward-nya langka.
+    available_resources = MINING_RESOURCES
+
+    if max_level < 8:
+        available_resources = [
+            r for r in MINING_RESOURCES
+            if r["id"] != "nexus_core"
+        ]
+
+    if not available_resources:
+        available_resources = [
+            r for r in MINING_RESOURCES
+            if r["id"] != "nexus_core"
+        ]
+
     for i in range(random.randint(2, 4)):
-        res = pick_mining_resource()
+        weights = [r["weight"] for r in available_resources]
+        res = random.choices(available_resources, weights=weights, k=1)[0]
 
         chosen_point = None
 
@@ -2267,7 +2291,7 @@ def generate_mining_nodes(enemy_targets=None, max_level: int = 1):
 
             point = {
                 "x": x,
-                "y": y
+                "y": y,
             }
 
             if is_too_close_to_any(point, enemy_targets, MIN_DISTANCE_FROM_ENEMY):
@@ -2297,13 +2321,14 @@ def generate_mining_nodes(enemy_targets=None, max_level: int = 1):
 
         distance = int((dx ** 2 + dy ** 2) ** 0.5)
 
-        max_level = max(1, int(max_level or 1))
         guardian_level = random.randint(1, max_level)
-        guardian_power = 700 + (guardian_level * 170) + random.randint(0, 420)
+        guardian_power = 500 + (guardian_level * 140) + random.randint(0, 260)
 
         if res["id"] == "nexus_core":
-            guardian_level += random.randint(2, 4)
+            signal_strength = "Strong"
             guardian_power += random.randint(600, 1200)
+        else:
+            signal_strength = random.choice(allowed_signals)
 
         node_id = f"mine_{scan_counter}_{i}_{random.randint(1000, 9999)}"
 
@@ -2326,7 +2351,7 @@ def generate_mining_nodes(enemy_targets=None, max_level: int = 1):
             "capacity": res["capacity"] + (guardian_level * 120),
             "owner": None,
             "status": "Unoccupied",
-            "signal_strength": "Strong" if res["id"] == "nexus_core" else random.choice(["Weak", "Medium", "Strong"]),
+            "signal_strength": signal_strength,
             "asset": res["asset"],
         })
 
@@ -3577,7 +3602,8 @@ async def scan(request: Request):
     all_targets = fresh_targets + player_targets
     fresh_mining_nodes = generate_mining_nodes(
         fresh_targets,
-        max_level=scan_rule["max_mining_level"]
+        max_level=scan_rule["max_mining_level"],
+        allowed_signals=scan_rule["allowed_signals"],
     )
 
     GAME_STATE["targets"] = {
@@ -3589,7 +3615,8 @@ async def scan(request: Request):
     }
 
     visible_players = []
-    visible_non_player = []
+    visible_npc = []
+    visible_mining = []
 
     # NPC + Player Base
     for t in all_targets:
@@ -3616,7 +3643,7 @@ async def scan(request: Request):
             "intel_status": "scout_required",
         }
 
-        # Player Base tidak dibatasi level radar.
+        # Player Base tidak dibatasi level/tier/signal radar.
         # Dia juga tidak memakan slot scan NPC/mining.
         if t.get("kind") == "player":
             visible_players.append(safe_target)
@@ -3636,7 +3663,78 @@ async def scan(request: Request):
         if target_signal not in scan_rule["allowed_signals"]:
             continue
 
-        visible_non_player.append(safe_target)
+        visible_npc.append(safe_target)
+
+    # Mining nodes
+    for node in fresh_mining_nodes:
+        if int(node.get("distance", 9999)) > radius:
+            continue
+
+        if int(node.get("level", 1)) > scan_rule["max_mining_level"]:
+            continue
+
+        node_signal = node.get("signal_strength", "Weak")
+
+        if node_signal not in scan_rule["allowed_signals"]:
+            continue
+
+        visible_mining.append(node)
+
+    # Acak masing-masing kategori dulu.
+    random.shuffle(visible_npc)
+    random.shuffle(visible_mining)
+
+    limit = int(scan_rule["total_limit"])
+    selected_non_player = []
+
+    # Radar Lv.1:
+    # pilih kategori dulu, bukan item.
+    # Jadi peluang NPC dan Mining lebih adil.
+    if limit == 1:
+        available_categories = []
+
+        if visible_npc:
+            available_categories.append("npc")
+
+        if visible_mining:
+            available_categories.append("mining")
+
+        if available_categories:
+            picked_category = random.choice(available_categories)
+
+            if picked_category == "npc":
+                selected_non_player.append(visible_npc[0])
+
+            if picked_category == "mining":
+                selected_non_player.append(visible_mining[0])
+
+    else:
+        # Radar Lv.2+:
+        # isi slot secara campuran antara NPC dan mining.
+        while len(selected_non_player) < limit and (visible_npc or visible_mining):
+            available_categories = []
+
+            if visible_npc:
+                available_categories.append("npc")
+
+            if visible_mining:
+                available_categories.append("mining")
+
+            picked_category = random.choice(available_categories)
+
+            if picked_category == "npc":
+                selected_non_player.append(visible_npc.pop(0))
+
+            if picked_category == "mining":
+                selected_non_player.append(visible_mining.pop(0))
+
+    # Player base muncul terpisah dan tidak memakan kuota scan.
+    visible_players = sorted(
+        visible_players,
+        key=lambda t: int(t.get("distance", 9999))
+    )
+
+    visible = visible_players + selected_non_player
 
     # Mining nodes
     for node in fresh_mining_nodes:
