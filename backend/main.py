@@ -108,9 +108,9 @@ def make_reset_player_profile(player_id: str, old_profile: dict | None = None):
         "defense_units": [],
 
         "resources": {
-            "credits": 5000,
+            "credits": 3200,
+            "nano_parts": 400,
             "data_shard": 0,
-            "nano_parts": 1200,
             "nexus_core": 0,
         },
 
@@ -2736,25 +2736,55 @@ def get_unit_train_cost(unit_id: str, level: int):
     stats = get_unit_stats(unit_id, level)
     return stats.get("train_cost", {"credits": 100, "nano_parts": 10})
 
-def get_train_batch_limit(profile: dict):
+UNIT_TRAIN_BATCH_BASE_BY_LEVEL = {
+    1: 50,
+    2: 40,
+    3: 30,
+    4: 20,
+    5: 10,
+}
+
+
+def get_unit_factory_training_multiplier(profile: dict):
+    """
+    Bonus dari level Unit Factory.
+    Lv.1 = 1.00x
+    Lv.2 = 1.05x
+    Lv.3 = 1.10x
+    Lv.4 = 1.15x
+    Lv.5 = 1.20x
+    dst.
+    """
     factory_level = get_profile_building_level(profile, "unit_factory")
 
     if factory_level <= 0:
         return 0
 
-    if factory_level == 1:
-        return 5
+    return 1 + (max(0, factory_level - 1) * 0.05)
 
-    if factory_level == 2:
-        return 10
 
-    if factory_level == 3:
-        return 20
+def get_unit_train_batch_limit(profile: dict, unit_id: str, unit_level: int):
+    """
+    Batas train per batch.
+    Tidak membatasi total owned.
+    Berlaku untuk semua jenis pasukan.
+    Nanti research per jenis pasukan bisa ditambahkan di sini.
+    """
+    factory_level = get_profile_building_level(profile, "unit_factory")
 
-    if factory_level == 4:
-        return 35
+    if factory_level <= 0:
+        return 0
 
-    return 50
+    unit_level = int(unit_level or 1)
+
+    base_limit = UNIT_TRAIN_BATCH_BASE_BY_LEVEL.get(
+        unit_level,
+        max(5, 50 - ((unit_level - 1) * 10))
+    )
+
+    multiplier = get_unit_factory_training_multiplier(profile)
+
+    return max(1, int(math.ceil(base_limit * multiplier)))
 
 
 def get_unit_promote_cost(unit_id: str, from_level: int, amount: int) -> Dict[str, int]:
@@ -4711,18 +4741,18 @@ async def train_unit(req: TrainUnitRequest, request: Request):
             detail="Bangun Unit Factory dulu sebelum melatih pasukan."
         )
 
-    batch_limit = get_train_batch_limit(profile)
-
-    if int(req.amount) > batch_limit:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unit Factory Lv.{factory_level} hanya bisa train max {batch_limit} unit per batch."
-        )
-
     unit = get_unit_config(req.unit_id)
 
     if not unit:
         raise HTTPException(status_code=400, detail="Unknown unit")
+
+    batch_limit = get_unit_train_batch_limit(profile, req.unit_id, req.level)
+
+    if int(req.amount) > batch_limit:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unit Factory Lv.{factory_level} hanya bisa train max {batch_limit} {unit['name']} Lv.{req.level} per batch."
+        )
 
     unlocked_level = int(profile["unit_tech"].get(req.unit_id, 1))
 
@@ -5366,6 +5396,8 @@ def get_units_for_profile(profile: dict):
                 "cargo": stats["cargo"],
 
                 "train_cost": train_cost,
+                "train_batch_limit": get_unit_train_batch_limit(profile, unit_id, level),
+                "factory_train_multiplier": round(get_unit_factory_training_multiplier(profile), 2),
                 "promote_cost": {
                     "nano_parts": 40 * (level + 1)
                 },

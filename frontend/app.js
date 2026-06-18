@@ -3387,17 +3387,32 @@ function getTrainAffordableMax(trainCost) {
   return Math.max(0, Math.min(...limits));
 }
 
-function getTrainBatchLimit() {
+function getTrainBatchLimitForLevel(levelInfo) {
+  const fromServer = Number(levelInfo?.train_batch_limit ?? 0);
+
+  if (fromServer > 0) {
+    return fromServer;
+  }
+
+  // fallback kalau server belum mengirim train_batch_limit
   const factory = buildingsData?.buildings?.unit_factory || {};
-  const level = Number(factory.level ?? 0);
+  const factoryLevel = Number(factory.level ?? 0);
+  const unitLevel = Number(levelInfo?.level ?? 1);
 
-  if (level <= 0) return 0;
-  if (level === 1) return 5;
-  if (level === 2) return 10;
-  if (level === 3) return 20;
-  if (level === 4) return 35;
+  if (factoryLevel <= 0) return 0;
 
-  return 50;
+  const baseByLevel = {
+    1: 50,
+    2: 40,
+    3: 30,
+    4: 20,
+    5: 10,
+  };
+
+  const base = baseByLevel[unitLevel] || Math.max(5, 50 - ((unitLevel - 1) * 10));
+  const multiplier = 1 + (Math.max(0, factoryLevel - 1) * 0.05);
+
+  return Math.max(1, Math.ceil(base * multiplier));
 }
 
 function getTrainSliderAmount(unitId, level) {
@@ -3457,7 +3472,7 @@ function openUnitFactoryDetail(unitId) {
 
     const key = trainAmountKey(unit.id, lv.level);
 
-    const batchLimit = getTrainBatchLimit();
+    const batchLimit = getTrainBatchLimitForLevel(lv);
     const affordableMax = getTrainAffordableMax(trainCost);
 
     const canTrain = lv.unlocked && batchLimit > 0 && affordableMax > 0;
@@ -3556,6 +3571,10 @@ function openUnitFactoryDetail(unitId) {
 
             <p class="premium-cost-note">
               Base Cost: ${getTrainCostText(trainCost)} / unit
+            </p>
+            <p class="premium-cost-note">
+              Batch Limit: ${batchLimit} / training
+              ${lv.factory_train_multiplier ? `(Factory x${lv.factory_train_multiplier})` : ""}
             </p>
           </div>
         </div>
