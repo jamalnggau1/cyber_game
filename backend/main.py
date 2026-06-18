@@ -5350,6 +5350,39 @@ UNIT_TRAIN_BATCH_BASE_BY_LEVEL = {
     5: 50,
 }
 
+UNIT_TRAIN_PROFILE = {
+    "probe": {
+        "batch_factor": 1.20,
+        "type": "Scout",
+        "role": "Cheap utility and recon unit",
+    },
+    "breaker": {
+        "batch_factor": 1.00,
+        "type": "Assault",
+        "role": "Balanced heavy attacker",
+    },
+    "relay": {
+        "batch_factor": 0.85,
+        "type": "Support",
+        "role": "Routing and speed support",
+    },
+    "ghost": {
+        "batch_factor": 0.75,
+        "type": "Stealth",
+        "role": "Fast low-trace attacker",
+    },
+    "extractor": {
+        "batch_factor": 0.60,
+        "type": "Loot",
+        "role": "High cargo resource carrier",
+    },
+    "payload": {
+        "batch_factor": 0.45,
+        "type": "Burst",
+        "role": "High damage limited unit",
+    },
+}
+
 UNIT_FACTORY_TRAIN_BONUS_PER_LEVEL = 0.05
 
 
@@ -5363,6 +5396,15 @@ def get_unit_factory_training_multiplier(profile: dict):
 
 
 def get_unit_train_batch_limit(profile: dict, unit_id: str, unit_level: int):
+    """
+    Batas train per batch.
+    Total owned unit tidak dibatasi.
+
+    Dipengaruhi oleh:
+    - level unit
+    - level Unit Factory
+    - jenis pasukan
+    """
     factory_level = get_profile_building_level(profile, "unit_factory")
 
     if factory_level <= 0:
@@ -5371,9 +5413,14 @@ def get_unit_train_batch_limit(profile: dict, unit_id: str, unit_level: int):
     unit_level = int(unit_level or 1)
 
     base_limit = UNIT_TRAIN_BATCH_BASE_BY_LEVEL.get(unit_level, 10)
-    multiplier = get_unit_factory_training_multiplier(profile)
+    factory_multiplier = get_unit_factory_training_multiplier(profile)
 
-    return max(1, int(math.ceil(base_limit * multiplier)))
+    profile_config = UNIT_TRAIN_PROFILE.get(unit_id, {})
+    unit_factor = float(profile_config.get("batch_factor", 1.0))
+
+    final_limit = base_limit * factory_multiplier * unit_factor
+
+    return max(1, int(math.ceil(final_limit)))
 
 def get_units_for_profile(profile: dict):
     profile = ensure_profile_unit_system(profile)
