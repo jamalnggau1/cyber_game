@@ -1853,14 +1853,13 @@ def get_radar_scan_rule(radar_level: int):
 
     if radar_level <= 0:
         return {
-            "radius": 40 + (radar_level * 12),
-            "total_limit": min(10, radar_level),
-            "enemy_limit": min(10, radar_level),
-            "mining_limit": min(10, radar_level),
-            "max_npc_level": radar_level,
-            "max_mining_level": radar_level,
-            "allowed_tiers": get_allowed_tiers_for_radar(radar_level),
-            "allowed_signals": get_allowed_signals_for_radar(radar_level),
+            "radius": 0,
+            "total_limit": 0,
+            "enemy_limit": 0,
+            "mining_limit": 0,
+            "max_npc_level": 0,
+            "max_mining_level": 0,
+            "allowed_tiers": [],
             "allowed_signals": [],
         }
 
@@ -1871,16 +1870,17 @@ def get_radar_scan_rule(radar_level: int):
         # Semakin tinggi radar, jumlah hasil bertambah.
         "total_limit": min(10, radar_level),
 
-        # field lama agar frontend lama tidak rusak
+        # Field lama agar frontend lama tidak rusak.
         "enemy_limit": min(10, radar_level),
         "mining_limit": min(10, radar_level),
 
-        # Radar Lv.5 berarti boleh Lv.1 sampai Lv.5, bukan semua Lv.5.
+        # Radar Lv.5 berarti boleh Lv.1 sampai Lv.5.
         "max_npc_level": radar_level,
         "max_mining_level": radar_level,
 
-        # Ini filter penting supaya Elite tidak muncul di early game.
+        # Filter tier dan signal.
         "allowed_tiers": get_allowed_tiers_for_radar(radar_level),
+        "allowed_signals": get_allowed_signals_for_radar(radar_level),
     }
 
 def make_default_player_buildings():
