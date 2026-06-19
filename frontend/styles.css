@@ -4404,3 +4404,14 @@ input[type=number] {
   line-height: 1.4;
   margin-bottom: 10px;
 }
+.radar-point.occupied-node {
+    border: 2px solid var(--danger);
+    box-shadow: 0 0 8px var(--danger);
+    animation: pulse-danger 1.5s infinite;
+}
+
+@keyframes pulse-danger {
+    0% { box-shadow: 0 0 4px var(--danger); }
+    50% { box-shadow: 0 0 12px var(--danger); }
+    100% { box-shadow: 0 0 4px var(--danger); }
+}

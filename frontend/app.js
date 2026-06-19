@@ -489,6 +489,10 @@ function getOperationPhaseText(op) {
       return "Returning to base";
     }
 
+    if (op.phase === "occupying") {
+      return "Mining resource";
+    }
+
     if (op.phase === "completed") {
       return "Completed";
     }
@@ -1276,6 +1280,7 @@ function renderOperationCard(op) {
       </div>
 
       <div class="sheet-actions">
+        ${op.phase === "occupying" ? `<button onclick="recallOperation('${op.id}')" style="background:var(--warn); color:#000;">Recall</button>` : ""}
         <button onclick="openOperationDetail('${op.id}')">View</button>
       </div>
     </div>
@@ -1353,6 +1358,29 @@ async function resolveAttackImpact(op) {
     if (data.phase === "returning") {
       const returnSeconds = Math.max(1, Number(data.return_seconds || op.returnSeconds || 1));
       const now = Date.now();
+      // TAMBAHKAN BLOK INI:
+      if (data.phase === "occupying") {
+        op.phase = "occupying";
+        op.status = "running";
+        op.title = `Mining at ${data.target_name || op.targetName || "Target"}`;
+        op.startedAt = Date.now();
+        
+        // Jika occupy_ends_at null (waktu tidak terbatas), kita beri fallback aman
+        op.endsAt = data.occupy_ends_at ? (Number(data.occupy_ends_at) * 1000) : (Date.now() + 86400000); 
+        op.totalSeconds = Math.max(1, Math.ceil((op.endsAt - op.startedAt) / 1000));
+        op.occupy_ends_at = data.occupy_ends_at;
+
+        addGameMessage(
+          "battle",
+          "Mining Started",
+          `${data.target_name || op.targetName || "Target"}\n${op.finalLog}\nUnits are occupying the node.`
+        );
+
+        await loadState();
+        renderOperationQueueList();
+        updateOperationQueueWidget();
+        return;
+      }
 
       let returnEnd = now + returnSeconds * 1000;
 
@@ -1447,6 +1475,44 @@ ${op.finalLog}`
   }
 }
 
+async function recallOperation(attackId) {
+  const op = activeOperations.find(o => o.id === attackId);
+  if (op && op.resolving) return; // Cegah double klik
+  if (op) op.resolving = true;
+
+  try {
+    const data = await api(`/api/attack/${attackId}/recall`, { method: "POST" });
+    if (op) op.resolving = false;
+
+    if (data.phase === "returning") {
+      const returnSeconds = Math.max(1, Number(data.return_seconds || 30));
+      const now = Date.now();
+      const returnEnd = now + returnSeconds * 1000;
+
+      if (op) {
+        op.phase = "returning";
+        op.status = "running";
+        op.title = `Returning from ${data.target_name || op.targetName}`;
+        op.returnSeconds = returnSeconds;
+        op.startedAt = now;
+        op.endsAt = returnEnd;
+        op.totalSeconds = Math.max(1, Math.ceil((returnEnd - now) / 1000));
+      }
+
+      addGameMessage("battle", "Recall Issued", "Pasukan ditarik dari tambang dan membawa loot sementara.");
+      alert("Pasukan ditarik dari tambang dan sedang perjalanan pulang!");
+      
+      await loadState();
+      renderOperationQueueList();
+      updateOperationQueueWidget();
+    }
+  } catch (err) {
+    if (op) op.resolving = false;
+    console.warn("Recall failed:", err);
+    alert("Gagal recall pasukan: " + err.message);
+  }
+}
+
 async function finalizeExpiredOperations() {
   const expired = activeOperations.filter(op => {
     return op.status === "running" && getOperationRemaining(op) <= 0;
@@ -1492,6 +1558,11 @@ ${op.finalLog}`,
 
       if (op.phase === "returning") {
         await resolveAttackReturn(op);
+        continue;
+      }
+      
+      if (op.phase === "occupying") {
+        await recallOperation(op.id);
         continue;
       }
 
@@ -5181,6 +5252,14 @@ function selectRadarSignal(targetId) {
 function openMiningNodeSheet(node) {
   const asset = getEnemyAsset(node);
 
+  let ownershipHtml = `<p style="color:var(--good); font-weight:bold; margin-bottom: 10px;">Status: Unoccupied</p>`;
+  
+  if (node.status === "Occupied") {
+    // Cek apakah pemiliknya adalah kita atau orang lain
+    const ownerName = (node.owner === state.player.id) ? "YOU" : node.owner;
+    ownershipHtml = `<p style="color:var(--danger); font-weight:bold; margin-bottom: 10px;">Status: Occupied by ${ownerName}</p>`;
+  }
+
   showBuildingSheet(
     node.name,
     `
@@ -5194,6 +5273,8 @@ function openMiningNodeSheet(node) {
         </div>
       </div>
 
+      ${ownershipHtml}
+
       ${row("Resource", node.resource_name)}
       ${row("Production", `${node.production_per_minute} / minute`)}
       ${row("Capacity", node.capacity)}
@@ -5201,7 +5282,6 @@ function openMiningNodeSheet(node) {
       ${row("Guardian Power", node.guardian_power)}
       ${row("Distance", `${node.distance} Trace Unit`)}
       ${row("Coordinate", `X:${node.x} / Y:${node.y}`)}
-      ${row("Status", node.status || "Unoccupied")}
 
       <p class="muted" style="margin-top:12px;">
         Jika guardian berhasil dikalahkan, pasukan tidak langsung pulang.

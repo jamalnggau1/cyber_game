@@ -4929,6 +4929,58 @@ async def attack_impact(attack_id: str, request: Request):
 
     return active_attack
 
+@app.post("/api/attack/{attack_id}/recall")
+async def attack_recall(attack_id: str, request: Request):
+    await sync_state_from_db()
+
+    attacker_id, attacker = get_or_create_active_player_profile(request)
+    active_attacks = GAME_STATE.setdefault("active_attacks", {})
+    active_attack = active_attacks.get(attack_id)
+
+    if not active_attack or active_attack.get("player_id") != attacker_id:
+        raise HTTPException(status_code=404, detail="Operation tidak ditemukan.")
+
+    if active_attack.get("phase") != "occupying":
+        raise HTTPException(status_code=400, detail="Pasukan tidak sedang menambang.")
+
+    now = time.time()
+    target_id = active_attack.get("target_id")
+
+    # 1. Hitung hasil tambang secara presisi (Lazy Evaluation)
+    mined_amount = process_mining_tick(target_id, now)
+
+    # 2. Masukkan hasil tambang ke kargo pasukan (pending_reward)
+    res_id = active_attack.get("mining_resource_id", "credits")
+    
+    if "pending_reward" not in active_attack:
+        active_attack["pending_reward"] = {"credits": 0, "data_shard": 0, "nano_parts": 0, "nexus_core": 0}
+        
+    active_attack["pending_reward"][res_id] = int(active_attack["pending_reward"].get(res_id, 0)) + mined_amount
+
+    # 3. Lepaskan penguasaan tambang di Global State
+    target = GAME_STATE.get("mining_nodes", {}).get(target_id)
+    if target and target.get("owner") == attacker_id:
+        target["owner"] = None
+        target["status"] = "Unoccupied"
+
+    # 4. Ubah status pasukan menjadi Pulang (Returning)
+    return_seconds = int(active_attack.get("return_seconds", 30))
+    active_attack["phase"] = "returning"
+    active_attack["return_at"] = now + return_seconds
+    active_attack["occupy_ends_at"] = None
+
+    active_attack["battle_log"].append("")
+    active_attack["battle_log"].append("RECALL COMMAND ISSUED:")
+    active_attack["battle_log"].append(f"- Cargo Mined: {mined_amount} {res_id}")
+    active_attack["battle_log"].append("- Troops are packing up and returning to base.")
+
+    GAME_STATE["players"][attacker_id] = attacker
+    active_attacks[attack_id] = active_attack
+    
+    await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
+
+    return active_attack
+
 @app.post("/api/attack/{attack_id}/return")
 async def attack_return(attack_id: str, request: Request):
     await sync_state_from_db()
