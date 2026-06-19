@@ -2208,36 +2208,83 @@ def is_too_close_to_any(point, points, min_distance):
             return True
     return False
 
-def generate_mining_nodes(enemy_targets=None, max_level: int = 1):
+def generate_mining_nodes(
+    enemy_targets=None,
+    max_level: int = 1,
+    allowed_signals: list[str] | None = None,
+):
     p = GAME_STATE["player"]
     scan_counter = GAME_STATE.get("scan_counter", 0)
+
     enemy_targets = enemy_targets or []
     max_level = max(1, int(max_level or 1))
 
     nodes = []
+
     MIN_DISTANCE_FROM_ENEMY = 26
     MIN_DISTANCE_FROM_MINING = 18
 
-    # Kuota Global Sederhana untuk Kelangkaan Nexus Core
-    # Cek berapa banyak Nexus Core yang sedang aktif di peta (simulasi sederhana)
-    active_nexus_cores = sum(1 for n in GAME_STATE.get("mining_nodes", {}).values() if n["resource_id"] == "nexus_core")
-    
+    # Hitung kuota Nexus Core global
+    active_nexus_cores = sum(
+        1 for n in GAME_STATE.get("mining_nodes", {}).values() 
+        if n.get("resource_id") == "nexus_core"
+    )
+
     available_resources = [r for r in MINING_RESOURCES if r["id"] != "nexus_core"]
-    
-    # Nexus Core hanya di-roll jika max_level >= 7 dan kuota belum penuh
-    if max_level >= 7 and active_nexus_cores < 10: 
-        if random.random() < 0.15: # 15% peluang muncul saat scan radar tinggi
+
+    if max_level >= 7 and active_nexus_cores < 10:
+        if random.random() < 0.15:
             available_resources = MINING_RESOURCES
+
+    if not available_resources:
+        available_resources = MINING_RESOURCES
 
     for i in range(random.randint(2, 4)):
         weights = [r["weight"] for r in available_resources]
         res = random.choices(available_resources, weights=weights, k=1)[0]
 
-        # ... (logika pencarian koordinat X, Y sama seperti kode Anda sebelumnya) ...
-        # Anggap kita sudah dapat chosen_point
+        chosen_point = None
+
+        # Logika pencarian koordinat bebas tabrakan
+        for attempt in range(60):
+            dx = random.randint(-55, 55)
+            dy = random.randint(-55, 55)
+
+            if abs(dx) < 12:
+                dx += random.choice([-18, 18])
+
+            if abs(dy) < 12:
+                dy += random.choice([-18, 18])
+
+            x = p["x"] + dx
+            y = p["y"] + dy
+
+            point = {"x": x, "y": y}
+
+            if is_too_close_to_any(point, enemy_targets, MIN_DISTANCE_FROM_ENEMY):
+                continue
+
+            if is_too_close_to_any(point, nodes, MIN_DISTANCE_FROM_MINING):
+                continue
+
+            chosen_point = point
+            break
+
+        # Fallback kalau radar terlalu padat
+        if chosen_point is None:
+            angle = random.random() * 6.28318
+            distance_from_base = random.randint(38, 58)
+            chosen_point = {
+                "x": int(p["x"] + math.cos(angle) * distance_from_base),
+                "y": int(p["y"] + math.sin(angle) * distance_from_base),
+            }
+
         x = chosen_point["x"]
         y = chosen_point["y"]
-        distance = int(((x - p["x"]) ** 2 + (y - p["y"]) ** 2) ** 0.5)
+
+        dx = x - p["x"]
+        dy = y - p["y"]
+        distance = int((dx ** 2 + dy ** 2) ** 0.5)
 
         # Penentuan Level dan Signal absolut
         if res["id"] == "nexus_core":
@@ -2253,13 +2300,17 @@ def generate_mining_nodes(enemy_targets=None, max_level: int = 1):
                 signal_strength = "Strong"
 
         guardian_power = 500 + (guardian_level * 180) + random.randint(0, 300)
+        
         if signal_strength == "Strong":
-            guardian_power = int(guardian_power * 1.5) # Buff stat untuk signal Strong
+            guardian_power = int(guardian_power * 1.5)
+
+        node_id = f"mine_{scan_counter}_{i}_{random.randint(1000, 9999)}"
 
         nodes.append({
-            "id": f"mine_{scan_counter}_{i}_{random.randint(1000, 9999)}",
+            "id": node_id,
             "kind": "mining",
             "name": f"{res['node_name']} Lv.{guardian_level}",
+            "type": "Mining Node",
             "x": x,
             "y": y,
             "distance": distance,
@@ -2272,9 +2323,9 @@ def generate_mining_nodes(enemy_targets=None, max_level: int = 1):
             "capacity": res["capacity"] + (guardian_level * 120),
             
             # State untuk Lazy Evaluation
-            "owner": None, # Player ID yang sedang menduduki
-            "occupied_at": None, # Timestamp kapan mulai menduduki
-            "status": "Unoccupied", # Unoccupied, Occupied, Depleted
+            "owner": None,
+            "occupied_at": None,
+            "status": "Unoccupied",
             
             "signal_strength": signal_strength,
             "asset": res["asset"],
