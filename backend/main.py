@@ -4642,12 +4642,56 @@ async def attack_impact(attack_id: str, request: Request):
         else:
             # Jika targetnya NPC/Player musuh, pasukan langsung PULANG (Returning)
             return_seconds = int(active_attack.get("return_seconds", 1) or 1)
+
+        if success and target.get("kind") == "mining":
+            # 1. Hitung Kargo dari pasukan yang selamat (surviving_units)
+            total_cargo = 0
+            for unit_id, level_map in surviving.items():
+                for level_text, amount in level_map.items():
+                    amount = int(amount or 0)
+                    if amount > 0:
+                        stats = get_unit_stats(unit_id, int(level_text))
+                        total_cargo += stats["cargo"] * amount
+
+            # 2. Kalkulasi jumlah yang bisa ditambang vs kapasitas tambang
+            production_per_minute = float(target.get("production_per_minute", 1))
+            capacity = int(target.get("capacity", 0))
+
+            # Pasukan hanya bisa membawa sebanyak kargo mereka ATAU sisa isi tambang
+            max_mineable = min(total_cargo, capacity)
+            mining_minutes = max_mineable / max(0.1, production_per_minute)
+            mining_seconds = int(mining_minutes * 60)
+
+            # 3. Update status tambang di peta
+            target["owner"] = attacker_id
+            target["occupied_at"] = now
+            target["status"] = "Occupied"
+
+            # 4. Ubah pasukan menjadi mode menetap (Occupying)
+            active_attack["phase"] = "occupying"
+            active_attack["status"] = "running"
+            active_attack["battle_resolved"] = True
+            active_attack["success"] = success
+
+            # Simpan jadwal kapan kargo penuh
+            active_attack["occupy_ends_at"] = now + mining_seconds
+            active_attack["mining_capacity_booked"] = max_mineable
+            active_attack["return_at"] = None  # Kosongkan jadwal pulang karena mereka sedang menetap
+
+            battle_log.append("")
+            battle_log.append("MINING OPERATION STARTED:")
+            battle_log.append(f"- Surviving Troop Cargo: {total_cargo}")
+            battle_log.append(f"- Target Lock: {max_mineable} {target.get('resource_name', 'resources')}")
+            battle_log.append(f"- Estimated Time: {int(mining_minutes)} minutes")
+
+        else:
+            # Jika target adalah NPC musuh atau Player Base, langsung pulang
             active_attack["phase"] = "returning"
             active_attack["status"] = "running"
+            active_attack["battle_resolved"] = True
+            active_attack["success"] = success
             active_attack["return_at"] = now + return_seconds
 
-        active_attack["battle_resolved"] = True
-        active_attack["success"] = success
         active_attack["impact_resolved_at"] = now
         # -----------------------------------------------------------------------------------------
         active_attack["pending_reward"] = {
