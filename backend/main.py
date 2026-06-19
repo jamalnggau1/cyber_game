@@ -1939,6 +1939,7 @@ def ensure_player_profile_schema(profile: dict):
     profile.setdefault("scanner_level", 0)
     profile.setdefault("scout_level", 0)
     profile.setdefault("ai_core_level", 0)
+    profile.setdefault("active_operations", [])
 
     if "buildings" not in profile or not isinstance(profile["buildings"], dict):
         profile["buildings"] = make_default_player_buildings()
@@ -2332,6 +2333,30 @@ def generate_mining_nodes(
         })
 
     return nodes
+
+def process_mining_tick(node_id: str, current_time: float) -> int:
+    """Menghitung hasil tambang pasif (Lazy Evaluation)."""
+    node = GAME_STATE.get("mining_nodes", {}).get(node_id)
+    if not node or node.get("status") != "Occupied" or not node.get("owner"):
+        return 0
+
+    occupied_at = node.get("occupied_at", current_time)
+    elapsed_minutes = (current_time - occupied_at) / 60.0
+
+    if elapsed_minutes <= 0:
+        return 0
+
+    mined_amount = int(elapsed_minutes * node.get("production_per_minute", 0))
+    mined_amount = min(mined_amount, node.get("capacity", 0))
+
+    if mined_amount > 0:
+        node["capacity"] -= mined_amount
+        node["occupied_at"] = current_time
+        
+        if node["capacity"] <= 0:
+            node["status"] = "Depleted"
+            
+    return mined_amount
 
 def process_mining_tick(node_id: str, current_time: float):
     """
@@ -4330,12 +4355,6 @@ async def attack(req: AttackRequest, request: Request):
             "energy_cost": 0,
         }
 
-    if target.get("kind") == "mining":
-        raise HTTPException(
-            status_code=400,
-            detail="Mining node belum bisa diserang dengan attack."
-        )
-
     if target.get("kind") == "player" and target.get("player_id") == attacker_id:
         raise HTTPException(status_code=400, detail="Tidak bisa menyerang base sendiri.")
 
@@ -4589,11 +4608,29 @@ async def attack_impact(attack_id: str, request: Request):
     if target.get("kind") == "enemy" and target.get("status") in ["depleted", "collapsed"]:
         return_seconds = int(active_attack.get("return_seconds", 1) or 1)
 
-        active_attack["phase"] = "returning"
+        # --- GANTI BAGIAN BAWAH (SEBELUM active_attack["battle_resolved"] = True) MENJADI INI ---
+    
+        if success and target.get("kind") == "mining":
+            # Jika menang di tambang, pasukan MENETAP (Occupying)
+            active_attack["phase"] = "occupying"
+            active_attack["status"] = "running"
+            active_attack["return_at"] = None  # Belum ada jadwal pulang sampai ditarik
+            
+            # Ambil alih tambang
+            target["owner"] = attacker_id
+            target["occupied_at"] = now
+            target["status"] = "Occupied"
+        else:
+            # Jika targetnya NPC/Player musuh, pasukan langsung PULANG (Returning)
+            return_seconds = int(active_attack.get("return_seconds", 1) or 1)
+            active_attack["phase"] = "returning"
+            active_attack["status"] = "running"
+            active_attack["return_at"] = now + return_seconds
+
         active_attack["battle_resolved"] = True
-        active_attack["success"] = False
-        active_attack["target_depleted"] = True
-        active_attack["return_at"] = now + return_seconds
+        active_attack["success"] = success
+        active_attack["impact_resolved_at"] = now
+        # -----------------------------------------------------------------------------------------
         active_attack["pending_reward"] = {
             "credits": 0,
             "data_shard": 0,
