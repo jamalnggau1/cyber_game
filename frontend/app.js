@@ -5151,26 +5151,29 @@ function createEnemyMarker(target, index, total, radius) {
 
   const markerKind = target.kind === "mining" ? "mining" : "enemy";
 
-  const fixedPos = getRadarSlotPosition(
-    pos.left,
-    pos.top,
-    markerKind
-  );
+  const fixedPos = getRadarSlotPosition(pos.left, pos.top, markerKind);
 
   const markerTypeClass = target.kind === "mining"
     ? "mining-marker"
     : "enemy-hostile-marker";
 
   const levelText = `Lv.${target.level || target.guardian_level || 1}`;
-  
 
   const marker = document.createElement("button");
-  marker.className = `enemy-marker enemy-image-marker ${markerTypeClass} ${signalClass}`;
+  
+  // Menggabungkan semua class bawaan
+  let markerClasses = `enemy-marker enemy-image-marker ${markerTypeClass} ${signalClass}`;
+  
+  // Menambahkan efek border merah JIKA tambang sedang dijajah
+  if (target.kind === "mining" && target.status === "Occupied") {
+    markerClasses += " occupied-node";
+  }
+  
+  marker.className = markerClasses;
   marker.dataset.targetId = String(target.id);
 
   marker.style.left = fixedPos.left;
   marker.style.top = fixedPos.top;
-
   marker.style.zIndex = target.kind === "mining" ? 9 : 8;
 
   marker.title = `${target.name} | ${target.distance} Trace Unit`;

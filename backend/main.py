@@ -3609,9 +3609,22 @@ async def scan(request: Request):
         t["id"]: t for t in all_targets
     }
 
-    GAME_STATE["mining_nodes"] = {
-        n["id"]: n for n in fresh_mining_nodes
+    # === JANGAN HAPUS TAMBANG YANG SEDANG DIKUASAI ===
+    # 1. Selamatkan semua tambang yang sedang dijajah dari memori lama
+    old_occupied_nodes = {
+        n_id: node for n_id, node in GAME_STATE.get("mining_nodes", {}).items()
+        if node.get("status") == "Occupied"
     }
+
+    # 2. Buat daftar tambang baru hasil scan
+    new_mining_dict = {n["id"]: n for n in fresh_mining_nodes}
+
+    # 3. Gabungkan tambang baru dengan tambang lama yang sedang dijajah
+    new_mining_dict.update(old_occupied_nodes)
+
+    # 4. Simpan kembali ke Global State secara utuh
+    GAME_STATE["mining_nodes"] = new_mining_dict
+    # =================================================
 
     visible_players = []
     visible_npc = []
