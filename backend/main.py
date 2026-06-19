@@ -3821,13 +3821,41 @@ def apply_scout_noise_mask(report: dict):
 def build_scout_report(target_id: str, attacker_profile: dict):
     p = attacker_profile
 
-    target = GAME_STATE.get("targets", {}).get(target_id)
+    target = GAME_STATE.get("targets", {}).get(target_id) or GAME_STATE.get("mining_nodes", {}).get(target_id)
 
-    if not target:
-        raise HTTPException(
-            status_code=404,
-            detail="Target not found. Lakukan Scan Area dulu."
-        )
+    if target.get("kind") == "mining":
+        return {
+            "target_id": target_id,
+            "name": target.get("name", "Mining Node"),
+            "distance": target.get("distance", "Unknown"),
+            "type": "Mining Node",
+            "report_quality": "Clear Intel",
+            "noise": "Low",
+            "resources": {
+                "credits": target.get("capacity") if target.get("resource_id") == "credits" else 0,
+                "data_shard": target.get("capacity") if target.get("resource_id") == "data_shard" else 0,
+                "nano_parts": target.get("capacity") if target.get("resource_id") == "nano_parts" else 0,
+                "nexus_core": target.get("capacity") if target.get("resource_id") == "nexus_core" else 0,
+            },
+            "enemy_army": [{
+                "name": "Guardian",
+                "level": target.get("guardian_level", 1),
+                "count": "Unknown",
+                "role": "Protector"
+            }],
+            "estimated_power": target.get("guardian_power", 0),
+            "defense_modules": ["Natural Defense"],
+            "defense_style": "Wild Guardian",
+            "weakness_hint": "Brute Force Attack",
+            "counter_risk": "None",
+            "lab_level": target.get("level", 1),
+            "base_tier": target.get("signal_strength", "Unknown"),
+            "vault_size": "N/A",
+            "firewall": "None",
+            "trap": "None",
+            "trace_scanner": "None",
+            "build_clue": "None"
+        }
 
     level = get_effective_scout_level(p)
     enemy_army = target.get("enemy_army", [])
@@ -3978,7 +4006,7 @@ async def start_scout(payload: dict = Body(...), request: Request = None):
             detail="target_id kosong. Lakukan Scan Area ulang lalu pilih target."
         )
 
-    target = GAME_STATE.get("targets", {}).get(target_id)
+    target = GAME_STATE.get("targets", {}).get(target_id) or GAME_STATE.get("mining_nodes", {}).get(target_id)
 
     if not target:
         raise HTTPException(
@@ -4011,7 +4039,10 @@ async def start_scout(payload: dict = Body(...), request: Request = None):
     profile["energy"] = int(profile.get("energy", 0)) - energy_cost
 
     GAME_STATE["players"][player_id] = profile
-    GAME_STATE["targets"][target_id] = target
+    if target.get("kind") == "mining":
+        GAME_STATE["mining_nodes"][target_id] = target
+    else:
+        GAME_STATE["targets"][target_id] = target
 
     await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
 
@@ -4290,7 +4321,7 @@ async def attack(req: AttackRequest, request: Request):
     attacker = ensure_profile_ai_system(attacker)
     attacker = ensure_recovery_system(attacker)
 
-    target = GAME_STATE.get("targets", {}).get(req.target_id)
+    target = GAME_STATE.get("targets", {}).get(req.target_id) or GAME_STATE.get("mining_nodes", {}).get(req.target_id)
 
     if not target:
         raise HTTPException(
@@ -4556,7 +4587,7 @@ async def attack_impact(attack_id: str, request: Request):
         }
 
     target_id = active_attack.get("target_id")
-    target = GAME_STATE.get("targets", {}).get(target_id)
+    target = GAME_STATE.get("targets", {}).get(target_id) or GAME_STATE.get("mining_nodes", {}).get(target_id)
 
     if not target:
         # Target hilang sebelum pasukan sampai.
@@ -4893,7 +4924,10 @@ async def attack_impact(attack_id: str, request: Request):
     if defender and target.get("player_id"):
         GAME_STATE["players"][target["player_id"]] = defender
 
-    GAME_STATE["targets"][target_id] = target
+    if target.get("kind") == "mining":
+        GAME_STATE["mining_nodes"][target_id] = target
+    else:
+        GAME_STATE["targets"][target_id] = target
 
     active_attacks[attack_id] = active_attack
     GAME_STATE["active_attacks"] = active_attacks
