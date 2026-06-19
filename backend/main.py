@@ -3829,12 +3829,6 @@ def build_scout_report(target_id: str, attacker_profile: dict):
             detail="Target not found. Lakukan Scan Area dulu."
         )
 
-    if target.get("kind") == "mining":
-        raise HTTPException(
-            status_code=400,
-            detail="Mining node belum memakai Scout enemy."
-        )
-
     level = get_effective_scout_level(p)
     enemy_army = target.get("enemy_army", [])
     enemy_build = target.get("enemy_build", {})
@@ -3993,12 +3987,6 @@ async def start_scout(payload: dict = Body(...), request: Request = None):
         )
 
     target = refresh_player_target_from_profile(target)
-
-    if target.get("kind") == "mining":
-        raise HTTPException(
-            status_code=400,
-            detail="Mining node belum bisa di-scout dengan Scout Drone."
-        )
 
     if target.get("kind") == "player" and target.get("player_id") == player_id:
         raise HTTPException(

@@ -5210,8 +5210,8 @@ function openMiningNodeSheet(node) {
       </p>
 
       <div class="sheet-actions">
-        <button disabled>Attack Guardian Soon</button>
-        <button disabled>Scout Node Soon</button>
+        <button onclick="openAttackSetupFromRadar('${node.id}')">Attack</button>
+        <button onclick="closeBuildingSheet(); scoutPopup('${node.id}')">Scout</button>
         <button onclick="closeBuildingSheet()">Close</button>
       </div>
     `
