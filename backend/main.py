@@ -3736,6 +3736,22 @@ async def scan(request: Request):
     visible = visible_players + selected_non_player
 
     await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
+    # === LOGIKA PENGUNCIAN TAMBANG OCCUPIED ===
+    # Ambil semua tambang yang sedang dikuasai oleh pemain ini.
+    # Di fungsi scan ini, ID pemain ada di variabel 'player_id'.
+    my_occupied_nodes = [
+        node for node in GAME_STATE.get("mining_nodes", {}).values()
+        if node.get("owner") == player_id and node.get("status") == "Occupied"
+    ]
+
+    # Hasil target yang akan ditampilkan ada di variabel 'visible'.
+    existing_ids = {t["id"] for t in visible} 
+    
+    for occ_node in my_occupied_nodes:
+        # Jika tambang yang kita kuasai tidak masuk acakan radar, paksa masukkan!
+        if occ_node["id"] not in existing_ids:
+            visible.append(occ_node)
+    # ==========================================
 
     return {
         "scan_id": GAME_STATE["scan_counter"],
@@ -3752,7 +3768,7 @@ async def scan(request: Request):
         "enemy_limit": scan_rule["enemy_limit"],
         "mining_limit": scan_rule["mining_limit"],
 
-        "targets": visible,
+        "targets": visible,  # <-- Sekarang visible sudah berisi tambang milik Anda!
         "enemy_count": len([t for t in visible if t.get("kind") not in ["player", "mining"]]),
         "player_count": len([t for t in visible if t.get("kind") == "player"]),
         "mining_count": len([t for t in visible if t.get("kind") == "mining"]),

@@ -5253,11 +5253,39 @@ function openMiningNodeSheet(node) {
   const asset = getEnemyAsset(node);
 
   let ownershipHtml = `<p style="color:var(--good); font-weight:bold; margin-bottom: 10px;">Status: Unoccupied</p>`;
-  
+  let actionHtml = "";
+
   if (node.status === "Occupied") {
-    // Cek apakah pemiliknya adalah kita atau orang lain
-    const ownerName = (node.owner === state.player.id) ? "YOU" : node.owner;
+    // Cek apakah ini tambang milik kita
+    const isMine = node.owner === state.player.id;
+    const ownerName = isMine ? "YOU" : node.owner;
     ownershipHtml = `<p style="color:var(--danger); font-weight:bold; margin-bottom: 10px;">Status: Occupied by ${ownerName}</p>`;
+
+    if (isMine) {
+      // Cari data operasi pasukan yang sedang kemah di sini
+      const activeOp = activeOperations.find(op => op.targetId === node.id && op.phase === "occupying");
+      const opId = activeOp ? activeOp.id : "";
+
+      // Ubah tombol menjadi Recall
+      actionHtml = `
+        <button onclick="recallOperation('${opId}')" style="background:var(--warn); color:#000; font-weight:bold;">Recall Troops</button>
+        <button onclick="closeBuildingSheet()">Close</button>
+      `;
+    } else {
+      // Jika milik orang lain, munculkan tombol Attack PvP
+      actionHtml = `
+        <button onclick="openAttackSetupFromRadar('${node.id}')">Attack (PvP)</button>
+        <button onclick="closeBuildingSheet(); scoutPopup('${node.id}')">Scout</button>
+        <button onclick="closeBuildingSheet()">Close</button>
+      `;
+    }
+  } else {
+    // Jika masih kosong / dijaga Guardian
+    actionHtml = `
+      <button onclick="openAttackSetupFromRadar('${node.id}')">Attack Guardian</button>
+      <button onclick="closeBuildingSheet(); scoutPopup('${node.id}')">Scout</button>
+      <button onclick="closeBuildingSheet()">Close</button>
+    `;
   }
 
   showBuildingSheet(
@@ -5290,9 +5318,7 @@ function openMiningNodeSheet(node) {
       </p>
 
       <div class="sheet-actions">
-        <button onclick="openAttackSetupFromRadar('${node.id}')">Attack</button>
-        <button onclick="closeBuildingSheet(); scoutPopup('${node.id}')">Scout</button>
-        <button onclick="closeBuildingSheet()">Close</button>
+        ${actionHtml}
       </div>
     `
   );
