@@ -536,9 +536,10 @@ function addAttackOperation(attackResult, finalLogText, targetId) {
   );
 
   const now = Date.now();
+  const opId = attackResult.id || `atk_${now}`;
 
   const op = {
-    id: attackResult.id || `atk_${now}`,
+    id: opId,
     type: "attack",
     phase: attackResult.phase || "outbound",
     status: "running",
@@ -551,7 +552,6 @@ function addAttackOperation(attackResult, finalLogText, targetId) {
     outboundSeconds: outbound,
     returnSeconds: returnSeconds,
 
-    // Untuk fase pertama, timer hanya sampai target.
     totalSeconds: outbound,
     startedAt: now,
     reachedAt: now + outbound * 1000,
@@ -563,21 +563,25 @@ function addAttackOperation(attackResult, finalLogText, targetId) {
       : (finalLogText || "")
   };
 
-  activeOperations.unshift(op);
+  // === PERBAIKAN BUG LAYAR KEMBAR (CLOCK DRIFT FIX) ===
+  // Cek apakah server sudah memasukkan data ini ke layar. 
+  // Jika sudah ada, timpa saja datanya, JANGAN DITAMBAH BARU!
+  const existingIndex = activeOperations.findIndex(o => o.id === opId);
+  if (existingIndex >= 0) {
+    activeOperations[existingIndex] = op;
+  } else {
+    activeOperations.unshift(op);
+  }
+  // ====================================================
 
   addGameMessage(
     "battle",
     "Attack Launched",
-    `${op.title}
-Distance: ${op.distance} Trace Unit
-Outbound Time: ${formatSeconds(outbound)}
-Return Time: ${formatSeconds(returnSeconds)}
-Status: Units are going to target.`
+    `${op.title}\nDistance: ${op.distance} Trace Unit\nOutbound Time: ${formatSeconds(outbound)}\nReturn Time: ${formatSeconds(returnSeconds)}\nStatus: Units are going to target.`
   );
 
   updateOperationQueueWidget();
   startOperationQueueTimer();
-
   openOperationQueueSheet();
 }
 
