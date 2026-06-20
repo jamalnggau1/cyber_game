@@ -4723,6 +4723,28 @@ async def attack_impact(attack_id: str, request: Request):
     if "Repair Node" in defense_modules and "payload_booster" not in module_ids:
         defense_score += 260
 
+    # === 1. PVP MINING COMBAT: LAWAN PASUKAN PEMAIN A ===
+    if target.get("kind") == "mining" and target.get("status") == "Occupied":
+        occupier_power = 0
+        # Cari pasukan siapa yang sedang kemah di lahan ini
+        for op_id, op_data in GAME_STATE.get("active_attacks", {}).items():
+            if op_data.get("target_id") == target_id and op_data.get("phase") == "occupying":
+                # Hitung kekuatan murni dari pasukan yang sedang berjaga
+                for uid, levels in op_data.get("surviving_units", {}).items():
+                    for lvl, amt in levels.items():
+                        amt = int(amt or 0)
+                        if amt > 0:
+                            stats = get_unit_stats(uid, int(lvl))
+                            unit_score = int((stats["hp"] * 0.06) + (stats["attack"] * 2.1) + (stats["defense"] * 0.65) + (stats["speed"] * 7) + (stats["cargo"] * 3))
+                            occupier_power += unit_score * amt
+                break
+                
+        # Jika ketemu, ganti defense pertahanan menjadi power pasukan Pemain A
+        if occupier_power > 0:
+            defense_score = occupier_power
+            defense_modules = [] # Matikan perlindungan alam (karena PvP)
+    # ====================================================
+
     attack_roll = random.uniform(0.92, 1.08)
     defense_roll = random.uniform(0.95, 1.06)
 
@@ -4856,6 +4878,42 @@ async def attack_impact(attack_id: str, request: Request):
             max_mineable = min(total_cargo, capacity)
             mining_minutes = max_mineable / max(0.1, production_per_minute)
             mining_seconds = int(mining_minutes * 60)
+
+            # === PVP MINING TAKEOVER: USIR PEMILIK LAMA ===
+            previous_owner_id = target.get("owner")
+            if previous_owner_id and previous_owner_id != attacker_id:
+                # Cari pasukan pemilik lama yang sedang menambang di sini
+                for op_id, op_data in GAME_STATE.get("active_attacks", {}).items():
+                    if op_data.get("target_id") == target_id and op_data.get("phase") == "occupying":
+                        
+                        # 1. Hitung dan berikan hasil tambangnya selama ini
+                        stolen_amount = process_mining_tick(target_id, now)
+                        res_id = op_data.get("mining_resource_id", "credits")
+                        
+                        if "pending_reward" not in op_data:
+                            op_data["pending_reward"] = {"credits": 0, "data_shard": 0, "nano_parts": 0, "nexus_core": 0}
+                        
+                        op_data["pending_reward"][res_id] = int(op_data["pending_reward"].get(res_id, 0)) + stolen_amount
+                        
+                        # 2. Paksa pasukan lama untuk pulang (Returning)
+                        op_data["phase"] = "returning"
+                        op_data["return_at"] = now + int(op_data.get("return_seconds", 30))
+                        op_data["occupy_ends_at"] = None
+                        
+                        # 3. Tulis log agar pemilik lama tahu dia diserang
+                        if not isinstance(op_data.get("battle_log"), list):
+                            op_data["battle_log"] = []
+                            
+                        op_data["battle_log"].append("")
+                        op_data["battle_log"].append("⚠️ NODE UNDER ATTACK (PvP)!")
+                        op_data["battle_log"].append(f"- Diserang dan direbut oleh: {attacker.get('name', 'Unknown')}")
+                        op_data["battle_log"].append(f"- Berhasil mengamankan: {stolen_amount} {res_id}")
+                        op_data["battle_log"].append("- Pasukan ditarik mundur ke base.")
+                        
+                        # Simpan pembaruan status pasukan lama
+                        GAME_STATE["active_attacks"][op_id] = op_data
+                        break
+            # ===============================================
 
             # 3. Update Status Node
             target["owner"] = attacker_id
