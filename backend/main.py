@@ -3462,6 +3462,12 @@ async def state(request: Request):
 
     GAME_STATE["players"][player_id] = profile
     await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
+    # === SISIPIKAN VARIABEL INI ===
+    player_active_attacks = {
+        op_id: op for op_id, op in GAME_STATE.get("active_attacks", {}).items()
+        if op.get("player_id") == player_id
+    }
+    # ==============================
     return {
         "player": player_view,
         "resources": player_view["resources"],
@@ -3475,6 +3481,8 @@ async def state(request: Request):
         "max_deploy_units": get_max_deploy_units_for_profile(profile),
         "research": get_research_with_costs_for_profile(profile),
         "energy_regen_per_minute": get_energy_regen_per_minute_for_profile(profile),
+        # === TAMBAHKAN KUNCI SINKRONISASI INI KE DALAM RETURN ===
+        "active_attacks": player_active_attacks,
     }
 
 def make_player_scan_targets(attacker_player_id: str):
