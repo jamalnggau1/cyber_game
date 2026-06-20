@@ -6,6 +6,7 @@ let currentUnitFactoryView = null;
 let contestedNodes = [];
 let currentResearchLabTab = "research";
 let currentUnitFactoryTab = "train";
+let isLaunchingAttack = false;
 let promoteAmountDraft = {};
 let selectedTarget = null;
 let selectedModules = new Set();
@@ -5897,6 +5898,9 @@ function removeTargetFromLocalRadar(targetId) {
 }
 
 async function launchAttack() {
+  // 1. CEGAH DOUBLE CLICK
+  if (isLaunchingAttack) return; 
+  isLaunchingAttack = true;
   try {
     if (!selectedTarget) {
       alert("Pilih target dulu.");
@@ -5929,6 +5933,9 @@ async function launchAttack() {
       method: "POST",
       body: JSON.stringify(payload)
     });
+    // 2. Jika sukses, tutup menu setup
+    closeAttackSetup(); // atau fungsi penutup menu Anda
+    loadState();
 
     // Kalau server bilang target sudah habis/depleted,
     // hapus dari radar lokal dan jangan mulai travel.
@@ -5968,7 +5975,10 @@ async function launchAttack() {
     showAttackTravelSheet(res, log, targetId);
   } catch (err) {
     alert("Attack gagal: " + err.message);
-  }
+  } finally {
+    // 3. BUKA KEMBALI KUNCINYA APAPUN YANG TERJADI
+    isLaunchingAttack = false;
+    }
 }
 
 function switchPage(id) {

@@ -4427,7 +4427,10 @@ async def attack(req: AttackRequest, request: Request):
     for op in GAME_STATE.get("active_attacks", {}).values():
         if op.get("player_id") == attacker_id and op.get("target_id") == req.target_id:
             if op.get("phase") in ["outbound", "occupying"]:
-                raise HTTPException(status_code=400, detail="Kamu sudah mengirim pasukan ke lahan ini!")
+                raise HTTPException(
+                    status_code=400, 
+                    detail="Kamu sudah mengirim pasukan ke target ini!"
+                )
     # ===============================================
 
     if len(req.module_ids) > 6:
