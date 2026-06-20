@@ -5934,7 +5934,7 @@ async function launchAttack() {
       body: JSON.stringify(payload)
     });
     // 2. Jika sukses, tutup menu setup
-    closeAttackSetup(); // atau fungsi penutup menu Anda
+    closeBuildingSheet(); // atau fungsi penutup menu Anda
     loadState();
 
     // Kalau server bilang target sudah habis/depleted,
