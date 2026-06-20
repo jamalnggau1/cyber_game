@@ -2233,7 +2233,7 @@ def generate_mining_nodes(
 
     available_resources = [r for r in MINING_RESOURCES if r["id"] != "nexus_core"]
 
-    if max_level >= 7 and active_nexus_cores < 10:
+    if max_level >= 1 and active_nexus_cores < 10:
         if random.random() < 0.15:
             available_resources = MINING_RESOURCES
 
