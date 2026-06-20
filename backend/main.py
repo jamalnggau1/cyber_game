@@ -1014,7 +1014,7 @@ def get_building_upgrade_cost(building_id: str, level: int):
         if next_level >= 5:
             cost["data_shard"] = cost.get("data_shard", 0) + (next_level * 80)
 
-        if next_level >= 7:
+        if next_level >= 1:
             cost["nexus_core"] = cost.get("nexus_core", 0) + max(1, next_level - 6)
 
     return cost
