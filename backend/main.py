@@ -3749,22 +3749,28 @@ async def scan(request: Request):
     visible = visible_players + selected_non_player
 
     await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
-    # === LOGIKA PENGUNCIAN TAMBANG OCCUPIED ===
-    # Ambil semua tambang yang sedang dikuasai oleh pemain ini.
-    # Di fungsi scan ini, ID pemain ada di variabel 'player_id'.
-    my_occupied_nodes = [
+    # === LOGIKA MEMUNCULKAN SEMUA TAMBANG PVP (OCCUPIED) ===
+    # Ambil semua tambang yang sedang dijajah (baik milik sendiri maupun orang lain)
+    all_occupied_nodes = [
         node for node in GAME_STATE.get("mining_nodes", {}).values()
-        if node.get("owner") == player_id and node.get("status") == "Occupied"
+        if node.get("status") == "Occupied"
     ]
 
-    # Hasil target yang akan ditampilkan ada di variabel 'visible'.
     existing_ids = {t["id"] for t in visible} 
     
-    for occ_node in my_occupied_nodes:
-        # Jika tambang yang kita kuasai tidak masuk acakan radar, paksa masukkan!
-        if occ_node["id"] not in existing_ids:
-            visible.append(occ_node)
-    # ==========================================
+    for occ_node in all_occupied_nodes:
+        # Hitung jarak asli dari akun yang sedang scan ke lokasi tambang
+        dx = int(occ_node.get("x", 0)) - int(profile.get("x", 120))
+        dy = int(occ_node.get("y", 0)) - int(profile.get("y", 450))
+        real_dist = int((dx ** 2 + dy ** 2) ** 0.5)
+
+        # Jika tambang masuk di area radar dan belum ada di list, PAKSA MUNCULKAN!
+        if real_dist <= radius and occ_node["id"] not in existing_ids:
+            # Buat salinan (copy) agar tidak merusak koordinat global
+            display_node = dict(occ_node)
+            display_node["distance"] = max(1, real_dist)
+            visible.append(display_node)
+    # =======================================================
 
     return {
         "scan_id": GAME_STATE["scan_counter"],
