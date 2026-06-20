@@ -1258,12 +1258,20 @@ function renderOperationCard(op) {
   const remaining = getOperationRemaining(op);
   const progress = getOperationProgress(op);
 
+  // Pastikan tombol recall muncul jika fase menambang
+  const recallBtn = op.phase === "occupying"
+    ? `<button onclick="recallOperation('${op.id}')" style="background:var(--warn); color:#000; border:none; padding:8px 12px; border-radius:6px; font-weight:bold; cursor:pointer; flex: 1;">Recall Troops</button>`
+    : "";
+
   return `
     <div class="operation-card" data-op-id="${op.id}">
-      <div class="operation-type">${op.type.toUpperCase()}</div>
-      <h3>${escapeHtml(op.title || "Operation")}</h3>
+      <div class="operation-type" style="background: ${op.phase === "occupying" ? "var(--good)" : "var(--accent2)"}; color:#000; font-weight:bold; padding:2px 6px; border-radius:4px; display:inline-block; font-size:10px; margin-bottom:6px;">
+        ${(op.phase === "occupying" ? "MINING" : op.type).toUpperCase()}
+      </div>
+      
+      <h3 style="margin: 4px 0;">${escapeHtml(op.title || "Operation")}</h3>
 
-      <small id="opPhase_${op.id}" class="muted">
+      <small id="opPhase_${op.id}" class="muted" style="display:block; margin-bottom:4px;">
         ${escapeHtml(getOperationPhaseText(op))}
       </small>
 
@@ -1273,15 +1281,15 @@ function renderOperationCard(op) {
         </span>
       </small>
 
-      <small>Distance: ${escapeHtml(String(op.distance || "?"))} Trace Unit</small>
+      <small style="display:block; margin-top:4px;">Distance: ${escapeHtml(String(op.distance || "?"))} Trace Unit</small>
 
-      <div class="operation-progress">
+      <div class="operation-progress" style="margin-top:8px;">
         <div id="opProgress_${op.id}" style="width:${progress}%"></div>
       </div>
 
-      <div class="sheet-actions">
-        ${op.phase === "occupying" ? `<button onclick="recallOperation('${op.id}')" style="background:var(--warn); color:#000;">Recall</button>` : ""}
-        <button onclick="openOperationDetail('${op.id}')">View</button>
+      <div class="sheet-actions" style="margin-top:12px; display:flex; gap:8px;">
+        ${recallBtn}
+        <button onclick="openOperationDetail('${op.id}')" style="flex: 1;">View Detail</button>
       </div>
     </div>
   `;
@@ -2032,13 +2040,70 @@ function renderPlayerStatusHtml(p) {
   `;
 }
 
+function syncOperationsFromState() {
+  if (!state || !state.active_attacks) return;
+
+  // Ambil semua operasi milik player ini yang masih berjalan
+  const serverOps = Object.values(state.active_attacks).filter(op => 
+    op.player_id === state.player.id && op.status === "running"
+  );
+
+  serverOps.forEach(srvOp => {
+    let localOp = activeOperations.find(o => o.id === srvOp.id);
+    const now = Date.now();
+
+    if (!localOp) {
+      // Jika data hilang karena refresh, buat ulang di UI!
+      let endsAt = now;
+      if (srvOp.phase === "outbound" && srvOp.impact_at) endsAt = srvOp.impact_at * 1000;
+      if (srvOp.phase === "returning" && srvOp.return_at) endsAt = srvOp.return_at * 1000;
+      if (srvOp.phase === "occupying") endsAt = srvOp.occupy_ends_at ? (srvOp.occupy_ends_at * 1000) : now + 86400000;
+
+      localOp = {
+        id: srvOp.id,
+        type: srvOp.type || "attack",
+        phase: srvOp.phase,
+        status: srvOp.status,
+        title: srvOp.phase === "occupying" ? `Mining at ${srvOp.target_name}` : `Attacking ${srvOp.target_name}`,
+        targetId: srvOp.target_id,
+        targetName: srvOp.target_name || "Unknown",
+        distance: srvOp.distance || "?",
+        startedAt: now,
+        endsAt: endsAt,
+        totalSeconds: Math.max(1, Math.ceil((endsAt - now) / 1000)),
+        occupy_ends_at: srvOp.occupy_ends_at,
+        return_at: srvOp.return_at,
+        impact_at: srvOp.impact_at
+      };
+      activeOperations.push(localOp);
+    } else {
+      // Jika data sudah ada, cukup update status terbarunya
+      localOp.phase = srvOp.phase;
+      localOp.status = srvOp.status;
+      localOp.occupy_ends_at = srvOp.occupy_ends_at;
+      localOp.return_at = srvOp.return_at;
+
+      if (srvOp.phase === "occupying") {
+        localOp.endsAt = srvOp.occupy_ends_at ? (srvOp.occupy_ends_at * 1000) : now + 86400000;
+        localOp.title = `Mining at ${srvOp.target_name}`;
+      } else if (srvOp.phase === "returning") {
+        localOp.endsAt = srvOp.return_at ? (srvOp.return_at * 1000) : now;
+        localOp.title = `Returning from ${srvOp.target_name}`;
+      }
+    }
+  });
+}
+
 async function loadState() {
   state = await api("/api/state");
   selectedAi = new Set(state?.player?.active_ai || []);
 
   const p = state.player;
-
   selectedAi = new Set(p.active_ai || []);
+
+  // ---> TAMBAHKAN BARIS INI DI SINI <---
+  syncOperationsFromState();
+  // ------------------------------------
 
   const statusBox = el("playerStatus");
   if (statusBox) {
