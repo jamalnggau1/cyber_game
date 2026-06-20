@@ -4364,6 +4364,17 @@ async def attack(req: AttackRequest, request: Request):
     attacker = ensure_profile_ai_system(attacker)
     attacker = ensure_recovery_system(attacker)
 
+    # === 1. GEMBOK MUTLAK (DOUBLE LOCK) ===
+    # Ini akan mencegah tumpukan serangan ke target yang sama (baik Mining maupun NPC/Player)
+    for op in GAME_STATE.get("active_attacks", {}).values():
+        if op.get("player_id") == attacker_id and op.get("target_id") == req.target_id:
+            if op.get("phase") in ["outbound", "occupying"]:
+                raise HTTPException(
+                    status_code=400, 
+                    detail="Kamu sudah mengirim pasukan ke target ini! Tunggu sampai selesai."
+                )
+    # ======================================
+
     target = GAME_STATE.get("targets", {}).get(req.target_id) or GAME_STATE.get("mining_nodes", {}).get(req.target_id)
 
     if not target:
@@ -4422,13 +4433,6 @@ async def attack(req: AttackRequest, request: Request):
     
     if target.get("kind") == "mining" and target.get("owner") == attacker_id:
         raise HTTPException(status_code=400, detail="Pasukanmu sudah menguasai lahan ini!")
-    
-    # === CEGAH PASUKAN GANDA KE TARGET YANG SAMA ===
-    for op in GAME_STATE.get("active_attacks", {}).values():
-        if op.get("player_id") == attacker_id and op.get("target_id") == req.target_id:
-            if op.get("phase") in ["outbound", "occupying"]:
-                raise HTTPException(status_code=400, detail="Kamu sudah mengirim pasukan ke lahan ini!")
-    # ===============================================
 
     if len(req.module_ids) > 6:
         raise HTTPException(status_code=400, detail="Max 6 modules")
@@ -4771,28 +4775,6 @@ async def attack_impact(attack_id: str, request: Request):
 
     attack_roll = random.uniform(0.92, 1.08)
     defense_roll = random.uniform(0.95, 1.06)
-
-    # === 1. PVP COMBAT: CARI PASUKAN PEMILIK LAMA ===
-    defender_op_id = None
-    if target.get("kind") == "mining" and target.get("status") == "Occupied":
-        occupier_power = 0
-        for op_id, op_data in GAME_STATE.get("active_attacks", {}).items():
-            if op_data.get("target_id") == target_id and op_data.get("phase") == "occupying":
-                defender_op_id = op_id
-                # Hitung kekuatan murni pasukan yang sedang jaga
-                for uid, levels in op_data.get("surviving_units", {}).items():
-                    for lvl, amt in levels.items():
-                        amt = int(amt or 0)
-                        if amt > 0:
-                            stats = get_unit_stats(uid, int(lvl))
-                            unit_score = int((stats["hp"] * 0.06) + (stats["attack"] * 2.1) + (stats["defense"] * 0.65) + (stats["speed"] * 7) + (stats["cargo"] * 3))
-                            occupier_power += unit_score * amt
-                break
-                
-        if occupier_power > 0:
-            defense_score = occupier_power
-            defense_modules = [] # Matikan perlindungan alam karena digantikan pasukan
-    # ===============================================
 
     final_attack_score = int(attack_score * attack_roll)
     final_defense_score = int(defense_score * defense_roll)
