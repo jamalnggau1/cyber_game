@@ -1014,7 +1014,7 @@ def get_building_upgrade_cost(building_id: str, level: int):
         if next_level >= 5:
             cost["data_shard"] = cost.get("data_shard", 0) + (next_level * 80)
 
-        if next_level >= 1:
+        if next_level >= 7:
             cost["nexus_core"] = cost.get("nexus_core", 0) + max(1, next_level - 6)
 
     return cost
@@ -2233,8 +2233,8 @@ def generate_mining_nodes(
 
     available_resources = [r for r in MINING_RESOURCES if r["id"] != "nexus_core"]
 
-    if max_level >= 1 and active_nexus_cores < 10:
-        if random.random() < 0.15:
+    if max_level >= 7 and active_nexus_cores < 10:
+        if random.random() < 0.80:
             available_resources = MINING_RESOURCES
 
     if not available_resources:
