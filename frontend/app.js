@@ -1363,38 +1363,39 @@ async function resolveAttackImpact(op) {
       markTargetCleared(data.target_id || op.targetId);
     }
 
+    // --- FIX: TANGANI FASE OCCUPYING (MINING) ---
+    if (data.phase === "occupying") {
+      op.phase = "occupying";
+      op.status = "running";
+      op.title = `Mining at ${data.target_name || op.targetName || "Target"}`;
+      op.startedAt = Date.now();
+      
+      // Hitung batas waktu tambang
+      op.endsAt = data.occupy_ends_at ? (Number(data.occupy_ends_at) * 1000) : (Date.now() + 86400000);
+      op.totalSeconds = Math.max(1, Math.ceil((op.endsAt - op.startedAt) / 1000));
+      op.occupy_ends_at = data.occupy_ends_at;
+
+      addGameMessage(
+        "battle",
+        "Mining Started",
+        `${data.target_name || op.targetName || "Target"}\n${op.finalLog}\nUnits are occupying the node.`
+      );
+
+      await loadState();
+      renderOperationQueueList();
+      updateOperationQueueWidget();
+      return;
+    }
+
+    // --- TANGANI FASE RETURNING (PULANG) ---
     if (data.phase === "returning") {
       const returnSeconds = Math.max(1, Number(data.return_seconds || op.returnSeconds || 1));
       const now = Date.now();
-      // TAMBAHKAN BLOK INI:
-      if (data.phase === "occupying") {
-        op.phase = "occupying";
-        op.status = "running";
-        op.title = `Mining at ${data.target_name || op.targetName || "Target"}`;
-        op.startedAt = Date.now();
-        
-        // Jika occupy_ends_at null (waktu tidak terbatas), kita beri fallback aman
-        op.endsAt = data.occupy_ends_at ? (Number(data.occupy_ends_at) * 1000) : (Date.now() + 86400000); 
-        op.totalSeconds = Math.max(1, Math.ceil((op.endsAt - op.startedAt) / 1000));
-        op.occupy_ends_at = data.occupy_ends_at;
-
-        addGameMessage(
-          "battle",
-          "Mining Started",
-          `${data.target_name || op.targetName || "Target"}\n${op.finalLog}\nUnits are occupying the node.`
-        );
-
-        await loadState();
-        renderOperationQueueList();
-        updateOperationQueueWidget();
-        return;
-      }
 
       let returnEnd = now + returnSeconds * 1000;
 
       if (data.return_at) {
         const serverReturnEnd = Number(data.return_at) * 1000;
-
         if (Number.isFinite(serverReturnEnd) && serverReturnEnd > now) {
           returnEnd = serverReturnEnd;
         }
@@ -1411,14 +1412,10 @@ async function resolveAttackImpact(op) {
       addGameMessage(
         "battle",
         "Attack Impact",
-        `${data.target_name || op.targetName || "Target"}
-${op.finalLog}
-
-Units are returning to base.`
+        `${data.target_name || op.targetName || "Target"}\n${op.finalLog}\n\nUnits are returning to base.`
       );
 
       await loadState();
-
       renderOperationQueueList();
       updateOperationQueueWidget();
       return;
@@ -1533,11 +1530,7 @@ async function finalizeExpiredOperations() {
       addGameMessage(
         "scout",
         "Scout Report Completed",
-        `${op.title}
-Target: ${op.targetName || "Unknown"}
-Distance: ${op.distance} Trace Unit
-
-${op.finalLog}`,
+        `${op.title}\nTarget: ${op.targetName || "Unknown"}\nDistance: ${op.distance} Trace Unit\n\n${op.finalLog}`,
         {
           targetId: op.targetId,
           targetName: op.targetName,
@@ -1569,6 +1562,7 @@ ${op.finalLog}`,
         continue;
       }
       
+      // AUTO RECALL JIKA WAKTU MINING HABIS
       if (op.phase === "occupying") {
         await recallOperation(op.id);
         continue;
@@ -1580,8 +1574,6 @@ ${op.finalLog}`,
     op.status = "completed";
   }
 
-  // Hapus scout completed lama dari running queue,
-  // tapi attack completed tetap boleh tampil di Completed list.
   activeOperations = activeOperations.filter(op => {
     if (op.type === "scout" && op.status === "completed") return false;
     return true;
