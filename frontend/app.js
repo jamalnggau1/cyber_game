@@ -2036,17 +2036,24 @@ function renderPlayerStatusHtml(p) {
 function syncOperationsFromState() {
   if (!state || !state.active_attacks) return;
 
-  // Ambil semua operasi milik player ini yang masih berjalan
+  // Ambil semua operasi resmi milik player ini dari SERVER
   const serverOps = Object.values(state.active_attacks).filter(op => 
     op.player_id === state.player.id && op.status === "running"
   );
 
+  // === 1. PEMBASMI HANTU (GHOST WIPE) ===
+  // Hapus semua kartu di layar yang sebenarnya sudah tidak ada di server
+  activeOperations = activeOperations.filter(localOp =>
+    serverOps.some(srvOp => srvOp.id === localOp.id)
+  );
+
+  // === 2. UPDATE DATA RESMI ===
   serverOps.forEach(srvOp => {
     let localOp = activeOperations.find(o => o.id === srvOp.id);
     const now = Date.now();
 
     if (!localOp) {
-      // Jika data hilang karena refresh, buat ulang di UI!
+      // Jika data hilang/baru, buat ulang di UI
       let endsAt = now;
       if (srvOp.phase === "outbound" && srvOp.impact_at) endsAt = srvOp.impact_at * 1000;
       if (srvOp.phase === "returning" && srvOp.return_at) endsAt = srvOp.return_at * 1000;
@@ -2085,6 +2092,12 @@ function syncOperationsFromState() {
       }
     }
   });
+
+  // === 3. PENCEGAH DUPLIKAT VISUAL ===
+  // Pastikan tidak ada dua kartu dengan ID yang kembar di dalam memori layar
+  activeOperations = activeOperations.filter((op, index, self) =>
+    index === self.findIndex((t) => t.id === op.id)
+  );
 }
 
 async function loadState() {
