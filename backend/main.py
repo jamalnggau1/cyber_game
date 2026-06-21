@@ -3752,9 +3752,6 @@ async def scan(request: Request):
                 selected_non_player.append(visible_mining.pop(0))
 
     # === BATASI JUMLAH PLAYER DI RADAR ===
-    # Radar level rendah hanya bisa melacak sedikit player.
-    # Level 1 = 1 Player, Level 2 = 2 Player, dst. Kita batasi maksimal 5 atau 6 player agar map tidak sumpek.
-    # === BATASI JUMLAH PLAYER DI RADAR ===
     player_limit = min(5, radar_level)
     
     # Acak urutan pemain yang ada di dalam jangkauan radar
@@ -3763,6 +3760,8 @@ async def scan(request: Request):
     # Potong jumlahnya sesuai limit
     visible_players = visible_players[:player_limit]
     # =====================================
+
+    visible = visible_players + selected_non_player
 
     await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
     # === LOGIKA MEMUNCULKAN SEMUA TAMBANG PVP (OCCUPIED) ===
