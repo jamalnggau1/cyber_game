@@ -1515,8 +1515,8 @@ ${op.finalLog}`
 
 async function recallOperation(attackId) {
   try {
-    // 1. Panggil API untuk menarik mundur pasukan
-    const data = await api(`/api/attack/${attackId}/recall`, "POST");
+    // PERBAIKAN: Menggunakan format { method: "POST" } yang benar
+    const data = await api(`/api/attack/${attackId}/recall`, { method: "POST" });
     
     // === PENGHAPUSAN MAP MARKER SECARA INSTAN ===
     // Jika server bilang tambang sudah habis, musnahkan dari layar!
