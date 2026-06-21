@@ -1519,7 +1519,17 @@ async function recallOperation(attackId) {
   } catch (err) {
     if (op) op.resolving = false;
     console.warn("Recall failed:", err);
-    alert("Gagal recall pasukan: " + err.message);
+    
+    // === PENANGANAN BENTROKAN WAKTU PVP ===
+    if (err.message.includes("tidak sedang menambang")) {
+      alert("⚠️ Terlambat! Pasukanmu sudah ditarik mundur atau baru saja diusir paksa oleh komandan lain!");
+      
+      // Paksa sinkronisasi layar saat itu juga agar UI kembali normal
+      loadState(); 
+    } else {
+      alert("Gagal recall pasukan: " + err.message);
+    }
+    // =====================================
   }
 }
 
@@ -6200,14 +6210,6 @@ async function initApp() {
       info.innerText = err.message;
     }
   });
-  // === TAMBAHKAN SINKRONISASI OTOMATIS INI ===
-  // Memaksa layar mengecek kabar dari server tiap 5 detik (selama layar menyala)
-  setInterval(() => {
-    if (document.visibilityState === "visible") {
-      loadState(); 
-    }
-  }, 5000);
-  // ==========================================
 }
 
 document.addEventListener("DOMContentLoaded", initApp);
