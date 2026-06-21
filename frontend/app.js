@@ -2040,24 +2040,23 @@ function renderPlayerStatusHtml(p) {
 function syncOperationsFromState() {
   if (!state || !state.active_attacks) return;
 
-  // Ambil semua operasi resmi milik player ini dari SERVER
   const serverOps = Object.values(state.active_attacks).filter(op => 
     op.player_id === state.player.id && op.status === "running"
   );
 
-  // === 1. PEMBASMI HANTU (GHOST WIPE) ===
-  // Hapus semua kartu di layar yang sebenarnya sudah tidak ada di server
   activeOperations = activeOperations.filter(localOp =>
     serverOps.some(srvOp => srvOp.id === localOp.id)
   );
 
-  // === 2. UPDATE DATA RESMI ===
+  // KUNCI PERBAIKAN: Sensor pendeteksi perubahan nasib
+  let forceRedraw = false; 
+
   serverOps.forEach(srvOp => {
     let localOp = activeOperations.find(o => o.id === srvOp.id);
     const now = Date.now();
 
     if (!localOp) {
-      // Jika data hilang/baru, buat ulang di UI
+      forceRedraw = true;
       let endsAt = now;
       if (srvOp.phase === "outbound" && srvOp.impact_at) endsAt = srvOp.impact_at * 1000;
       if (srvOp.phase === "returning" && srvOp.return_at) endsAt = srvOp.return_at * 1000;
@@ -2081,7 +2080,12 @@ function syncOperationsFromState() {
       };
       activeOperations.push(localOp);
     } else {
-      // Jika data sudah ada, cukup update status terbarunya
+      
+      // Jika server bilang fase berubah (misal dari Occupying dilempar jadi Returning)
+      if (localOp.phase !== srvOp.phase) {
+        forceRedraw = true; // Wajib gambar ulang UI-nya!
+      }
+
       localOp.phase = srvOp.phase;
       localOp.status = srvOp.status;
       localOp.occupy_ends_at = srvOp.occupy_ends_at;
@@ -2097,11 +2101,15 @@ function syncOperationsFromState() {
     }
   });
 
-  // === 3. PENCEGAH DUPLIKAT VISUAL ===
-  // Pastikan tidak ada dua kartu dengan ID yang kembar di dalam memori layar
   activeOperations = activeOperations.filter((op, index, self) =>
     index === self.findIndex((t) => t.id === op.id)
   );
+
+  // Jika ada pasukan yang diusir, paksa kartu antrean berubah warna saat itu juga!
+  if (forceRedraw) {
+    renderOperationQueueList();
+    updateOperationQueueWidget();
+  }
 }
 
 async function loadState() {
@@ -6192,6 +6200,14 @@ async function initApp() {
       info.innerText = err.message;
     }
   });
+  // === TAMBAHKAN SINKRONISASI OTOMATIS INI ===
+  // Memaksa layar mengecek kabar dari server tiap 5 detik (selama layar menyala)
+  setInterval(() => {
+    if (document.visibilityState === "visible") {
+      loadState(); 
+    }
+  }, 5000);
+  // ==========================================
 }
 
 document.addEventListener("DOMContentLoaded", initApp);
