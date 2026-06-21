@@ -3751,11 +3751,16 @@ async def scan(request: Request):
             if picked_category == "mining":
                 selected_non_player.append(visible_mining.pop(0))
 
-    # Player base muncul terpisah dan tidak memakan kuota scan.
+    # === BATASI JUMLAH PLAYER DI RADAR ===
+    # Radar level rendah hanya bisa melacak sedikit player.
+    # Level 1 = 1 Player, Level 2 = 2 Player, dst. Kita batasi maksimal 5 atau 6 player agar map tidak sumpek.
+    player_limit = min(5, radar_level)
+    
     visible_players = sorted(
         visible_players,
         key=lambda t: int(t.get("distance", 9999))
-    )
+    )[:player_limit] # Potong array-nya sesuai limit!
+    # =====================================
 
     visible = visible_players + selected_non_player
 
