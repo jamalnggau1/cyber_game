@@ -3508,6 +3508,12 @@ def make_player_scan_targets(attacker_player_id: str):
         if player_id == attacker_player_id:
             continue
 
+        # === FILTER AKUN HANTU / DEV ===
+        # Hanya tampilkan pemain asli yang login pakai Telegram (ID mulai dari tg_)
+        if not str(player_id).startswith("tg_"):
+            continue
+        # ===============================
+
         dx = int(defender.get("x", 120)) - int(attacker.get("x", 120))
         dy = int(defender.get("y", 450)) - int(attacker.get("y", 450))
         distance = int((dx ** 2 + dy ** 2) ** 0.5)
