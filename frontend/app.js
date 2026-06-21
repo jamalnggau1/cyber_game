@@ -6210,6 +6210,13 @@ async function initApp() {
       info.innerText = err.message;
     }
   });
+  // === TAMBAHKAN SINKRONISASI OTOMATIS INI ===
+  setInterval(() => {
+    if (document.visibilityState === "visible") {
+      loadState(); 
+    }
+  }, 5000);
+  // ==========================================
 }
 
 document.addEventListener("DOMContentLoaded", initApp);
