@@ -2307,6 +2307,19 @@ def generate_mining_nodes(
 
         node_id = f"mine_{scan_counter}_{i}_{random.randint(1000, 9999)}"
 
+        # === PENYESUAIAN RESOURCE LEVEL 1 (UNTUK TESTING & BALANCING) ===
+        if guardian_level == 1:
+            # Kapasitas sangat kecil dan produksi cepat agar habis dalam 30 detik
+            final_capacity = 50
+            final_production = 100.0 
+        else:
+            # Lahan Level 2 ke atas berjalan normal
+            final_capacity = res["capacity"] + (guardian_level * 120)
+            final_production = res["base_rate"] + round(guardian_level * 0.35, 2)
+        # ================================================================
+
+        node_id = f"mine_{scan_counter}_{i}_{random.randint(1000, 9999)}"
+
         nodes.append({
             "id": node_id,
             "kind": "mining",
@@ -2320,8 +2333,10 @@ def generate_mining_nodes(
             "guardian_power": guardian_power,
             "resource_id": res["id"],
             "resource_name": res["name"],
-            "production_per_minute": res["base_rate"] + round(guardian_level * 0.35, 2),
-            "capacity": res["capacity"] + (guardian_level * 120),
+            
+            # Gunakan variabel yang sudah disesuaikan di atas
+            "production_per_minute": final_production,
+            "capacity": final_capacity,
             
             # State untuk Lazy Evaluation
             "owner": None,

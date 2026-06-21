@@ -1540,7 +1540,7 @@ async function recallOperation(attackId) {
       addGameMessage("battle", "Recall Issued", "Pasukan ditarik dari tambang dan membawa loot sementara.");
       alert("Pasukan ditarik dari tambang dan sedang perjalanan pulang!");
       
-      await loadState();
+      await silentSync();
       renderOperationQueueList();
       updateOperationQueueWidget();
     }
@@ -1553,7 +1553,7 @@ async function recallOperation(attackId) {
       alert("⚠️ Terlambat! Pasukanmu sudah ditarik mundur atau baru saja diusir paksa oleh komandan lain!");
       
       // Paksa sinkronisasi layar saat itu juga agar UI kembali normal
-      loadState(); 
+      await silentSync();
     } else {
       alert("Gagal recall pasukan: " + err.message);
     }
