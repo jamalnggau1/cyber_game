@@ -5890,6 +5890,14 @@ def get_or_create_active_player_profile(request: Request):
         })
         GAME_STATE["players"][player_id] = profile
 
+    # === AUTO SCATTER: CEGAH PENUMPUKAN KOORDINAT ===
+    # Jika markas player masih di koordinat default (120, 450), 
+    # lempar mereka ke koordinat acak agar peta lebih realistis!
+    if profile.get("x") == 120 and profile.get("y") == 450:
+        profile["x"] = random.randint(100, 900)
+        profile["y"] = random.randint(100, 900)
+    # ===============================================
+
     profile = ensure_player_profile_schema(profile)
     GAME_STATE["players"][player_id] = profile
 
