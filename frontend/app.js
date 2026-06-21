@@ -1386,7 +1386,35 @@ async function resolveAttackImpact(op) {
         `${data.target_name || op.targetName || "Target"}\n${op.finalLog}\nUnits are occupying the node.`
       );
 
-      await loadState();
+      // === UPDATE INDIVIDUAL RADAR & MAP (TANPA FULL REFRESH) ===
+      const targetIdStr = String(op.targetId || data.target_id);
+      
+      // 1. Update data radar di memori lokal secara instan
+      if (typeof radarTargets !== 'undefined') {
+        const targetInRadar = radarTargets.find(t => String(t.id) === targetIdStr);
+        if (targetInRadar) {
+          targetInRadar.status = "Occupied";
+          targetInRadar.owner = state?.player?.id || "YOU";
+          
+          // 2. Jika popup informasi tambang ini sedang terbuka di layar, render ulang!
+          if (String(selectedTarget) === targetIdStr) {
+            openMiningNodeSheet(targetInRadar);
+          }
+        }
+      }
+
+      // 3. Tambahkan efek cincin merah di map (occupied-node) secara instan
+      const marker = document.querySelector(`.enemy-marker[data-target-id="${targetIdStr}"]`);
+      if (marker) {
+        marker.classList.add("occupied-node");
+      }
+      // ========================================================
+
+      // Gunakan sinkronisasi senyap (anti-glitch) menggantikan loadState()
+      if (typeof silentSync === "function") {
+        await silentSync();
+      }
+
       renderOperationQueueList();
       updateOperationQueueWidget();
       return;

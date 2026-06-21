@@ -2358,39 +2358,27 @@ def process_mining_tick(node_id: str, current_time: float) -> int:
             
     return mined_amount
 
-def process_mining_tick(node_id: str, current_time: float):
-    """
-    Fungsi ringan (tanpa database write) untuk menghitung hasil tambang.
-    Panggil ini TEPAT SEBELUM battle PvP terjadi di titik tambang.
-    """
-    node = GAME_STATE.get("mining_nodes", {}).get(node_id)
-    if not node or node["status"] != "Occupied" or not node["owner"]:
+def process_mining_tick(target_id: str, now: float) -> int:
+    target = GAME_STATE.get("mining_nodes", {}).get(target_id)
+    if not target:
         return 0
-
-    occupied_at = node.get("occupied_at", current_time)
-    elapsed_minutes = (current_time - occupied_at) / 60.0
-
-    if elapsed_minutes <= 0:
-        return 0
-
-    # Hitung resource yang berhasil digali
-    mined_amount = int(elapsed_minutes * node["production_per_minute"])
+        
+    occ_at = float(target.get("occupied_at", now) or now)
+    prod = float(target.get("production_per_minute", 1))
+    cap = int(target.get("capacity", 0))
     
-    # Pastikan tidak melebihi sisa kapasitas tambang
-    mined_amount = min(mined_amount, node["capacity"])
-
-    # Potong kapasitas tambang dan perbarui waktu
-    node["capacity"] -= mined_amount
-    node["occupied_at"] = current_time # Reset timer untuk sesi (atau penyerang) berikutnya
+    minutes = max(0, (now - occ_at) / 60.0)
+    mined = int(minutes * prod)
     
-    if node["capacity"] <= 0:
-        node["status"] = "Depleted"
-
-    # Masukkan loot sementara ke cargo milik owner (Pemain A)
-    # Ini memastikan jika Pemain A kalah, dia pulang membawa mined_amount ini.
-    # Logic penambahan ke inventory diproses saat fase "Return".
+    # Cegah hasil tambang melebihi sisa kapasitas
+    if mined > cap:
+        mined = cap
+        
+    # POTONG KAPASITAS DI DATABASE
+    target["capacity"] = cap - mined
+    target["occupied_at"] = now
     
-    return mined_amount
+    return mined
 
 def scale_enemy_stat(base_value: int, unit_level: int) -> int:
     return int(base_value * (1 + ((unit_level - 1) * 0.22)))
@@ -4945,32 +4933,52 @@ async def attack_impact(attack_id: str, request: Request):
                         break
             # ===============================================
 
-            # 3. Update Status Node
-            target["owner"] = attacker_id
-            target["occupied_at"] = now
-            target["status"] = "Occupied"
+            # === CEK JIKA LAHAN KOSONG SAAT DIREBUT ===
+            if capacity <= 0:
+                # Lahan sudah habis dikuras komandan sebelumnya!
+                if target_id in GAME_STATE.get("mining_nodes", {}):
+                    del GAME_STATE["mining_nodes"][target_id]
+                
+                active_attack["phase"] = "returning"
+                active_attack["status"] = "running"
+                active_attack["battle_resolved"] = True
+                active_attack["success"] = False
+                active_attack["return_at"] = now + int(active_attack.get("return_seconds", 30))
+                active_attack["impact_resolved_at"] = now
+                active_attack["pending_reward"] = {"credits": 0, "data_shard": 0, "nano_parts": 0, "nexus_core": 0}
 
-            # 4. Ubah Fase Pasukan
-            active_attack["phase"] = "occupying"
-            active_attack["status"] = "running"
-            active_attack["battle_resolved"] = True
-            active_attack["success"] = True
-            active_attack["occupy_ends_at"] = now + mining_seconds
-            active_attack["mining_capacity_booked"] = max_mineable
-            active_attack["mining_resource_id"] = target.get("resource_id")
-            active_attack["return_at"] = None
-            active_attack["impact_resolved_at"] = now
-            active_attack["pending_reward"] = {
-                "credits": 0, "data_shard": 0, "nano_parts": 0, "nexus_core": 0,
-            }
+                battle_log.append("MINING NODE DEPLETED:")
+                battle_log.append("- Saat kamu berhasil merebut lahan ini, resourcenya ternyata sudah dikuras habis oleh komandan musuh!")
+                battle_log.append("- Lahan hancur dan sinyalnya hilang dari radar.")
+                battle_log.append("STATUS: RETURNING TO BASE EMPTY HANDED")
+                
+            else:
+                # 3. Update Status Node
+                target["owner"] = attacker_id
+                target["occupied_at"] = now
+                target["status"] = "Occupied"
 
-            battle_log.append("MINING OPERATION STARTED:")
-            battle_log.append(f"- Surviving Troop Cargo: {total_cargo}")
-            battle_log.append(f"- Target Lock: {max_mineable} {target.get('resource_name', 'resources')}")
-            battle_log.append(f"- Estimated Time: {int(mining_minutes)} minutes")
-            battle_log.append(f"TRACE: +{trace_gain}. Current Trace: {attacker['trace']}%.")
-            battle_log.append("")
-            battle_log.append("STATUS: OCCUPYING NODE")
+                # 4. Ubah Fase Pasukan
+                active_attack["phase"] = "occupying"
+                active_attack["status"] = "running"
+                active_attack["battle_resolved"] = True
+                active_attack["success"] = True
+                active_attack["occupy_ends_at"] = now + mining_seconds
+                active_attack["mining_capacity_booked"] = max_mineable
+                active_attack["mining_resource_id"] = target.get("resource_id")
+                active_attack["return_at"] = None
+                active_attack["impact_resolved_at"] = now
+                active_attack["pending_reward"] = {
+                    "credits": 0, "data_shard": 0, "nano_parts": 0, "nexus_core": 0,
+                }
+
+                battle_log.append("MINING OPERATION STARTED:")
+                battle_log.append(f"- Surviving Troop Cargo: {total_cargo}")
+                battle_log.append(f"- Target Lock: {max_mineable} {target.get('resource_name', 'resources')}")
+                battle_log.append(f"- Estimated Time: {int(mining_minutes)} minutes")
+                battle_log.append(f"TRACE: +{trace_gain}. Current Trace: {attacker['trace']}%.")
+                battle_log.append("")
+                battle_log.append("STATUS: OCCUPYING NODE")
 
         else:
             battle_log.append("MINING FAILED:")
@@ -5094,7 +5102,18 @@ async def attack_recall(attack_id: str, request: Request):
     # 3. Lepaskan penguasaan tambang di Global State
     target = GAME_STATE.get("mining_nodes", {}).get(target_id)
     if target and target.get("owner") == attacker_id:
-        target["owner"] = None
+        target = GAME_STATE.get("mining_nodes", {}).get(target_id)
+        if target:
+            target["owner"] = None
+            
+            # === JIKA KAPASITAS HABIS, MUSNAHKAN DARI MAP ===
+            if int(target.get("capacity", 0)) <= 0:
+                if target_id in GAME_STATE.get("mining_nodes", {}):
+                    del GAME_STATE["mining_nodes"][target_id]
+            else:
+                # Masih ada sisa, lepaskan agar bisa diserang orang lain
+                target["status"] = "active"
+            # ================================================
         target["status"] = "Unoccupied"
 
     # 4. Ubah status pasukan menjadi Pulang (Returning)
