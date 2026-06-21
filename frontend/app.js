@@ -2119,9 +2119,30 @@ function syncOperationsFromState() {
       activeOperations.push(localOp);
     } else {
       
-      // Jika server bilang fase berubah (misal dari Occupying dilempar jadi Returning)
+      // Jika server bilang fase berubah (dari Occupying dilempar jadi Returning)
       if (localOp.phase !== srvOp.phase) {
-        forceRedraw = true; // Wajib gambar ulang UI-nya!
+        forceRedraw = true; 
+
+        // === AUTO-REMOVE MAP PIN ===
+        // Jika pasukan kita pulang (entah karena kalah, ditarik manual, atau lahan HABIS),
+        // hapus titik lahan ini dari map secara instan agar tidak jadi "tambang hantu".
+        if (localOp.phase === "occupying" && srvOp.phase === "returning") {
+          const tId = String(srvOp.target_id);
+
+          // 1. Hapus dari memori radar
+          if (typeof radarTargets !== 'undefined') {
+            radarTargets = radarTargets.filter(t => String(t.id) !== tId);
+          }
+
+          // 2. Hilangkan icon dari layar
+          document.querySelectorAll(`.enemy-marker[data-target-id="${tId}"]`).forEach(el => el.remove());
+
+          // 3. Jika pop-up tambang ini sedang ditatap pemain, tutup paksa!
+          if (String(selectedTarget) === tId) {
+            closeBuildingSheet();
+          }
+        }
+        // ===========================
       }
 
       localOp.phase = srvOp.phase;
@@ -5391,8 +5412,8 @@ function openMiningNodeSheet(node) {
     if (isMine) {
       ownerName = "YOU";
     } else if (String(node.owner) === String(state?.player?.id)) {
-      // Radar bilang ini punya kita, tapi pasukan kita sudah hilang (baru saja direbut musuh)
-      ownerName = "Enemy Commander"; 
+      // Radar bilang ini punya kita, tapi pasukan kita sudah hilang/pulang
+      ownerName = "Unknown (Signal Lost)";
     } else if (String(ownerName).startsWith("tg_")) {
       // Samarkan ID telegram yang panjang
       ownerName = "Commander " + String(ownerName).slice(3, 7); 
