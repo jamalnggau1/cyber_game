@@ -5117,19 +5117,19 @@ async def attack_recall(attack_id: str, request: Request):
     # 3. Lepaskan penguasaan tambang di Global State
     target = GAME_STATE.get("mining_nodes", {}).get(target_id)
     if target and target.get("owner") == attacker_id:
-        target = GAME_STATE.get("mining_nodes", {}).get(target_id)
-        if target:
-            target["owner"] = None
-            
-            # === JIKA KAPASITAS HABIS, MUSNAHKAN DARI MAP ===
-            if int(target.get("capacity", 0)) <= 0:
-                if target_id in GAME_STATE.get("mining_nodes", {}):
-                    del GAME_STATE["mining_nodes"][target_id]
-            else:
-                # Masih ada sisa, lepaskan agar bisa diserang orang lain
-                target["status"] = "active"
-            # ================================================
-        target["status"] = "Unoccupied"
+        target["owner"] = None
+        
+        # === JIKA KAPASITAS HABIS, MUSNAHKAN DARI MAP ===
+        if int(target.get("capacity", 0)) <= 0:
+            if target_id in GAME_STATE.get("mining_nodes", {}):
+                del GAME_STATE["mining_nodes"][target_id]
+            # Beri sinyal ke HP bahwa lahan ini sudah musnah
+            active_attack["target_depleted"] = True
+        else:
+            # Masih ada sisa, lepaskan agar bisa diserang orang lain
+            target["status"] = "Unoccupied"
+            active_attack["target_depleted"] = False
+        # ================================================
 
     # 4. Ubah status pasukan menjadi Pulang (Returning)
     return_seconds = int(active_attack.get("return_seconds", 30))

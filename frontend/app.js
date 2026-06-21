@@ -1514,50 +1514,50 @@ ${op.finalLog}`
 }
 
 async function recallOperation(attackId) {
-  const op = activeOperations.find(o => o.id === attackId);
-  if (op && op.resolving) return; // Cegah double klik
-  if (op) op.resolving = true;
-
   try {
-    const data = await api(`/api/attack/${attackId}/recall`, { method: "POST" });
-    if (op) op.resolving = false;
+    // 1. Panggil API untuk menarik mundur pasukan
+    const data = await api(`/api/attack/${attackId}/recall`, "POST");
+    
+    // === PENGHAPUSAN MAP MARKER SECARA INSTAN ===
+    // Jika server bilang tambang sudah habis, musnahkan dari layar!
+    if (data.target_depleted) {
+      const tId = String(data.target_id);
 
-    if (data.phase === "returning") {
-      const returnSeconds = Math.max(1, Number(data.return_seconds || 30));
-      const now = Date.now();
-      const returnEnd = now + returnSeconds * 1000;
-
-      if (op) {
-        op.phase = "returning";
-        op.status = "running";
-        op.title = `Returning from ${data.target_name || op.targetName}`;
-        op.returnSeconds = returnSeconds;
-        op.startedAt = now;
-        op.endsAt = returnEnd;
-        op.totalSeconds = Math.max(1, Math.ceil((returnEnd - now) / 1000));
+      // Bersihkan dari memori radar HP
+      if (typeof radarTargets !== 'undefined') {
+        radarTargets = radarTargets.filter(t => String(t.id) !== tId);
+      }
+      if (typeof placedRadarPoints !== 'undefined') {
+        placedRadarPoints = placedRadarPoints.filter(t => String(t.id) !== tId);
       }
 
-      addGameMessage("battle", "Recall Issued", "Pasukan ditarik dari tambang dan membawa loot sementara.");
-      alert("Pasukan ditarik dari tambang dan sedang perjalanan pulang!");
-      
-      await silentSync();
-      renderOperationQueueList();
-      updateOperationQueueWidget();
+      // HAPUS PAKSA elemen gambar/ikon di peta!
+      document.querySelectorAll(`[data-target-id="${tId}"], [data-id="${tId}"], [id*="${tId}"]`).forEach(el => el.remove());
+
+      // Tutup popup jika kebetulan pemain sedang melihat popup-nya
+      if (String(selectedTarget) === tId) {
+        closeBuildingSheet();
+      }
     }
+    // ============================================
+
+    // Paksa sinkronisasi senyap agar queue dan UI terupdate
+    if (typeof silentSync === "function") {
+      await silentSync();
+    } else {
+      await loadState();
+    }
+
   } catch (err) {
-    if (op) op.resolving = false;
     console.warn("Recall failed:", err);
     
-    // === PENANGANAN BENTROKAN WAKTU PVP ===
     if (err.message.includes("tidak sedang menambang")) {
-      alert("⚠️ Terlambat! Pasukanmu sudah ditarik mundur atau baru saja diusir paksa oleh komandan lain!");
-      
-      // Paksa sinkronisasi layar saat itu juga agar UI kembali normal
-      await silentSync();
+      alert("⚠️ Terlambat! Pasukanmu sudah ditarik mundur atau baru saja diusir paksa oleh komandan musuh!");
+      if (typeof silentSync === "function") silentSync(); 
+      else loadState();
     } else {
       alert("Gagal recall pasukan: " + err.message);
     }
-    // =====================================
   }
 }
 
