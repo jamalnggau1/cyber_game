@@ -3754,15 +3754,15 @@ async def scan(request: Request):
     # === BATASI JUMLAH PLAYER DI RADAR ===
     # Radar level rendah hanya bisa melacak sedikit player.
     # Level 1 = 1 Player, Level 2 = 2 Player, dst. Kita batasi maksimal 5 atau 6 player agar map tidak sumpek.
+    # === BATASI JUMLAH PLAYER DI RADAR ===
     player_limit = min(5, radar_level)
     
-    visible_players = sorted(
-        visible_players,
-        key=lambda t: int(t.get("distance", 9999))
-    )[:player_limit] # Potong array-nya sesuai limit!
+    # Acak urutan pemain yang ada di dalam jangkauan radar
+    random.shuffle(visible_players)
+    
+    # Potong jumlahnya sesuai limit
+    visible_players = visible_players[:player_limit]
     # =====================================
-
-    visible = visible_players + selected_non_player
 
     await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
     # === LOGIKA MEMUNCULKAN SEMUA TAMBANG PVP (OCCUPIED) ===
