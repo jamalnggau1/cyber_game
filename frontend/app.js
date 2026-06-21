@@ -6201,46 +6201,52 @@ async function silentSync() {
 // ===============================================
 
 async function initApp() {
-  await initTelegramMiniApp();
-  await loadState();
-  maybeShowOnboarding();
-  document.querySelectorAll(".tab").forEach(btn => {
-    btn.addEventListener("click", () => {
-      switchPage(btn.dataset.page);
+  try {
+    // 1. Hubungkan ke Telegram
+    await initTelegramMiniApp();
+
+    // 2. Load data game dari server (CUKUP 1 KALI SAJA DI AWAL)
+    await loadState();
+    maybeShowOnboarding();
+
+    // 3. Pasang semua Event Listener tombol
+    document.querySelectorAll(".tab").forEach(btn => {
+      btn.addEventListener("click", () => {
+        switchPage(btn.dataset.page);
+      });
     });
-  });
 
-  const scanBtn = el("scanBtn");
-  if (scanBtn) {
-    scanBtn.addEventListener("click", scan);
-  }
+    const scanBtn = el("scanBtn");
+    if (scanBtn) {
+      scanBtn.addEventListener("click", scan);
+    }
 
-  const launchAttackBtn = el("launchAttackBtn");
-  if (launchAttackBtn) {
-    launchAttackBtn.addEventListener("click", launchAttack);
-  }
+    const launchAttackBtn = el("launchAttackBtn");
+    if (launchAttackBtn) {
+      launchAttackBtn.addEventListener("click", launchAttack);
+    }
 
-  loadState().then(() => {
+    // 4. Lakukan Scan otomatis di awal
     scan().catch(err => {
-      console.warn("Scan gagal/skip:", err);
+      console.warn("Scan awal gagal/skip:", err);
     });
-  }).catch(err => {
+
+    // 5. Jalankan Sinkronisasi Senyap setiap 5 detik (Anti-Glitch)
+    setInterval(() => {
+      if (document.visibilityState === "visible") {
+        silentSync();
+      }
+    }, 5000);
+
+  } catch (err) {
+    // Tangkap error jika server sedang bermasalah
     console.error("LOAD STATE ERROR:", err);
-
     setText("playerStatus", "Error loading data");
-
     const info = el("buildingInfo");
     if (info) {
       info.innerText = err.message;
     }
-  });
-  // === SINKRONISASI OTOMATIS (VERSI SENYAP) ===
-  setInterval(() => {
-    if (document.visibilityState === "visible") {
-      silentSync(); // <-- Ganti loadState() menjadi silentSync()
-    }
-  }, 5000);
-  // ==========================================
+  }
 }
 
 document.addEventListener("DOMContentLoaded", initApp);
