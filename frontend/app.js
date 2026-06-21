@@ -5348,27 +5348,39 @@ function selectRadarSignal(targetId) {
 function openMiningNodeSheet(node) {
   const asset = getEnemyAsset(node);
 
+  // 1. Cek KEBENARAN MUTLAK dari data real-time antrean pasukan kita
+  const activeOp = activeOperations.find(op => String(op.targetId) === String(node.id) && op.phase === "occupying");
+  const isMine = !!activeOp;
+
+  // 2. Deteksi apakah data radar di layar kita "basi" (stale)
+  let currentStatus = node.status;
+  let displayOwner = node.owner;
+
+  if (isMine) {
+    currentStatus = "Occupied";
+  } else if (currentStatus === "Occupied" && String(node.owner) === String(state?.player?.id)) {
+    // Radar bilang ini punya kita, TAPI kita tidak punya pasukan di sana.
+    // Artinya: Kita baru saja ditendang musuh dan belum melakukan Scan ulang!
+    displayOwner = "Enemy Commander"; 
+  } else if (String(displayOwner).startsWith("tg_")) {
+    // Samarkan ID Telegram musuh agar terlihat seperti nama game MMO
+    displayOwner = "Commander " + String(displayOwner).slice(3, 7);
+  }
+
   let ownershipHtml = `<p style="color:var(--good); font-weight:bold; margin-bottom: 10px;">Status: Unoccupied</p>`;
   let actionHtml = "";
 
-  if (node.status === "Occupied") {
-    // Cek apakah ini tambang milik kita
-    const isMine = node.owner === state.player.id;
-    const ownerName = isMine ? "YOU" : node.owner;
+  if (currentStatus === "Occupied") {
+    const ownerName = isMine ? "YOU" : displayOwner;
     ownershipHtml = `<p style="color:var(--danger); font-weight:bold; margin-bottom: 10px;">Status: Occupied by ${ownerName}</p>`;
 
     if (isMine) {
-      // Cari data operasi pasukan yang sedang kemah di sini
-      const activeOp = activeOperations.find(op => op.targetId === node.id && op.phase === "occupying");
       const opId = activeOp ? activeOp.id : "";
-
-      // Ubah tombol menjadi Recall
       actionHtml = `
         <button onclick="recallOperation('${opId}')" style="background:var(--warn); color:#000; font-weight:bold;">Recall Troops</button>
         <button onclick="closeBuildingSheet()">Close</button>
       `;
     } else {
-      // Jika milik orang lain, munculkan tombol Attack PvP
       actionHtml = `
         <button onclick="openAttackSetupFromRadar('${node.id}')">Attack (PvP)</button>
         <button onclick="closeBuildingSheet(); scoutPopup('${node.id}')">Scout</button>
@@ -5376,7 +5388,6 @@ function openMiningNodeSheet(node) {
       `;
     }
   } else {
-    // Jika masih kosong / dijaga Guardian
     actionHtml = `
       <button onclick="openAttackSetupFromRadar('${node.id}')">Attack Guardian</button>
       <button onclick="closeBuildingSheet(); scoutPopup('${node.id}')">Scout</button>
