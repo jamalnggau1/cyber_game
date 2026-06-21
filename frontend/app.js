@@ -6176,6 +6176,30 @@ async function completeOnboarding() {
   }
 }
 
+// === FUNGSI SINKRONISASI SENYAP (ANTI-GLITCH) ===
+async function silentSync() {
+  try {
+    // 1. Ambil data terbaru dari server diam-diam
+    const data = await api("/api/state");
+    if (!data) return;
+
+    // 2. Perbarui data global di memori HP (tanpa menggambar ulang layar)
+    state = data;
+
+    // 3. HANYA periksa antrean pasukan. 
+    // Fungsi ini sudah punya sensor 'forceRedraw', jadi layar HANYA akan
+    // di-refresh jika ada status pasukan yang berubah (misal: kalah, pulang, dsb).
+    syncOperationsFromState();
+
+    // Opsional: Jika Anda punya fungsi untuk update angka resource (uang/energi)
+    // yang tidak bikin glitch, bisa dipanggil di sini. Jika tidak, abaikan.
+
+  } catch (err) {
+    // Biarkan kosong agar error jaringan kecil tidak mengganggu layar pemain
+  }
+}
+// ===============================================
+
 async function initApp() {
   await initTelegramMiniApp();
   await loadState();
@@ -6210,10 +6234,10 @@ async function initApp() {
       info.innerText = err.message;
     }
   });
-  // === TAMBAHKAN SINKRONISASI OTOMATIS INI ===
+  // === SINKRONISASI OTOMATIS (VERSI SENYAP) ===
   setInterval(() => {
     if (document.visibilityState === "visible") {
-      loadState(); 
+      silentSync(); // <-- Ganti loadState() menjadi silentSync()
     }
   }, 5000);
   // ==========================================
