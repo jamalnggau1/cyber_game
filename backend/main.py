@@ -58,11 +58,15 @@ async def send_telegram_alert(chat_id: str, message: str):
     payload = {'chat_id': chat_id, 'text': message}
     
     try:
-        # Menggunakan httpx secara asinkron dengan timeout 5 detik
         async with httpx.AsyncClient(timeout=5.0) as client:
-            await client.post(url, data=payload)
+            response = await client.post(url, data=payload)
+            # Jika Telegram menolak (status bukan 200 OK), cetak alasannya!
+            if response.status_code != 200:
+                print(f"[TG ERROR] Gagal kirim ke {chat_id}: {response.text}")
+            else:
+                print(f"[TG SUCCESS] Notifikasi Red Alert terkirim ke {chat_id}")
     except Exception as e:
-        print(f"Gagal kirim notif TG ke {chat_id}: {e}")
+        print(f"[TG EXCEPTION] Gagal kirim notif TG ke {chat_id}: {e}")
 # ==========================================
 
 def require_admin(request: Request):
