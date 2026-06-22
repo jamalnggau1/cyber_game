@@ -1760,8 +1760,15 @@ def apply_building_unlocks(profile: dict):
 
         if not requirements:
             continue
-
-        building["locked"] = not is_building_requirement_met(profile, requirements)
+        
+        # UJI COBA
+        # === HACK TESTING UNTUK MEMBUKA SEMUA BANGUNAN ===
+        # Beri tanda '#' pada baris aslinya agar tidak hilang:
+        # building["locked"] = not is_building_requirement_met(profile, requirements)
+        
+        # Paksa semua bangunan jadi terbuka (False):
+        building["locked"] = False 
+        # =================================================
 
     # sync level profile utama
     profile["lab_level"] = get_profile_building_level(profile, "main_lab")
