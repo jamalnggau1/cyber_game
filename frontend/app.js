@@ -6290,7 +6290,7 @@ function renderGuildList(guilds) {
         <p class="muted" style="margin-top: 0;">${escapeHtml(g.description || "No description")}</p>
         <div class="row"><span>Members</span><span>${g.members_count}/${g.max_members}</span></div>
         <div class="sheet-actions" style="margin-top:8px;">
-          <button disabled>Join (Soon)</button>
+          <button style="background: var(--good); color: #000; font-weight: bold;" onclick="joinGuild('${g.id}')">Join Guild</button>
         </div>
       </div>
     `).join("")
@@ -6311,6 +6311,21 @@ function renderGuildList(guilds) {
       </div>
     `
   );
+}
+
+async function joinGuild(guildId) {
+  try {
+    const data = await api("/api/guilds/join", {
+      method: "POST",
+      body: JSON.stringify({ guild_id: guildId })
+    });
+    
+    alert(data.message);
+    await loadState(); // Sinkronisasi ulang data player dari server
+    openGuildGateSheet(); // Buka ulang UI agar langsung memuat layar "My Guild"
+  } catch (err) {
+    alert("Gagal bergabung: " + err.message);
+  }
 }
 
 // Fungsi helper untuk JS memproses klik logo

@@ -2526,6 +2526,9 @@ generate_targets()
 # ==========================================================
 # API models
 # ==========================================================
+class JoinGuildRequest(BaseModel):
+    guild_id: str
+
 class CreateGuildRequest(BaseModel):
     name: str = Field(min_length=3, max_length=20)
     description: str = Field(default="", max_length=150)
@@ -6691,71 +6694,45 @@ async def create_guild(req: CreateGuildRequest, request: Request):
         "guild": new_guild,
         "resources": profile["resources"]
     }
+# ==========================================================
 
-@app.post("/api/guilds/create")
-async def create_guild(req: CreateGuildRequest, request: Request):
+@app.post("/api/guilds/join")
+async def join_guild(req: JoinGuildRequest, request: Request):
     await sync_state_from_db()
     
     player_id, profile = get_or_create_active_player_profile(request)
     profile = ensure_player_profile_schema(profile)
-    GAME_STATE.setdefault("guilds", {})
 
-    # 1. Cek apakah pemain sudah berada di guild lain
+    # 1. Pastikan pemain belum masuk guild lain
     if profile.get("guild_id"):
-        raise HTTPException(status_code=400, detail="Kamu sudah bergabung di sebuah Guild!")
+        raise HTTPException(status_code=400, detail="Kamu sudah berada di sebuah Guild!")
 
-    # 2. Cek apakah nama guild sudah dipakai orang lain
-    for existing_guild in GAME_STATE["guilds"].values():
-        if existing_guild["name"].lower() == req.name.lower():
-            raise HTTPException(status_code=400, detail=f"Nama Guild '{req.name}' sudah ada yang memakai.")
-
-    # 3. Cek biaya pembuatan Guild (misal: 10.000 Credits)
-    cost = 10000
-    resources = profile.setdefault("resources", {})
-    current_credits = int(resources.get("credits", 0))
-
-    if current_credits < cost:
-        raise HTTPException(
-            status_code=400, 
-            detail=f"Credits tidak cukup. Butuh {cost} Credits untuk mendirikan Guild."
-        )
-
-    # 4. Potong biaya dan buat Guild baru
-    resources["credits"] = current_credits - cost
-    profile["resources"] = resources
-
-    guild_id = f"gld_{int(time.time())}_{random.randint(100, 999)}"
+    # 2. Cari guild yang mau dimasuki
+    GAME_STATE.setdefault("guilds", {})
+    guild = GAME_STATE["guilds"].get(req.guild_id)
     
-    # Power awal guild dihitung dari power kaptennya
-    initial_power = get_profile_base_power(profile)
+    if not guild:
+        raise HTTPException(status_code=404, detail="Guild tidak ditemukan atau sudah dibubarkan.")
 
-    new_guild = {
-        "id": guild_id,
-        "name": req.name,
-        "description": req.description,
-        "leader_id": player_id,
-        "members": [player_id], # Leader otomatis jadi member pertama
-        "max_members": 50,
-        "level": 1,
-        "power": initial_power,
-        "created_at": time.time(),
-    }
+    # 3. Cek apakah guild sudah penuh
+    if len(guild.get("members", [])) >= guild.get("max_members", 50):
+        raise HTTPException(status_code=400, detail="Mohon maaf, Guild ini sudah penuh!")
 
-    # Simpan ke Global State
-    GAME_STATE["guilds"][guild_id] = new_guild
-    profile["guild_id"] = guild_id
+    # 4. Masukkan pemain ke daftar anggota sebagai "member" biasa
+    guild["members"].append({
+        "player_id": player_id,
+        "role": "member",
+        "joined_at": time.time()
+    })
+
+    # 5. Update profil pemain dan simpan
+    profile["guild_id"] = req.guild_id
     GAME_STATE["players"][player_id] = profile
+    GAME_STATE["guilds"][req.guild_id] = guild
 
     await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
 
-    return {
-        "success": True, 
-        "message": f"Guild [{req.name}] berhasil didirikan!",
-        "guild": new_guild,
-        "resources": profile["resources"]
-    }
-    
-# ==========================================================
+    return {"success": True, "message": f"Berhasil bergabung dengan {guild['name']}!"}
 
 @app.get("/api/guilds/my")
 async def get_my_guild(request: Request):
