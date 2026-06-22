@@ -4626,16 +4626,21 @@ async def attack(req: AttackRequest, request: Request):
 
     # === SISTEM RED ALERT NOTIFIKASI TELEGRAM ===
     defender_tg_id = None
-    target_id_str = str(req.target_id)
     
-    if target_id_str.startswith("tg_"):
-        defender_tg_id = target_id_str.replace("tg_", "")
-    else:
-        target_node = GAME_STATE.get("mining_nodes", {}).get(target_id_str, {})
-        owner = target_node.get("owner", "")
-        if owner and str(owner).startswith("tg_"):
-            defender_tg_id = str(owner).replace("tg_", "")
+    # 1. Ambil ID pemain korban dari data 'target' (bukan dari req.target_id)
+    if target.get("kind") in ["enemy", "player"]:
+        # Jika menyerang markas pemain
+        target_player_id = str(target.get("player_id", ""))
+        if target_player_id.startswith("tg_"):
+            defender_tg_id = target_player_id.replace("tg_", "")
+            
+    elif target.get("kind") == "mining":
+        # Jika menyerang tambang yang dijajah pemain lain
+        owner_id = str(target.get("owner", ""))
+        if owner_id.startswith("tg_"):
+            defender_tg_id = owner_id.replace("tg_", "")
 
+    # 2. Jika ID Telegram berupa angka murni sudah didapat, tembak pesannya!
     if defender_tg_id:
         attacker_name = attacker.get("name", "Seorang Commander")
         
@@ -4646,17 +4651,19 @@ async def attack(req: AttackRequest, request: Request):
             f"Buka game SEKARANG untuk melindungi aset Anda!"
         )
         
-        # PERBAIKAN VERCEL: Eksekusi langsung secara asinkron tanpa BackgroundTasks
-        # Dengan timeout 1.5 detik, server game tidak akan lag meskipun Telegram sedang lambat.
         try:
+            # Gunakan httpx secara asinkron langsung di dalam sini
+            import httpx
             token = "6765251410:AAH3MVx6ExdjTNXas_KaX6sZ_7fqCFC9dz8"
             url = f"https://api.telegram.org/bot{token}/sendMessage"
             payload = {'chat_id': defender_tg_id, 'text': pesan}
             
             async with httpx.AsyncClient(timeout=1.5) as client:
-                await client.post(url, data=payload)
+                response = await client.post(url, data=payload)
+                # Tampilkan hasil di log Vercel untuk memastikan statusnya
+                print(f"[TG RESP] Status: {response.status_code} | Target: {defender_tg_id}")
         except Exception as e:
-            pass # Abaikan error agar game tetap berjalan lancar
+            print(f"[TG ERROR] {e}")
     # ============================================
 
     GAME_STATE["players"][attacker_id] = attacker
