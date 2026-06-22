@@ -6441,7 +6441,7 @@ let myGuildDataCache = null;
 let currentGuildTab = "info"; // Tab default saat dibuka
 
 async function renderMyGuild(forceRefresh = false) {
-  // 1. Tampilkan layar loading HANYA jika data belum ada atau pemain menekan tombol Refresh
+  // 1. Loading screen jika data belum ada
   if (forceRefresh || !myGuildDataCache) {
     showBuildingSheet("My Guild", `<div style="text-align:center; padding: 30px;"><p class="muted">Mengenkripsi sinyal Guild...</p></div>`);
     try {
@@ -6457,19 +6457,9 @@ async function renderMyGuild(forceRefresh = false) {
   const members = myGuildDataCache.members;
   const myRole = myGuildDataCache.my_role;
 
-  // 2. Buat Navigasi Tab (Sama seperti gaya Unit Factory)
-  const tabsHtml = `
-    <div class="facility-tabs" style="margin-bottom: 12px;">
-      <button class="${currentGuildTab === 'info' ? 'active' : ''}" onclick="switchGuildTab('info')">Guild</button>
-      <button class="${currentGuildTab === 'member' ? 'active' : ''}" onclick="switchGuildTab('member')">Member</button>
-      <button class="${currentGuildTab === 'reward' ? 'active' : ''}" onclick="switchGuildTab('reward')">Hadiah</button>
-      <button class="${currentGuildTab === 'research' ? 'active' : ''}" onclick="switchGuildTab('research')">Riset</button>
-    </div>
-  `;
-
   let bodyHtml = "";
 
-  // 3. Render isi layar berdasarkan Tab yang sedang aktif
+  // 2. Render isi berdasarkan Tab
   if (currentGuildTab === "info") {
     bodyHtml = `
       <div class="card" style="text-align: center;">
@@ -6486,7 +6476,6 @@ async function renderMyGuild(forceRefresh = false) {
 
       <div class="sheet-actions" style="margin-top: 16px;">
         ${myRole === 'leader' ? `<button style="background: var(--bad); color: #fff;" onclick="alert('Fungsi Disband sedang disiapkan!')">Disband Guild</button>` : `<button style="background: var(--bad); color: #fff;" onclick="alert('Fungsi Leave sedang disiapkan!')">Leave Guild</button>`}
-        <button onclick="closeBuildingSheet()">Close</button>
       </div>
     `;
   } 
@@ -6497,7 +6486,6 @@ async function renderMyGuild(forceRefresh = false) {
       if (m.role === "leader") roleBadge = `<span style="color: #ffd700; font-size: 10px; font-weight: bold; border: 1px solid #ffd700; padding: 2px 4px; border-radius: 4px; margin-left: 6px;">LEADER</span>`;
       else if (m.role === "admin") roleBadge = `<span style="color: #00ffff; font-size: 10px; font-weight: bold; border: 1px solid #00ffff; padding: 2px 4px; border-radius: 4px; margin-left: 6px;">ADMIN</span>`;
 
-      // Siapkan tombol eksekusi untuk tahap selanjutnya
       let actionButtons = "";
       if (myRole === "leader" && m.player_id !== state?.player?.id) {
         actionButtons = `
@@ -6527,7 +6515,14 @@ async function renderMyGuild(forceRefresh = false) {
       </div>
       <div class="sheet-actions">
         <button onclick="renderMyGuild(true)">Refresh Data</button>
-        <button onclick="closeBuildingSheet()">Close</button>
+      </div>
+    `;
+  }
+  else if (currentGuildTab === "rally") {
+    bodyHtml = `
+      <div class="card" style="text-align: center; padding: 40px 10px;">
+        <h3 style="color: #ff4444;">Guild Rally</h3>
+        <p class="muted">Pusat komando untuk menyerang Nexus Node atau markas Guild musuh bersama-sama. Sedang dalam tahap konstruksi.</p>
       </div>
     `;
   }
@@ -6537,9 +6532,6 @@ async function renderMyGuild(forceRefresh = false) {
         <h3 style="color: var(--good);">Guild Rewards</h3>
         <p class="muted">Fitur pembagian hadiah harian, loot dari Nexus War, dan bonus donasi sedang dalam tahap konstruksi.</p>
       </div>
-      <div class="sheet-actions">
-        <button onclick="closeBuildingSheet()">Close</button>
-      </div>
     `;
   }
   else if (currentGuildTab === "research") {
@@ -6548,14 +6540,30 @@ async function renderMyGuild(forceRefresh = false) {
         <h3 style="color: #00ffff;">Guild Tech</h3>
         <p class="muted">Fitur riset teknologi guild untuk meningkatkan buff dan power seluruh anggota sedang dalam tahap konstruksi.</p>
       </div>
-      <div class="sheet-actions">
-        <button onclick="closeBuildingSheet()">Close</button>
-      </div>
     `;
   }
 
-  // 4. Render semuanya ke layar!
-  showBuildingSheet("My Guild", tabsHtml + bodyHtml);
+  // 3. Gabungkan tombol Close umum
+  const closeHtml = `
+    <div class="sheet-actions" style="margin-top: 12px;">
+      <button onclick="closeBuildingSheet()">Close Window</button>
+    </div>
+  `;
+
+  // 4. Susun Navigasi Tab di Bawah (Bottom Navigation)
+  // Saya menambahkan inline style agar kelima tombol muat sejajar dengan rapi
+  const tabsHtml = `
+    <div class="facility-tabs" style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 12px; display: flex; gap: 4px;">
+      <button class="${currentGuildTab === 'info' ? 'active' : ''}" style="flex: 1; padding: 8px 4px; font-size: 11px;" onclick="switchGuildTab('info')">Info</button>
+      <button class="${currentGuildTab === 'member' ? 'active' : ''}" style="flex: 1; padding: 8px 4px; font-size: 11px;" onclick="switchGuildTab('member')">Member</button>
+      <button class="${currentGuildTab === 'rally' ? 'active' : ''}" style="flex: 1; padding: 8px 4px; font-size: 11px;" onclick="switchGuildTab('rally')">Rally</button>
+      <button class="${currentGuildTab === 'reward' ? 'active' : ''}" style="flex: 1; padding: 8px 4px; font-size: 11px;" onclick="switchGuildTab('reward')">Hadiah</button>
+      <button class="${currentGuildTab === 'research' ? 'active' : ''}" style="flex: 1; padding: 8px 4px; font-size: 11px;" onclick="switchGuildTab('research')">Riset</button>
+    </div>
+  `;
+
+  // Gabungkan Semuanya: Body -> Close -> Tab Bawah
+  showBuildingSheet("My Guild", bodyHtml + closeHtml + tabsHtml);
 }
 
 // Fungsi Trigger untuk berpindah Tab secara instan
