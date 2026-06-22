@@ -4673,6 +4673,12 @@ async def attack(req: AttackRequest, request: Request):
     GAME_STATE["active_attacks"][attack_id] = active_attack
 
     await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
+    print("=== TG DEBUG ===", flush=True)
+    print("kind:", target.get("kind"), flush=True)
+    print("player_id:", target.get("player_id"), flush=True)
+    print("owner:", target.get("owner"), flush=True)
+    print("defender_tg_id:", defender_tg_id, flush=True)
+    print("=================", flush=True)
 
     return active_attack
 
