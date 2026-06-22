@@ -8,6 +8,7 @@ import random
 import os
 import time
 import httpx
+from fastapi import BackgroundTasks
 import copy
 import requests
 from backend.database import init_db, load_game_state, save_game_state, PLAYER_ID
@@ -48,6 +49,20 @@ FRONTEND_DIR = BASE_DIR.parent / "frontend"
 
 ADMIN_KEY = os.getenv("ADMIN_KEY", "")
 
+# ==========================================
+# BOT TELEGRAM NOTIFIER (BACKGROUND TASK)
+# ==========================================
+async def send_telegram_alert(chat_id: str, message: str):
+    token = "6765251410:AAH3MVx6ExdjTNXas_KaX6sZ_7fqCFC9dz8"
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    payload = {'chat_id': chat_id, 'text': message}
+    
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            await client.post(url, data=payload)
+    except Exception as e:
+        print(f"Gagal kirim notif TG ke {chat_id}: {e}")
+# ==========================================
 
 def require_admin(request: Request):
     key = request.headers.get("X-Admin-Key", "")
@@ -4384,7 +4399,7 @@ async def ai_analyze(request: Request, payload: dict = Body(...)):
     }
 
 @app.post("/api/attack")
-async def attack(req: AttackRequest, request: Request):
+async def attack(req: AttackRequest, request: Request, background_tasks: BackgroundTasks):
     await sync_state_from_db()
 
     attacker_id, attacker = get_or_create_active_player_profile(request)
@@ -4627,17 +4642,19 @@ async def attack(req: AttackRequest, request: Request):
 
     # === SISTEM RED ALERT NOTIFIKASI TELEGRAM ===
     defender_tg_id = None
+    target_id_str = str(req.target_id)
     
-    if target.get("kind") in ["enemy", "player"]:
-        target_player_id = str(target.get("player_id", ""))
-        if target_player_id.startswith("tg_"):
-            defender_tg_id = target_player_id.replace("tg_", "")
-            
-    elif target.get("kind") == "mining":
-        owner_id = str(target.get("owner", ""))
-        if owner_id.startswith("tg_"):
-            defender_tg_id = owner_id.replace("tg_", "")
+    # 1. Cek apakah targetnya adalah base pemain lain
+    if target_id_str.startswith("tg_"):
+        defender_tg_id = target_id_str.replace("tg_", "")
+    else:
+        # 2. Cek apakah targetnya tambang yang sedang dikuasai orang lain
+        target_node = GAME_STATE.get("mining_nodes", {}).get(target_id_str, {})
+        owner = target_node.get("owner", "")
+        if owner and str(owner).startswith("tg_"):
+            defender_tg_id = str(owner).replace("tg_", "")
 
+    # Jika korban punya ID Telegram, tembak notifikasi di background!
     if defender_tg_id:
         attacker_name = attacker.get("name", "Seorang Commander")
         
@@ -4648,37 +4665,15 @@ async def attack(req: AttackRequest, request: Request):
             f"Buka game SEKARANG untuk melindungi aset Anda!"
         )
         
-        try:
-            import httpx
-            token = "6765251410:AAH3MVx6ExdjTNXas_KaX6sZ_7fqCFC9dz8"
-            url = f"https://api.telegram.org/bot{token}/sendMessage"
-            
-            # 1. KITA GUNAKAN FORMAT DARI TES ANDA:
-            payload = {
-                "chat_id": int(defender_tg_id), # Ubah paksa jadi Integer
-                "text": pesan
-            }
-            
-            # 2. KITA GUNAKAN TIMEOUT 5 DETIK SEPERTI TES ANDA:
-            async with httpx.AsyncClient(timeout=5.0) as client:
-                # 3. KITA GUNAKAN json= BUKAN data=:
-                response = await client.post(url, json=payload)
-                print(f"[TG RESP] Status: {response.status_code} | Target: {defender_tg_id}")
-        except Exception as e:
-            print(f"[TG ERROR] {e}")
+        # Eksekusi instan tanpa membuat server nge-lag
+        background_tasks.add_task(send_telegram_alert, defender_tg_id, pesan)
     # ============================================
-
+    
     GAME_STATE["players"][attacker_id] = attacker
     GAME_STATE.setdefault("active_attacks", {})
     GAME_STATE["active_attacks"][attack_id] = active_attack
 
     await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
-    print("=== TG DEBUG ===", flush=True)
-    print("kind:", target.get("kind"), flush=True)
-    print("player_id:", target.get("player_id"), flush=True)
-    print("owner:", target.get("owner"), flush=True)
-    print("defender_tg_id:", defender_tg_id, flush=True)
-    print("=================", flush=True)
 
     return active_attack
 
