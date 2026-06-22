@@ -5214,12 +5214,21 @@ async def attack_return(attack_id: str, request: Request):
     if active_attack.get("return_resolved"):
         return active_attack
 
+    # === PERBAIKAN BUG ABORT: IZINKAN PASUKAN PULANG ===
     if not active_attack.get("battle_resolved"):
-        return {
-            **active_attack,
-            "not_ready": True,
-            "message": "Battle belum terjadi. Pasukan belum sampai target.",
-        }
+        # Jika impact_at is None, berarti misi ini di-Abort di tengah jalan.
+        if active_attack.get("impact_at") is not None:
+            return {
+                **active_attack,
+                "not_ready": True,
+                "message": "Battle belum terjadi. Pasukan belum sampai target.",
+            }
+        else:
+            # PENTING: Selamatkan pasukan utuh 100% kembali ke inventory
+            # karena mereka putar balik dan tidak jadi berperang!
+            if not active_attack.get("surviving_units"):
+                active_attack["surviving_units"] = copy.deepcopy(active_attack.get("selected_units", {}))
+    # ===================================================
 
     if active_attack.get("phase") != "returning":
         return {
