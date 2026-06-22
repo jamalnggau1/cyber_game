@@ -7,8 +7,6 @@ import math
 import random
 import os
 import time
-import httpx
-from fastapi import BackgroundTasks
 import copy
 import requests
 from backend.database import init_db, load_game_state, save_game_state, PLAYER_ID
@@ -49,25 +47,6 @@ FRONTEND_DIR = BASE_DIR.parent / "frontend"
 
 ADMIN_KEY = os.getenv("ADMIN_KEY", "")
 
-# ==========================================
-# BOT TELEGRAM NOTIFIER (BACKGROUND TASK)
-# ==========================================
-async def send_telegram_alert(chat_id: str, message: str):
-    token = "6765251410:AAH3MVx6ExdjTNXas_KaX6sZ_7fqCFC9dz8"
-    url = f"https://api.telegram.org/bot{token}/sendMessage"
-    payload = {'chat_id': chat_id, 'text': message}
-    
-    try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.post(url, data=payload)
-            # Jika Telegram menolak (status bukan 200 OK), cetak alasannya!
-            if response.status_code != 200:
-                print(f"[TG ERROR] Gagal kirim ke {chat_id}: {response.text}")
-            else:
-                print(f"[TG SUCCESS] Notifikasi Red Alert terkirim ke {chat_id}")
-    except Exception as e:
-        print(f"[TG EXCEPTION] Gagal kirim notif TG ke {chat_id}: {e}")
-# ==========================================
 
 def require_admin(request: Request):
     key = request.headers.get("X-Admin-Key", "")
@@ -4404,7 +4383,7 @@ async def ai_analyze(request: Request, payload: dict = Body(...)):
     }
 
 @app.post("/api/attack")
-async def attack(req: AttackRequest, request: Request, background_tasks: BackgroundTasks):
+async def attack(req: AttackRequest, request: Request):
     await sync_state_from_db()
 
     attacker_id, attacker = get_or_create_active_player_profile(request)
@@ -4649,17 +4628,14 @@ async def attack(req: AttackRequest, request: Request, background_tasks: Backgro
     defender_tg_id = None
     target_id_str = str(req.target_id)
     
-    # 1. Cek apakah targetnya adalah base pemain lain
     if target_id_str.startswith("tg_"):
         defender_tg_id = target_id_str.replace("tg_", "")
     else:
-        # 2. Cek apakah targetnya tambang yang sedang dikuasai orang lain
         target_node = GAME_STATE.get("mining_nodes", {}).get(target_id_str, {})
         owner = target_node.get("owner", "")
         if owner and str(owner).startswith("tg_"):
             defender_tg_id = str(owner).replace("tg_", "")
 
-    # Jika korban punya ID Telegram, tembak notifikasi di background!
     if defender_tg_id:
         attacker_name = attacker.get("name", "Seorang Commander")
         
@@ -4670,8 +4646,17 @@ async def attack(req: AttackRequest, request: Request, background_tasks: Backgro
             f"Buka game SEKARANG untuk melindungi aset Anda!"
         )
         
-        # Eksekusi instan tanpa membuat server nge-lag
-        background_tasks.add_task(send_telegram_alert, defender_tg_id, pesan)
+        # PERBAIKAN VERCEL: Eksekusi langsung secara asinkron tanpa BackgroundTasks
+        # Dengan timeout 1.5 detik, server game tidak akan lag meskipun Telegram sedang lambat.
+        try:
+            token = "6765251410:AAH3MVx6ExdjTNXas_KaX6sZ_7fqCFC9dz8"
+            url = f"https://api.telegram.org/bot{token}/sendMessage"
+            payload = {'chat_id': defender_tg_id, 'text': pesan}
+            
+            async with httpx.AsyncClient(timeout=1.5) as client:
+                await client.post(url, data=payload)
+        except Exception as e:
+            pass # Abaikan error agar game tetap berjalan lancar
     # ============================================
 
     GAME_STATE["players"][attacker_id] = attacker
