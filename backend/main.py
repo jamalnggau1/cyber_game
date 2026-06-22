@@ -2546,6 +2546,11 @@ class ManageGuildMemberRequest(BaseModel):
     target_id: str
     action: str  # Isinya nanti: "kick", "promote", "demote", atau "transfer"
 
+class GuildSettingsRequest(BaseModel):
+    description: str = Field(default="", max_length=150)
+    logo_id: str
+    join_mode: str = Field(default="auto") # Bisa "auto" atau "approval"
+
 class JoinGuildRequest(BaseModel):
     guild_id: str
 
@@ -6768,6 +6773,42 @@ async def create_guild(req: CreateGuildRequest, request: Request):
     }
 # ==========================================================
 
+@app.post("/api/guilds/settings")
+async def update_guild_settings(req: GuildSettingsRequest, request: Request):
+    await sync_state_from_db()
+
+    player_id, profile = get_or_create_active_player_profile(request)
+    guild_id = profile.get("guild_id")
+
+    if not guild_id or guild_id not in GAME_STATE.get("guilds", {}):
+        raise HTTPException(status_code=400, detail="Kamu tidak berada di Guild.")
+
+    guild = GAME_STATE["guilds"][guild_id]
+
+    # Cari tahu apa jabatan pemain yang sedang mencoba mengedit
+    my_role = "member"
+    for m in guild.get("members", []):
+        if isinstance(m, dict) and m.get("player_id") == player_id:
+            my_role = m.get("role", "member")
+            break
+            
+    # Gembok Keamanan: Hanya Leader & Admin yang boleh edit!
+    if my_role not in ["leader", "admin"]:
+        raise HTTPException(status_code=403, detail="Hanya Leader dan Admin yang bisa mengubah pengaturan Guild!")
+
+    # Update Logo
+    selected_logo = next((l for l in GUILD_LOGOS if l["id"] == req.logo_id), GUILD_LOGOS[0])
+    
+    guild["description"] = req.description
+    guild["logo_id"] = selected_logo["id"]
+    guild["logo_asset"] = selected_logo["asset"]
+    guild["join_mode"] = req.join_mode # Simpan mode rekrutmen
+
+    GAME_STATE["guilds"][guild_id] = guild
+    await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
+
+    return {"success": True, "message": "Pengaturan Guild berhasil diperbarui!"}
+
 @app.post("/api/guilds/join")
 async def join_guild(req: JoinGuildRequest, request: Request):
     await sync_state_from_db()
@@ -6775,35 +6816,44 @@ async def join_guild(req: JoinGuildRequest, request: Request):
     player_id, profile = get_or_create_active_player_profile(request)
     profile = ensure_player_profile_schema(profile)
 
-    # 1. Pastikan pemain belum masuk guild lain
     if profile.get("guild_id"):
         raise HTTPException(status_code=400, detail="Kamu sudah berada di sebuah Guild!")
 
-    # 2. Cari guild yang mau dimasuki
     GAME_STATE.setdefault("guilds", {})
     guild = GAME_STATE["guilds"].get(req.guild_id)
     
     if not guild:
-        raise HTTPException(status_code=404, detail="Guild tidak ditemukan atau sudah dibubarkan.")
+        raise HTTPException(status_code=404, detail="Guild tidak ditemukan.")
 
-    # 3. Cek apakah guild sudah penuh
     if len(guild.get("members", [])) >= guild.get("max_members", 50):
         raise HTTPException(status_code=400, detail="Mohon maaf, Guild ini sudah penuh!")
 
-    # 4. Masukkan pemain ke daftar anggota sebagai "member" biasa
+    join_mode = guild.get("join_mode", "auto")
+
+    # === JIKA MODE PERLU PERSETUJUAN (APPROVAL) ===
+    if join_mode == "approval":
+        requests_list = guild.setdefault("join_requests", [])
+        if player_id in requests_list:
+            raise HTTPException(status_code=400, detail="Kamu sudah mengirim permintaan. Tunggu disetujui Admin.")
+            
+        guild["join_requests"].append(player_id)
+        GAME_STATE["guilds"][req.guild_id] = guild
+        await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
+        
+        return {"success": True, "message": "Permintaan bergabung telah dikirim! Menunggu persetujuan Admin."}
+        
+    # === JIKA MODE BEBAS MASUK (AUTO) ===
     guild["members"].append({
         "player_id": player_id,
         "role": "member",
         "joined_at": time.time()
     })
 
-    # 5. Update profil pemain dan simpan
     profile["guild_id"] = req.guild_id
     GAME_STATE["players"][player_id] = profile
     GAME_STATE["guilds"][req.guild_id] = guild
 
     await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
-
     return {"success": True, "message": f"Berhasil bergabung dengan {guild['name']}!"}
 
 @app.post("/api/guilds/manage_member")

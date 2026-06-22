@@ -6475,6 +6475,7 @@ async function renderMyGuild(forceRefresh = false) {
       </div>
 
       <div class="sheet-actions" style="margin-top: 16px;">
+        ${(myRole === 'leader' || myRole === 'admin') ? `<button style="background: var(--warn); color: #000;" onclick="openGuildSettingsForm()">Edit Guild Info</button>` : ''}
         ${myRole === 'leader' ? `<button style="background: var(--bad); color: #fff;" onclick="alert('Fungsi Disband sedang disiapkan!')">Disband Guild</button>` : `<button style="background: var(--bad); color: #fff;" onclick="alert('Fungsi Leave sedang disiapkan!')">Leave Guild</button>`}
       </div>
     `;
@@ -6651,5 +6652,79 @@ async function initApp() {
     }
   }
 }
+
+window.openGuildSettingsForm = function() {
+  if (!myGuildDataCache) return;
+  const guild = myGuildDataCache.guild;
+  
+  // Daftar logo yang sama dengan form pembuatan
+  const logos = [
+    { id: "logo_dragon", asset: "assets/guild_dragon.webp" },
+    { id: "logo_skull", asset: "assets/guild_skull.webp" },
+    { id: "logo_cyber", asset: "assets/guild_cyber.webp" },
+    { id: "logo_wolf", asset: "assets/guild_wolf.webp" },
+    { id: "logo_eagle", asset: "assets/guild_eagle.webp" },
+    { id: "logo_shield", asset: "assets/guild_shield.webp" }
+  ];
+
+  selectedGuildLogoId = guild.logo_id || logos[0].id;
+  const currentJoinMode = guild.join_mode || "auto";
+
+  const logosHtml = logos.map(l => `
+    <img src="${l.asset}" 
+         data-id="${l.id}" 
+         class="guild-logo-option" 
+         onerror="this.src='assets/base.webp'"
+         style="width: 45px; height: 45px; object-fit: contain; cursor: pointer; border-radius: 6px; background: #0b132b; border: 2px solid ${l.id === selectedGuildLogoId ? 'var(--good)' : 'transparent'}; transition: border 0.2s;" 
+         onclick="selectGuildLogo('${l.id}')" />
+  `).join("");
+
+  showBuildingSheet(
+    "Guild Settings",
+    `
+      <label>Ubah Logo Guild:</label>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; margin-top: 8px;">
+        ${logosHtml}
+      </div>
+      
+      <label>Mode Rekrutmen:</label>
+      <select id="editJoinMode" style="width:100%; padding:8px; margin-bottom:12px; background:var(--bg2); color:#fff; border:1px solid var(--border); border-radius:4px;">
+        <option value="auto" ${currentJoinMode === 'auto' ? 'selected' : ''}>Terbuka (Siapapun Bebas Masuk)</option>
+        <option value="approval" ${currentJoinMode === 'approval' ? 'selected' : ''}>Tertutup (Butuh Persetujuan Admin)</option>
+      </select>
+
+      <label>Deskripsi Guild:</label>
+      <textarea id="editGuildDesc" maxlength="150" style="width:100%; padding:8px; margin-bottom:12px; background:var(--bg2); color:#fff; border:1px solid var(--border); border-radius:4px; min-height:80px;">${escapeHtml(guild.description || "")}</textarea>
+      
+      <div class="sheet-actions">
+        <button onclick="submitGuildSettings()" style="background: var(--good); color: #000; font-weight: bold;">Simpan Pengaturan</button>
+        <button onclick="renderMyGuild(false)">Batal</button>
+      </div>
+    `
+  );
+};
+
+window.submitGuildSettings = async function() {
+  const descInput = document.getElementById("editGuildDesc");
+  const modeInput = document.getElementById("editJoinMode");
+  
+  if (!descInput || !modeInput) return;
+  
+  try {
+    const data = await api("/api/guilds/settings", {
+      method: "POST",
+      body: JSON.stringify({ 
+        description: descInput.value.trim(),
+        logo_id: selectedGuildLogoId,
+        join_mode: modeInput.value
+      })
+    });
+    
+    alert(data.message);
+    renderMyGuild(true); // Tarik data baru dari server dan buka kembali layar info
+  } catch (err) {
+    alert("Gagal menyimpan pengaturan: " + err.message);
+  }
+};
 
 document.addEventListener("DOMContentLoaded", initApp);
