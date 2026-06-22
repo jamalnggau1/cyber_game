@@ -6662,7 +6662,17 @@ async def create_guild(req: CreateGuildRequest, request: Request):
         "logo_id": selected_logo["id"],
         "logo_asset": selected_logo["asset"],
         "leader_id": player_id,
-        "members": [player_id], 
+        
+        # KITA UBAH FORMAT MEMBERS MENJADI OBJECT DENGAN ROLE
+        "members": [
+            {
+                "player_id": player_id,
+                "role": "leader",
+                "joined_at": time.time()
+            }
+        ], 
+        # ===================================================
+        
         "max_members": 50,
         "level": 1,
         "power": initial_power,
@@ -6746,6 +6756,66 @@ async def create_guild(req: CreateGuildRequest, request: Request):
     }
     
 # ==========================================================
+
+@app.get("/api/guilds/my")
+async def get_my_guild(request: Request):
+    await sync_state_from_db()
+    
+    player_id, profile = get_or_create_active_player_profile(request)
+    guild_id = profile.get("guild_id")
+    
+    if not guild_id or guild_id not in GAME_STATE.get("guilds", {}):
+        raise HTTPException(status_code=404, detail="Kamu tidak berada di guild manapun.")
+        
+    guild = GAME_STATE["guilds"][guild_id]
+    
+    # Kumpulkan data lengkap setiap anggota dari database player
+    member_details = []
+    for member in guild.get("members", []):
+        # Proteksi jika data member masih format lama (string)
+        if isinstance(member, str):
+            mem_id = member
+            mem_role = "leader" if mem_id == guild.get("leader_id") else "member"
+        else:
+            mem_id = member.get("player_id")
+            mem_role = member.get("role", "member")
+            
+        mem_profile = GAME_STATE.get("players", {}).get(mem_id, {})
+        if not mem_profile:
+            continue
+            
+        # Hitung power anggota (Base Power + Army Power)
+        mem_power = get_profile_base_power(mem_profile) + get_profile_army_power(mem_profile)
+        
+        member_details.append({
+            "player_id": mem_id,
+            "name": mem_profile.get("name", mem_id),
+            "lab_level": mem_profile.get("lab_level", 1),
+            "power": mem_power,
+            "role": mem_role
+        })
+        
+    # Urutkan: Leader di atas, lalu Admin, lalu Member (berdasarkan Power)
+    def sort_key(x):
+        role_weight = {"leader": 3, "admin": 2, "member": 1}
+        return (role_weight.get(x["role"], 1), x["power"])
+        
+    member_details.sort(key=sort_key, reverse=True)
+    
+    # Update total power guild terbaru secara dinamis
+    total_power = sum(m["power"] for m in member_details)
+    guild["power"] = total_power
+    GAME_STATE["guilds"][guild_id] = guild
+    
+    # Cari tahu apa jabatan pemain yang sedang merequest ini
+    my_role = next((m["role"] for m in member_details if m["player_id"] == player_id), "member")
+    
+    return {
+        "success": True,
+        "guild": guild,
+        "members": member_details,
+        "my_role": my_role
+    }
 
 @app.middleware("http")
 async def add_cache_headers(request: Request, call_next):

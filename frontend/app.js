@@ -6272,22 +6272,7 @@ async function silentSync() {
 // MODULE: GUILD UI SYSTEM
 // ==========================================================
 
-async function openGuildGateSheet() {
-  try {
-    const data = await api("/api/guilds");
-    
-    if (data.player_guild_id) {
-      // Jika player sudah punya guild, tampilkan detail guild-nya
-      const myGuild = data.guilds.find(g => g.id === data.player_guild_id);
-      renderMyGuild(myGuild);
-    } else {
-      // Jika belum punya, tampilkan daftar guild & opsi Create
-      renderGuildList(data.guilds);
-    }
-  } catch (err) {
-    alert("Gagal memuat data guild: " + err.message);
-  }
-}
+
 
 let selectedGuildLogoId = "logo_dragon"; // Default pilihan awal
 
@@ -6414,36 +6399,103 @@ async function submitCreateGuild() {
   }
 }
 
-function renderMyGuild(guild) {
-  if (!guild) {
-     openGuildGateSheet();
-     return;
+async function openGuildGateSheet() {
+  try {
+    const data = await api("/api/guilds");
+    
+    if (data.player_guild_id) {
+      // Jika player sudah punya guild, panggil fungsi renderMyGuild
+      // Fungsi ini akan secara otomatis menarik data anggota dari server
+      renderMyGuild();
+    } else {
+      // Jika belum punya, tampilkan daftar guild & opsi Create
+      renderGuildList(data.guilds);
+    }
+  } catch (err) {
+    alert("Gagal memuat data guild: " + err.message);
   }
-  
-  showBuildingSheet(
-    "My Guild",
-    `
-      <div class="card" style="text-align: center;">
-        <img src="${guild.logo_asset}" style="width: 80px; height: 80px; object-fit: contain; border-radius: 8px; background: #0b132b; border: 1px solid var(--border); margin-bottom: 8px;" onerror="this.src='assets/base.webp'"/>
-        <h2 style="margin: 0;">${escapeHtml(guild.name)}</h2>
-        <span style="color: var(--good); font-weight: bold;">Lv. ${guild.level} | ${compactNumber(guild.power)} Power</span>
-        
-        <p class="muted" style="margin-top: 12px; text-align: left;">${escapeHtml(guild.description || "No description")}</p>
-        
-        <hr style="border-color: var(--border); margin: 12px 0;">
-        ${row("Members", `${guild.members_count}/${guild.max_members}`)}
-      </div>
-      
-      <p class="muted" style="margin-top:16px;">Fitur daftar anggota, donasi guild, dan Nexus War sedang dalam tahap konstruksi.</p>
-
-      <div class="sheet-actions">
-        <button onclick="closeBuildingSheet()">Close</button>
-      </div>
-    `
-  );
 }
 
-// ==========================================================
+async function renderMyGuild() {
+  // 1. Tampilkan layar loading sementara saat JS sedang mengambil data anggota
+  showBuildingSheet("My Guild", `<div style="text-align:center; padding: 30px;"><p class="muted">Mengenkripsi sinyal Guild...</p></div>`);
+  
+  try {
+    // 2. Tarik data lengkap guild + anggota dari API baru yang kita buat tadi!
+    const data = await api("/api/guilds/my");
+    const guild = data.guild;
+    const members = data.members;
+    const myRole = data.my_role;
+    
+    let membersHtml = "";
+    
+    // 3. Susun desain setiap anggota
+    members.forEach(m => {
+      // Buat Lencana Jabatan (Badge)
+      let roleBadge = "";
+      if (m.role === "leader") {
+        roleBadge = `<span style="color: #ffd700; font-size: 10px; font-weight: bold; border: 1px solid #ffd700; padding: 2px 4px; border-radius: 4px; margin-left: 6px;">LEADER</span>`;
+      } else if (m.role === "admin") {
+        roleBadge = `<span style="color: #00ffff; font-size: 10px; font-weight: bold; border: 1px solid #00ffff; padding: 2px 4px; border-radius: 4px; margin-left: 6px;">ADMIN</span>`;
+      }
+
+      // Tombol Aksi khusus Leader (Tidak akan muncul di layar member biasa)
+      let actionButtons = "";
+      if (myRole === "leader" && m.player_id !== state?.player?.id) {
+        actionButtons = `
+          <div style="margin-top: 8px; display: flex; gap: 6px;">
+            <button style="padding: 4px 8px; font-size: 11px; background: var(--bad); color: #fff;" onclick="alert('Fungsi Kick sedang disiapkan!')">Kick</button>
+            ${m.role === 'member' ? `<button style="padding: 4px 8px; font-size: 11px; background: var(--warn); color: #000;" onclick="alert('Fungsi Promote sedang disiapkan!')">Promote</button>` : ''}
+            ${m.role === 'admin' ? `<button style="padding: 4px 8px; font-size: 11px; background: var(--good); color: #000;" onclick="alert('Fungsi Demote sedang disiapkan!')">Demote</button>` : ''}
+          </div>
+        `;
+      }
+
+      membersHtml += `
+        <div class="card" style="margin-bottom: 8px; padding: 10px; border-left: 3px solid ${m.role === 'leader' ? '#ffd700' : (m.role === 'admin' ? '#00ffff' : 'var(--border)')}">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+             <div style="font-weight: bold; font-size: 14px;">${escapeHtml(m.name)} ${roleBadge}</div>
+             <div style="font-size: 12px; color: var(--good); font-weight: bold;">${compactNumber(m.power)} Pwr</div>
+          </div>
+          <div style="font-size: 12px; color: #aaa; margin-top: 4px;">Main Lab Lv.${m.lab_level}</div>
+          ${actionButtons}
+        </div>
+      `;
+    });
+
+    // 4. Render seluruh layar
+    showBuildingSheet(
+      "My Guild",
+      `
+        <div class="card" style="text-align: center;">
+          <img src="${guild.logo_asset}" style="width: 80px; height: 80px; object-fit: contain; border-radius: 8px; background: #0b132b; border: 1px solid var(--border); margin-bottom: 8px;" onerror="this.src='assets/base.webp'"/>
+          <h2 style="margin: 0;">${escapeHtml(guild.name)}</h2>
+          <span style="color: var(--good); font-weight: bold;">Lv. ${guild.level} | ${compactNumber(guild.power)} Total Power</span>
+          
+          <p class="muted" style="margin-top: 12px; text-align: left;">${escapeHtml(guild.description || "No description")}</p>
+          
+          <hr style="border-color: var(--border); margin: 12px 0;">
+          ${row("Members", `${members.length}/${guild.max_members}`)}
+          ${row("My Role", `<span style="color: ${myRole === 'leader' ? '#ffd700' : '#fff'}; font-weight: bold;">${myRole.toUpperCase()}</span>`)}
+        </div>
+        
+        <h3 style="margin-top: 16px;">Guild Members</h3>
+        <div style="max-height: 40vh; overflow-y: auto; padding-right: 4px; margin-bottom: 12px;">
+          ${membersHtml}
+        </div>
+
+        <div class="sheet-actions">
+          ${myRole === 'leader' ? `<button style="background: var(--bad); color: #fff;" onclick="alert('Fungsi Disband sedang disiapkan!')">Disband Guild</button>` : `<button style="background: var(--bad); color: #fff;" onclick="alert('Fungsi Leave sedang disiapkan!')">Leave Guild</button>`}
+          <button onclick="closeBuildingSheet()">Close</button>
+        </div>
+      `
+    );
+    
+  } catch (err) {
+    alert("Gagal memuat detail Guild: " + err.message);
+    closeBuildingSheet();
+  }
+}
 
 async function initApp() {
   try {
