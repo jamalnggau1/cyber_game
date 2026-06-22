@@ -7,6 +7,7 @@ import math
 import random
 import os
 import time
+import httpx
 import copy
 import requests
 from backend.database import init_db, load_game_state, save_game_state, PLAYER_ID
@@ -4624,58 +4625,48 @@ async def attack(req: AttackRequest, request: Request):
         ],
     }
 
+    # === SISTEM RED ALERT NOTIFIKASI TELEGRAM ===
     defender_tg_id = None
+    
+    if target.get("kind") in ["enemy", "player"]:
+        target_player_id = str(target.get("player_id", ""))
+        if target_player_id.startswith("tg_"):
+            defender_tg_id = target_player_id.replace("tg_", "")
+            
+    elif target.get("kind") == "mining":
+        owner_id = str(target.get("owner", ""))
+        if owner_id.startswith("tg_"):
+            defender_tg_id = owner_id.replace("tg_", "")
 
-# 1. Ambil ID pemain korban dari data 'target'
-if target.get("kind") in ["enemy", "player"]:
-    target_player_id = str(target.get("player_id", ""))
-
-    if target_player_id.startswith("tg_"):
-        defender_tg_id = int(target_player_id.replace("tg_", ""))
-
-elif target.get("kind") == "mining":
-    owner_id = str(target.get("owner", ""))
-
-    if owner_id.startswith("tg_"):
-        defender_tg_id = int(owner_id.replace("tg_", ""))
-
-
-# 2. Kirim notifikasi Telegram
-if defender_tg_id:
-
-    attacker_name = attacker.get("name", "Seorang Commander")
-
-    pesan = (
-        f"🚨 RED ALERT! 🚨\n\n"
-        f"Markas atau Tambang Anda sedang diserang oleh Commander {attacker_name}!\n"
-        f"Pasukan musuh akan tiba dalam {outbound_seconds} detik.\n\n"
-        f"Buka game SEKARANG untuk melindungi aset Anda!"
-    )
-
-    try:
-        import httpx
-
-        token = "6765251410:AAH3MVx6ExdjTNXas_KaX6sZ_7fqCFC9dz8"
-        url = f"https://api.telegram.org/bot{token}/sendMessage"
-
-        payload = {
-            "chat_id": defender_tg_id,
-            "text": pesan
-        }
-
-        async with httpx.AsyncClient(timeout=5) as client:
-            response = await client.post(url, json=payload)
-
-            result = response.json()
-
-            print(f"[TG STATUS] {response.status_code}")
-            print(f"[TG RESPONSE] {result}")
-            print(f"[TG TARGET] {defender_tg_id}")
-
-    except Exception as e:
-        print(f"[TG ERROR] {e}")
-
-# ============================================
+    if defender_tg_id:
+        attacker_name = attacker.get("name", "Seorang Commander")
+        
+        pesan = (
+            f"🚨 RED ALERT! 🚨\n\n"
+            f"Markas atau Tambang Anda sedang diserang oleh Commander {attacker_name}!\n"
+            f"Pasukan musuh akan tiba dalam {outbound_seconds} detik.\n\n"
+            f"Buka game SEKARANG untuk melindungi aset Anda!"
+        )
+        
+        try:
+            import httpx
+            token = "6765251410:AAH3MVx6ExdjTNXas_KaX6sZ_7fqCFC9dz8"
+            url = f"https://api.telegram.org/bot{token}/sendMessage"
+            
+            # 1. KITA GUNAKAN FORMAT DARI TES ANDA:
+            payload = {
+                "chat_id": int(defender_tg_id), # Ubah paksa jadi Integer
+                "text": pesan
+            }
+            
+            # 2. KITA GUNAKAN TIMEOUT 5 DETIK SEPERTI TES ANDA:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                # 3. KITA GUNAKAN json= BUKAN data=:
+                response = await client.post(url, json=payload)
+                print(f"[TG RESP] Status: {response.status_code} | Target: {defender_tg_id}")
+        except Exception as e:
+            print(f"[TG ERROR] {e}")
+    # ============================================
 
     GAME_STATE["players"][attacker_id] = attacker
     GAME_STATE.setdefault("active_attacks", {})
