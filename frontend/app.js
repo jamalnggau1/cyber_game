@@ -6437,37 +6437,74 @@ async function openGuildGateSheet() {
   }
 }
 
-async function renderMyGuild() {
-  // 1. Tampilkan layar loading sementara saat JS sedang mengambil data anggota
-  showBuildingSheet("My Guild", `<div style="text-align:center; padding: 30px;"><p class="muted">Mengenkripsi sinyal Guild...</p></div>`);
-  
-  try {
-    // 2. Tarik data lengkap guild + anggota dari API baru yang kita buat tadi!
-    const data = await api("/api/guilds/my");
-    const guild = data.guild;
-    const members = data.members;
-    const myRole = data.my_role;
-    
-    let membersHtml = "";
-    
-    // 3. Susun desain setiap anggota
-    members.forEach(m => {
-      // Buat Lencana Jabatan (Badge)
-      let roleBadge = "";
-      if (m.role === "leader") {
-        roleBadge = `<span style="color: #ffd700; font-size: 10px; font-weight: bold; border: 1px solid #ffd700; padding: 2px 4px; border-radius: 4px; margin-left: 6px;">LEADER</span>`;
-      } else if (m.role === "admin") {
-        roleBadge = `<span style="color: #00ffff; font-size: 10px; font-weight: bold; border: 1px solid #00ffff; padding: 2px 4px; border-radius: 4px; margin-left: 6px;">ADMIN</span>`;
-      }
+let myGuildDataCache = null;
+let currentGuildTab = "info"; // Tab default saat dibuka
 
-      // Tombol Aksi khusus Leader (Tidak akan muncul di layar member biasa)
+async function renderMyGuild(forceRefresh = false) {
+  // 1. Tampilkan layar loading HANYA jika data belum ada atau pemain menekan tombol Refresh
+  if (forceRefresh || !myGuildDataCache) {
+    showBuildingSheet("My Guild", `<div style="text-align:center; padding: 30px;"><p class="muted">Mengenkripsi sinyal Guild...</p></div>`);
+    try {
+      myGuildDataCache = await api("/api/guilds/my");
+    } catch (err) {
+      alert("Gagal memuat detail Guild: " + err.message);
+      closeBuildingSheet();
+      return;
+    }
+  }
+
+  const guild = myGuildDataCache.guild;
+  const members = myGuildDataCache.members;
+  const myRole = myGuildDataCache.my_role;
+
+  // 2. Buat Navigasi Tab (Sama seperti gaya Unit Factory)
+  const tabsHtml = `
+    <div class="facility-tabs" style="margin-bottom: 12px;">
+      <button class="${currentGuildTab === 'info' ? 'active' : ''}" onclick="switchGuildTab('info')">Guild</button>
+      <button class="${currentGuildTab === 'member' ? 'active' : ''}" onclick="switchGuildTab('member')">Member</button>
+      <button class="${currentGuildTab === 'reward' ? 'active' : ''}" onclick="switchGuildTab('reward')">Hadiah</button>
+      <button class="${currentGuildTab === 'research' ? 'active' : ''}" onclick="switchGuildTab('research')">Riset</button>
+    </div>
+  `;
+
+  let bodyHtml = "";
+
+  // 3. Render isi layar berdasarkan Tab yang sedang aktif
+  if (currentGuildTab === "info") {
+    bodyHtml = `
+      <div class="card" style="text-align: center;">
+        <img src="${guild.logo_asset}" style="width: 80px; height: 80px; object-fit: contain; border-radius: 8px; background: #0b132b; border: 1px solid var(--border); margin-bottom: 8px;" onerror="this.src='assets/base.webp'"/>
+        <h2 style="margin: 0;">${escapeHtml(guild.name)}</h2>
+        <span style="color: var(--good); font-weight: bold;">Lv. ${guild.level} | ${compactNumber(guild.power)} Total Power</span>
+        
+        <p class="muted" style="margin-top: 12px; text-align: left;">${escapeHtml(guild.description || "No description")}</p>
+        
+        <hr style="border-color: var(--border); margin: 12px 0;">
+        ${row("Total Members", `${members.length}/${guild.max_members}`)}
+        ${row("My Role", `<span style="color: ${myRole === 'leader' ? '#ffd700' : (myRole === 'admin' ? '#00ffff' : '#fff')}; font-weight: bold;">${myRole.toUpperCase()}</span>`)}
+      </div>
+
+      <div class="sheet-actions" style="margin-top: 16px;">
+        ${myRole === 'leader' ? `<button style="background: var(--bad); color: #fff;" onclick="alert('Fungsi Disband sedang disiapkan!')">Disband Guild</button>` : `<button style="background: var(--bad); color: #fff;" onclick="alert('Fungsi Leave sedang disiapkan!')">Leave Guild</button>`}
+        <button onclick="closeBuildingSheet()">Close</button>
+      </div>
+    `;
+  } 
+  else if (currentGuildTab === "member") {
+    let membersHtml = "";
+    members.forEach(m => {
+      let roleBadge = "";
+      if (m.role === "leader") roleBadge = `<span style="color: #ffd700; font-size: 10px; font-weight: bold; border: 1px solid #ffd700; padding: 2px 4px; border-radius: 4px; margin-left: 6px;">LEADER</span>`;
+      else if (m.role === "admin") roleBadge = `<span style="color: #00ffff; font-size: 10px; font-weight: bold; border: 1px solid #00ffff; padding: 2px 4px; border-radius: 4px; margin-left: 6px;">ADMIN</span>`;
+
+      // Siapkan tombol eksekusi untuk tahap selanjutnya
       let actionButtons = "";
       if (myRole === "leader" && m.player_id !== state?.player?.id) {
         actionButtons = `
           <div style="margin-top: 8px; display: flex; gap: 6px;">
-            <button style="padding: 4px 8px; font-size: 11px; background: var(--bad); color: #fff;" onclick="alert('Fungsi Kick sedang disiapkan!')">Kick</button>
-            ${m.role === 'member' ? `<button style="padding: 4px 8px; font-size: 11px; background: var(--warn); color: #000;" onclick="alert('Fungsi Promote sedang disiapkan!')">Promote</button>` : ''}
-            ${m.role === 'admin' ? `<button style="padding: 4px 8px; font-size: 11px; background: var(--good); color: #000;" onclick="alert('Fungsi Demote sedang disiapkan!')">Demote</button>` : ''}
+            <button style="padding: 4px 8px; font-size: 11px; background: var(--bad); color: #fff;" onclick="kickMember('${m.player_id}')">Kick</button>
+            ${m.role === 'member' ? `<button style="padding: 4px 8px; font-size: 11px; background: var(--warn); color: #000;" onclick="promoteMember('${m.player_id}')">Promote</button>` : ''}
+            ${m.role === 'admin' ? `<button style="padding: 4px 8px; font-size: 11px; background: var(--good); color: #000;" onclick="demoteMember('${m.player_id}')">Demote</button>` : ''}
           </div>
         `;
       }
@@ -6484,39 +6521,59 @@ async function renderMyGuild() {
       `;
     });
 
-    // 4. Render seluruh layar
-    showBuildingSheet(
-      "My Guild",
-      `
-        <div class="card" style="text-align: center;">
-          <img src="${guild.logo_asset}" style="width: 80px; height: 80px; object-fit: contain; border-radius: 8px; background: #0b132b; border: 1px solid var(--border); margin-bottom: 8px;" onerror="this.src='assets/base.webp'"/>
-          <h2 style="margin: 0;">${escapeHtml(guild.name)}</h2>
-          <span style="color: var(--good); font-weight: bold;">Lv. ${guild.level} | ${compactNumber(guild.power)} Total Power</span>
-          
-          <p class="muted" style="margin-top: 12px; text-align: left;">${escapeHtml(guild.description || "No description")}</p>
-          
-          <hr style="border-color: var(--border); margin: 12px 0;">
-          ${row("Members", `${members.length}/${guild.max_members}`)}
-          ${row("My Role", `<span style="color: ${myRole === 'leader' ? '#ffd700' : '#fff'}; font-weight: bold;">${myRole.toUpperCase()}</span>`)}
-        </div>
-        
-        <h3 style="margin-top: 16px;">Guild Members</h3>
-        <div style="max-height: 40vh; overflow-y: auto; padding-right: 4px; margin-bottom: 12px;">
-          ${membersHtml}
-        </div>
-
-        <div class="sheet-actions">
-          ${myRole === 'leader' ? `<button style="background: var(--bad); color: #fff;" onclick="alert('Fungsi Disband sedang disiapkan!')">Disband Guild</button>` : `<button style="background: var(--bad); color: #fff;" onclick="alert('Fungsi Leave sedang disiapkan!')">Leave Guild</button>`}
-          <button onclick="closeBuildingSheet()">Close</button>
-        </div>
-      `
-    );
-    
-  } catch (err) {
-    alert("Gagal memuat detail Guild: " + err.message);
-    closeBuildingSheet();
+    bodyHtml = `
+      <div style="max-height: 45vh; overflow-y: auto; padding-right: 4px; margin-bottom: 12px;">
+        ${membersHtml}
+      </div>
+      <div class="sheet-actions">
+        <button onclick="renderMyGuild(true)">Refresh Data</button>
+        <button onclick="closeBuildingSheet()">Close</button>
+      </div>
+    `;
   }
+  else if (currentGuildTab === "reward") {
+    bodyHtml = `
+      <div class="card" style="text-align: center; padding: 40px 10px;">
+        <h3 style="color: var(--good);">Guild Rewards</h3>
+        <p class="muted">Fitur pembagian hadiah harian, loot dari Nexus War, dan bonus donasi sedang dalam tahap konstruksi.</p>
+      </div>
+      <div class="sheet-actions">
+        <button onclick="closeBuildingSheet()">Close</button>
+      </div>
+    `;
+  }
+  else if (currentGuildTab === "research") {
+    bodyHtml = `
+      <div class="card" style="text-align: center; padding: 40px 10px;">
+        <h3 style="color: #00ffff;">Guild Tech</h3>
+        <p class="muted">Fitur riset teknologi guild untuk meningkatkan buff dan power seluruh anggota sedang dalam tahap konstruksi.</p>
+      </div>
+      <div class="sheet-actions">
+        <button onclick="closeBuildingSheet()">Close</button>
+      </div>
+    `;
+  }
+
+  // 4. Render semuanya ke layar!
+  showBuildingSheet("My Guild", tabsHtml + bodyHtml);
 }
+
+// Fungsi Trigger untuk berpindah Tab secara instan
+window.switchGuildTab = function(tab) {
+  currentGuildTab = tab;
+  renderMyGuild(false); // Render ulang UI tanpa perlu tarik data baru dari server
+};
+
+// Placeholder untuk API yang akan kita buat selanjutnya
+window.kickMember = function(targetId) {
+  alert("Fungsi Kick API sedang disiapkan untuk ID: " + targetId);
+};
+window.promoteMember = function(targetId) {
+  alert("Fungsi Promote API sedang disiapkan untuk ID: " + targetId);
+};
+window.demoteMember = function(targetId) {
+  alert("Fungsi Demote API sedang disiapkan untuk ID: " + targetId);
+};
 
 async function initApp() {
   try {
