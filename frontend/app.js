@@ -2663,6 +2663,11 @@ function openBuilding(buildingId) {
       return;
     }
 
+  if (buildingId === "guild_gate") {
+    openGuildGateSheet();
+    return;
+  }
+
     switchPage("aiPage");
     return;
   }
@@ -6261,6 +6266,138 @@ async function silentSync() {
   }
 }
 // ===============================================
+
+// ==========================================================
+// MODULE: GUILD UI SYSTEM
+// ==========================================================
+
+async function openGuildGateSheet() {
+  try {
+    const data = await api("/api/guilds");
+    
+    if (data.player_guild_id) {
+      // Jika player sudah punya guild, tampilkan detail guild-nya
+      const myGuild = data.guilds.find(g => g.id === data.player_guild_id);
+      renderMyGuild(myGuild);
+    } else {
+      // Jika belum punya, tampilkan daftar guild & opsi Create
+      renderGuildList(data.guilds);
+    }
+  } catch (err) {
+    alert("Gagal memuat data guild: " + err.message);
+  }
+}
+
+function renderGuildList(guilds) {
+  const listHtml = guilds.length
+    ? guilds.map(g => `
+      <div class="card" style="margin-bottom: 8px;">
+        <h3>${escapeHtml(g.name)} <small>Lv.${g.level}</small></h3>
+        <p class="muted">${escapeHtml(g.description || "No description")}</p>
+        <div class="row"><span>Members</span><span>${g.members_count}/${g.max_members}</span></div>
+        <div class="row"><span>Power</span><span>${compactNumber(g.power)}</span></div>
+        <div class="sheet-actions" style="margin-top:8px;">
+          <button disabled>Join (Soon)</button>
+        </div>
+      </div>
+    `).join("")
+    : `<p class="muted">Belum ada Guild di server ini. Jadilah yang pertama!</p>`;
+
+  showBuildingSheet(
+    "Guild Gate",
+    `
+      <p class="muted">Bergabung dengan Guild untuk bermain bersama, atau dirikan Guild barumu sendiri (Biaya: 10,000 Credits).</p>
+      
+      <div class="sheet-actions" style="margin-bottom: 16px;">
+        <button style="background: var(--good); color: #000; font-weight: bold;" onclick="openCreateGuildForm()">+ Create New Guild</button>
+      </div>
+
+      <h3>Available Guilds</h3>
+      <div class="guild-list" style="max-height: 40vh; overflow-y: auto; padding-right: 4px;">
+        ${listHtml}
+      </div>
+      
+      <div class="sheet-actions">
+        <button onclick="closeBuildingSheet()">Close</button>
+      </div>
+    `
+  );
+}
+
+function openCreateGuildForm() {
+  showBuildingSheet(
+    "Create Guild",
+    `
+      <p class="muted">Dirikan Guild baru. Biaya pembuatan adalah <b>10,000 Credits</b>.</p>
+      
+      <label>Guild Name (3-20 char)</label>
+      <input type="text" id="newGuildName" placeholder="e.g. Cyber Ninjas" maxlength="20" style="width:100%; padding:8px; margin-bottom:12px; background:var(--bg2); color:#fff; border:1px solid var(--border); border-radius:4px;" />
+      
+      <label>Description (Optional)</label>
+      <textarea id="newGuildDesc" placeholder="Guild description..." maxlength="150" style="width:100%; padding:8px; margin-bottom:12px; background:var(--bg2); color:#fff; border:1px solid var(--border); border-radius:4px; min-height:60px;"></textarea>
+      
+      <div class="sheet-actions">
+        <button onclick="submitCreateGuild()" style="background: var(--good); color: #000; font-weight: bold;">Create (10K Credits)</button>
+        <button onclick="openGuildGateSheet()">Back</button>
+      </div>
+    `
+  );
+}
+
+async function submitCreateGuild() {
+  const nameInput = document.getElementById("newGuildName");
+  const descInput = document.getElementById("newGuildDesc");
+  
+  if (!nameInput || !descInput) return;
+  
+  const name = nameInput.value.trim();
+  const desc = descInput.value.trim();
+  
+  if (name.length < 3) {
+    alert("Nama Guild minimal 3 karakter!");
+    return;
+  }
+  
+  try {
+    const data = await api("/api/guilds/create", {
+      method: "POST",
+      body: JSON.stringify({ name: name, description: desc })
+    });
+    
+    alert(data.message);
+    await loadState(); // Refresh status credits di layar
+    openGuildGateSheet(); // Kembali ke UI (akan otomatis memuat layar My Guild)
+  } catch (err) {
+    alert("Gagal membuat Guild: " + err.message);
+  }
+}
+
+function renderMyGuild(guild) {
+  if (!guild) {
+     openGuildGateSheet();
+     return;
+  }
+  
+  showBuildingSheet(
+    "My Guild",
+    `
+      <div class="card">
+        <h2>${escapeHtml(guild.name)} <small>Lv.${guild.level}</small></h2>
+        <p class="muted">${escapeHtml(guild.description || "No description")}</p>
+        <hr style="border-color: var(--border); margin: 12px 0;">
+        ${row("Members", `${guild.members_count}/${guild.max_members}`)}
+        ${row("Total Power", compactNumber(guild.power))}
+      </div>
+      
+      <p class="muted" style="margin-top:16px;">Fitur daftar anggota, donasi guild, dan Nexus War sedang dalam tahap konstruksi.</p>
+
+      <div class="sheet-actions">
+        <button onclick="closeBuildingSheet()">Close</button>
+      </div>
+    `
+  );
+}
+// ==========================================================
 
 async function initApp() {
   try {

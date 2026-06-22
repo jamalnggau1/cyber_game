@@ -805,7 +805,7 @@ BUILDING_MAX_LEVEL = {
     "recovery_center": 10,
     "research_lab": 10,
     "ai_core": 10,
-    "guild_gate": 10,
+    "guild_gate": 1,
 }
 MAIN_LAB_UPGRADE_REQUIREMENTS = {
     # Untuk naik ke Main Lab Lv.2
@@ -1718,7 +1718,7 @@ BUILT_BUILDING_ACTIONS = {
     "recovery_center": ["Recover", "Upgrade Recovery"],
     "research_lab": ["Research", "Upgrade Lab"],
     "ai_core": ["Open AI Agent", "Upgrade AI Core"],
-    "guild_gate": ["Open Guild", "Upgrade Guild Gate"],
+    "guild_gate": ["Open Guild"],
 }
 
 
@@ -2526,6 +2526,10 @@ generate_targets()
 # ==========================================================
 # API models
 # ==========================================================
+class CreateGuildRequest(BaseModel):
+    name: str = Field(min_length=3, max_length=20)
+    description: str = Field(default="", max_length=150)
+
 class RecoverUnitRequest(BaseModel):
     unit_id: str
     level: int = Field(ge=1)
@@ -6572,6 +6576,107 @@ async def save_defense_setup(req: DefenseSetupRequest, request: Request):
             "stats": get_defense_stats_for_profile(profile),
         }
     }
+
+# ==========================================================
+# MODULE: GUILD SYSTEM (MODULAR BLOCK)
+# ==========================================================
+
+@app.get("/api/guilds")
+async def get_guild_list(request: Request):
+    await sync_state_from_db()
+    
+    # Pastikan database guild sudah siap
+    GAME_STATE.setdefault("guilds", {})
+    
+    player_id, profile = get_or_create_active_player_profile(request)
+
+    # Konversi dictionary guild ke bentuk list untuk ditampilkan di layar
+    guild_list = []
+    for g_id, guild_data in GAME_STATE["guilds"].items():
+        guild_list.append({
+            "id": guild_data["id"],
+            "name": guild_data["name"],
+            "description": guild_data.get("description", ""),
+            "leader_id": guild_data["leader_id"],
+            "members_count": len(guild_data.get("members", [])),
+            "max_members": guild_data.get("max_members", 50),
+            "level": guild_data.get("level", 1),
+            "power": guild_data.get("power", 0)
+        })
+
+    # Urutkan dari power tertinggi ke terendah
+    guild_list = sorted(guild_list, key=lambda x: x["power"], reverse=True)
+
+    return {
+        "success": True,
+        "player_guild_id": profile.get("guild_id"), # Beri tahu UI apakah pemain sudah punya guild
+        "guilds": guild_list
+    }
+
+@app.post("/api/guilds/create")
+async def create_guild(req: CreateGuildRequest, request: Request):
+    await sync_state_from_db()
+    
+    player_id, profile = get_or_create_active_player_profile(request)
+    profile = ensure_player_profile_schema(profile)
+    GAME_STATE.setdefault("guilds", {})
+
+    # 1. Cek apakah pemain sudah berada di guild lain
+    if profile.get("guild_id"):
+        raise HTTPException(status_code=400, detail="Kamu sudah bergabung di sebuah Guild!")
+
+    # 2. Cek apakah nama guild sudah dipakai orang lain
+    for existing_guild in GAME_STATE["guilds"].values():
+        if existing_guild["name"].lower() == req.name.lower():
+            raise HTTPException(status_code=400, detail=f"Nama Guild '{req.name}' sudah ada yang memakai.")
+
+    # 3. Cek biaya pembuatan Guild (misal: 10.000 Credits)
+    cost = 10000
+    resources = profile.setdefault("resources", {})
+    current_credits = int(resources.get("credits", 0))
+
+    if current_credits < cost:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Credits tidak cukup. Butuh {cost} Credits untuk mendirikan Guild."
+        )
+
+    # 4. Potong biaya dan buat Guild baru
+    resources["credits"] = current_credits - cost
+    profile["resources"] = resources
+
+    guild_id = f"gld_{int(time.time())}_{random.randint(100, 999)}"
+    
+    # Power awal guild dihitung dari power kaptennya
+    initial_power = get_profile_base_power(profile)
+
+    new_guild = {
+        "id": guild_id,
+        "name": req.name,
+        "description": req.description,
+        "leader_id": player_id,
+        "members": [player_id], # Leader otomatis jadi member pertama
+        "max_members": 50,
+        "level": 1,
+        "power": initial_power,
+        "created_at": time.time(),
+    }
+
+    # Simpan ke Global State
+    GAME_STATE["guilds"][guild_id] = new_guild
+    profile["guild_id"] = guild_id
+    GAME_STATE["players"][player_id] = profile
+
+    await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
+
+    return {
+        "success": True, 
+        "message": f"Guild [{req.name}] berhasil didirikan!",
+        "guild": new_guild,
+        "resources": profile["resources"]
+    }
+    
+# ==========================================================
 
 @app.middleware("http")
 async def add_cache_headers(request: Request, call_next):
