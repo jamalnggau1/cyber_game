@@ -6684,7 +6684,9 @@ async def add_cache_headers(request: Request, call_next):
 
     path = request.url.path.lower()
 
-    if path.endswith((".webp", ".png", ".jpg", ".jpeg", ".svg", ".css", ".js", ".ico")):
+    # Hanya cache gambar (webp, png, dll). 
+    # File .js dan .css tidak di-cache agar update kode langsung masuk ke layar pemain!
+    if path.endswith((".webp", ".png", ".jpg", ".jpeg", ".svg", ".ico")):
         response.headers["Cache-Control"] = "public, max-age=604800"
 
     return response
