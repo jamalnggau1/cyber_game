@@ -6289,14 +6289,21 @@ async function openGuildGateSheet() {
   }
 }
 
+let selectedGuildLogoId = "logo_dragon"; // Default pilihan awal
+
 function renderGuildList(guilds) {
   const listHtml = guilds.length
     ? guilds.map(g => `
       <div class="card" style="margin-bottom: 8px;">
-        <h3>${escapeHtml(g.name)} <small>Lv.${g.level}</small></h3>
-        <p class="muted">${escapeHtml(g.description || "No description")}</p>
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+          <img src="${g.logo_asset}" style="width: 54px; height: 54px; object-fit: contain; border-radius: 6px; background: #0b132b; border: 1px solid var(--border);" onerror="this.src='assets/base.webp'"/>
+          <div style="flex: 1;">
+            <h3 style="margin: 0; font-size: 16px;">${escapeHtml(g.name)} <small>Lv.${g.level}</small></h3>
+            <div style="color: var(--good); font-size: 13px; font-weight: bold;">Power: ${compactNumber(g.power)}</div>
+          </div>
+        </div>
+        <p class="muted" style="margin-top: 0;">${escapeHtml(g.description || "No description")}</p>
         <div class="row"><span>Members</span><span>${g.members_count}/${g.max_members}</span></div>
-        <div class="row"><span>Power</span><span>${compactNumber(g.power)}</span></div>
         <div class="sheet-actions" style="margin-top:8px;">
           <button disabled>Join (Soon)</button>
         </div>
@@ -6307,17 +6314,13 @@ function renderGuildList(guilds) {
   showBuildingSheet(
     "Guild Gate",
     `
-      <p class="muted">Bergabung dengan Guild untuk bermain bersama, atau dirikan Guild barumu sendiri (Biaya: 10,000 Credits).</p>
-      
       <div class="sheet-actions" style="margin-bottom: 16px;">
         <button style="background: var(--good); color: #000; font-weight: bold;" onclick="openCreateGuildForm()">+ Create New Guild</button>
       </div>
-
       <h3>Available Guilds</h3>
-      <div class="guild-list" style="max-height: 40vh; overflow-y: auto; padding-right: 4px;">
+      <div class="guild-list" style="max-height: 50vh; overflow-y: auto; padding-right: 4px;">
         ${listHtml}
       </div>
-      
       <div class="sheet-actions">
         <button onclick="closeBuildingSheet()">Close</button>
       </div>
@@ -6325,12 +6328,46 @@ function renderGuildList(guilds) {
   );
 }
 
+// Fungsi helper untuk JS memproses klik logo
+window.selectGuildLogo = function(id) {
+  selectedGuildLogoId = id;
+  document.querySelectorAll('.guild-logo-option').forEach(el => {
+    el.style.borderColor = el.dataset.id === id ? 'var(--good)' : 'transparent';
+  });
+};
+
 function openCreateGuildForm() {
+  // Daftar logo (Bisa Anda tambah/ubah namanya nanti)
+  const logos = [
+    { id: "logo_dragon", asset: "assets/guild_dragon.webp" },
+    { id: "logo_skull", asset: "assets/guild_skull.webp" },
+    { id: "logo_cyber", asset: "assets/guild_cyber.webp" },
+    { id: "logo_wolf", asset: "assets/guild_wolf.webp" },
+    { id: "logo_eagle", asset: "assets/guild_eagle.webp" },
+    { id: "logo_shield", asset: "assets/guild_shield.webp" }
+  ];
+
+  selectedGuildLogoId = logos[0].id; // Reset ke yang pertama tiap buka form
+
+  const logosHtml = logos.map(l => `
+    <img src="${l.asset}" 
+         data-id="${l.id}" 
+         class="guild-logo-option" 
+         onerror="this.src='assets/base.webp'"
+         style="width: 50px; height: 50px; object-fit: contain; cursor: pointer; border-radius: 6px; background: #0b132b; border: 2px solid ${l.id === selectedGuildLogoId ? 'var(--good)' : 'transparent'}; transition: border 0.2s;" 
+         onclick="selectGuildLogo('${l.id}')" />
+  `).join("");
+
   showBuildingSheet(
     "Create Guild",
     `
-      <p class="muted">Dirikan Guild baru. Biaya pembuatan adalah <b>10,000 Credits</b>.</p>
+      <p class="muted">Biaya pembuatan: <b>10,000 Credits</b>.</p>
       
+      <label>Pilih Logo Guild:</label>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; margin-top: 8px;">
+        ${logosHtml}
+      </div>
+
       <label>Guild Name (3-20 char)</label>
       <input type="text" id="newGuildName" placeholder="e.g. Cyber Ninjas" maxlength="20" style="width:100%; padding:8px; margin-bottom:12px; background:var(--bg2); color:#fff; border:1px solid var(--border); border-radius:4px;" />
       
@@ -6362,12 +6399,16 @@ async function submitCreateGuild() {
   try {
     const data = await api("/api/guilds/create", {
       method: "POST",
-      body: JSON.stringify({ name: name, description: desc })
+      body: JSON.stringify({ 
+        name: name, 
+        description: desc,
+        logo_id: selectedGuildLogoId 
+      })
     });
     
     alert(data.message);
-    await loadState(); // Refresh status credits di layar
-    openGuildGateSheet(); // Kembali ke UI (akan otomatis memuat layar My Guild)
+    await loadState(); 
+    openGuildGateSheet(); 
   } catch (err) {
     alert("Gagal membuat Guild: " + err.message);
   }
@@ -6382,12 +6423,15 @@ function renderMyGuild(guild) {
   showBuildingSheet(
     "My Guild",
     `
-      <div class="card">
-        <h2>${escapeHtml(guild.name)} <small>Lv.${guild.level}</small></h2>
-        <p class="muted">${escapeHtml(guild.description || "No description")}</p>
+      <div class="card" style="text-align: center;">
+        <img src="${guild.logo_asset}" style="width: 80px; height: 80px; object-fit: contain; border-radius: 8px; background: #0b132b; border: 1px solid var(--border); margin-bottom: 8px;" onerror="this.src='assets/base.webp'"/>
+        <h2 style="margin: 0;">${escapeHtml(guild.name)}</h2>
+        <span style="color: var(--good); font-weight: bold;">Lv. ${guild.level} | ${compactNumber(guild.power)} Power</span>
+        
+        <p class="muted" style="margin-top: 12px; text-align: left;">${escapeHtml(guild.description || "No description")}</p>
+        
         <hr style="border-color: var(--border); margin: 12px 0;">
         ${row("Members", `${guild.members_count}/${guild.max_members}`)}
-        ${row("Total Power", compactNumber(guild.power))}
       </div>
       
       <p class="muted" style="margin-top:16px;">Fitur daftar anggota, donasi guild, dan Nexus War sedang dalam tahap konstruksi.</p>
@@ -6398,6 +6442,7 @@ function renderMyGuild(guild) {
     `
   );
 }
+
 // ==========================================================
 
 async function initApp() {

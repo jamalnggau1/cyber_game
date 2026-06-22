@@ -2529,6 +2529,7 @@ generate_targets()
 class CreateGuildRequest(BaseModel):
     name: str = Field(min_length=3, max_length=20)
     description: str = Field(default="", max_length=150)
+    logo_id: str = Field(default="logo_dragon")
 
 class RecoverUnitRequest(BaseModel):
     unit_id: str
@@ -6581,22 +6582,30 @@ async def save_defense_setup(req: DefenseSetupRequest, request: Request):
 # MODULE: GUILD SYSTEM (MODULAR BLOCK)
 # ==========================================================
 
+# Daftar logo bawaan. Pastikan gambar-gambar ini sudah Anda taruh di folder assets/
+GUILD_LOGOS = [
+    {"id": "logo_dragon", "asset": "assets/guild_dragon.webp"},
+    {"id": "logo_skull", "asset": "assets/guild_skull.webp"},
+    {"id": "logo_cyber", "asset": "assets/guild_cyber.webp"},
+    {"id": "logo_wolf", "asset": "assets/guild_wolf.webp"},
+    {"id": "logo_eagle", "asset": "assets/guild_eagle.webp"},
+    {"id": "logo_shield", "asset": "assets/guild_shield.webp"},
+]
+
 @app.get("/api/guilds")
 async def get_guild_list(request: Request):
     await sync_state_from_db()
     
-    # Pastikan database guild sudah siap
     GAME_STATE.setdefault("guilds", {})
-    
     player_id, profile = get_or_create_active_player_profile(request)
 
-    # Konversi dictionary guild ke bentuk list untuk ditampilkan di layar
     guild_list = []
     for g_id, guild_data in GAME_STATE["guilds"].items():
         guild_list.append({
             "id": guild_data["id"],
             "name": guild_data["name"],
             "description": guild_data.get("description", ""),
+            "logo_asset": guild_data.get("logo_asset", "assets/guild_dragon.webp"),
             "leader_id": guild_data["leader_id"],
             "members_count": len(guild_data.get("members", [])),
             "max_members": guild_data.get("max_members", 50),
@@ -6604,13 +6613,73 @@ async def get_guild_list(request: Request):
             "power": guild_data.get("power", 0)
         })
 
-    # Urutkan dari power tertinggi ke terendah
     guild_list = sorted(guild_list, key=lambda x: x["power"], reverse=True)
 
     return {
         "success": True,
-        "player_guild_id": profile.get("guild_id"), # Beri tahu UI apakah pemain sudah punya guild
+        "player_guild_id": profile.get("guild_id"),
         "guilds": guild_list
+    }
+
+@app.post("/api/guilds/create")
+async def create_guild(req: CreateGuildRequest, request: Request):
+    await sync_state_from_db()
+    
+    player_id, profile = get_or_create_active_player_profile(request)
+    profile = ensure_player_profile_schema(profile)
+    GAME_STATE.setdefault("guilds", {})
+
+    if profile.get("guild_id"):
+        raise HTTPException(status_code=400, detail="Kamu sudah bergabung di sebuah Guild!")
+
+    for existing_guild in GAME_STATE["guilds"].values():
+        if existing_guild["name"].lower() == req.name.lower():
+            raise HTTPException(status_code=400, detail=f"Nama Guild '{req.name}' sudah ada yang memakai.")
+
+    cost = 10000
+    resources = profile.setdefault("resources", {})
+    current_credits = int(resources.get("credits", 0))
+
+    if current_credits < cost:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Credits tidak cukup. Butuh {cost} Credits untuk mendirikan Guild."
+        )
+
+    # Validasi dan ambil asset logo
+    selected_logo = next((l for l in GUILD_LOGOS if l["id"] == req.logo_id), GUILD_LOGOS[0])
+
+    resources["credits"] = current_credits - cost
+    profile["resources"] = resources
+
+    guild_id = f"gld_{int(time.time())}_{random.randint(100, 999)}"
+    initial_power = get_profile_base_power(profile)
+
+    new_guild = {
+        "id": guild_id,
+        "name": req.name,
+        "description": req.description,
+        "logo_id": selected_logo["id"],
+        "logo_asset": selected_logo["asset"],
+        "leader_id": player_id,
+        "members": [player_id], 
+        "max_members": 50,
+        "level": 1,
+        "power": initial_power,
+        "created_at": time.time(),
+    }
+
+    GAME_STATE["guilds"][guild_id] = new_guild
+    profile["guild_id"] = guild_id
+    GAME_STATE["players"][player_id] = profile
+
+    await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
+
+    return {
+        "success": True, 
+        "message": f"Guild [{req.name}] berhasil didirikan!",
+        "guild": new_guild,
+        "resources": profile["resources"]
     }
 
 @app.post("/api/guilds/create")
@@ -6684,9 +6753,7 @@ async def add_cache_headers(request: Request, call_next):
 
     path = request.url.path.lower()
 
-    # Hanya cache gambar (webp, png, dll). 
-    # File .js dan .css tidak di-cache agar update kode langsung masuk ke layar pemain!
-    if path.endswith((".webp", ".png", ".jpg", ".jpeg", ".svg", ".ico")):
+    if path.endswith((".webp", ".png", ".jpg", ".jpeg", ".svg", ".css", ".js", ".ico")):
         response.headers["Cache-Control"] = "public, max-age=604800"
 
     return response
