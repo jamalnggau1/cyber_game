@@ -6489,10 +6489,11 @@ async function renderMyGuild(forceRefresh = false) {
       let actionButtons = "";
       if (myRole === "leader" && m.player_id !== state?.player?.id) {
         actionButtons = `
-          <div style="margin-top: 8px; display: flex; gap: 6px;">
-            <button style="padding: 4px 8px; font-size: 11px; background: var(--bad); color: #fff;" onclick="kickMember('${m.player_id}')">Kick</button>
-            ${m.role === 'member' ? `<button style="padding: 4px 8px; font-size: 11px; background: var(--warn); color: #000;" onclick="promoteMember('${m.player_id}')">Promote</button>` : ''}
-            ${m.role === 'admin' ? `<button style="padding: 4px 8px; font-size: 11px; background: var(--good); color: #000;" onclick="demoteMember('${m.player_id}')">Demote</button>` : ''}
+          <div style="margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap;">
+            <button style="padding: 4px 8px; font-size: 11px; background: var(--bad); color: #fff; border-radius: 4px;" onclick="kickMember('${m.player_id}')">Kick</button>
+            ${m.role === 'member' ? `<button style="padding: 4px 8px; font-size: 11px; background: var(--warn); color: #000; border-radius: 4px;" onclick="promoteMember('${m.player_id}')">Promote</button>` : ''}
+            ${m.role === 'admin' ? `<button style="padding: 4px 8px; font-size: 11px; background: var(--good); color: #000; border-radius: 4px;" onclick="demoteMember('${m.player_id}')">Demote</button>` : ''}
+            <button style="padding: 4px 8px; font-size: 11px; background: #9932cc; color: #fff; border-radius: 4px;" onclick="transferLeader('${m.player_id}')">Transfer Leader</button>
           </div>
         `;
       }
@@ -6572,15 +6573,34 @@ window.switchGuildTab = function(tab) {
   renderMyGuild(false); // Render ulang UI tanpa perlu tarik data baru dari server
 };
 
-// Placeholder untuk API yang akan kita buat selanjutnya
+// Fungsi Helper Utama untuk API Manajemen Anggota
+window.manageGuildMember = async function(targetId, action, confirmMsg) {
+  if (!confirm(confirmMsg)) return;
+
+  try {
+    const data = await api("/api/guilds/manage_member", {
+      method: "POST",
+      body: JSON.stringify({ target_id: targetId, action: action })
+    });
+    alert(data.message);
+    renderMyGuild(true); // Langsung refresh UI Guild tanpa loading lama
+  } catch (err) {
+    alert("Gagal mengeksekusi perintah: " + err.message);
+  }
+};
+
+// Tombol-tombol pemicunya:
 window.kickMember = function(targetId) {
-  alert("Fungsi Kick API sedang disiapkan untuk ID: " + targetId);
+  manageGuildMember(targetId, "kick", "⚠️ Yakin ingin menendang anggota ini dari Guild?");
 };
 window.promoteMember = function(targetId) {
-  alert("Fungsi Promote API sedang disiapkan untuk ID: " + targetId);
+  manageGuildMember(targetId, "promote", "Naikkan pangkat anggota ini menjadi Admin?");
 };
 window.demoteMember = function(targetId) {
-  alert("Fungsi Demote API sedang disiapkan untuk ID: " + targetId);
+  manageGuildMember(targetId, "demote", "Turunkan pangkat Admin ini menjadi member biasa?");
+};
+window.transferLeader = function(targetId) {
+  manageGuildMember(targetId, "transfer", "🔥 PERINGATAN FATAL! Yakin ingin menyerahkan kepemimpinan Guild ke orang ini? Kamu akan otomatis turun menjadi Admin.");
 };
 
 async function initApp() {

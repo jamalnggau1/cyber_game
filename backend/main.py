@@ -2542,6 +2542,10 @@ generate_targets()
 # ==========================================================
 # API models
 # ==========================================================
+class ManageGuildMemberRequest(BaseModel):
+    target_id: str
+    action: str  # Isinya nanti: "kick", "promote", "demote", atau "transfer"
+
 class JoinGuildRequest(BaseModel):
     guild_id: str
 
@@ -4668,7 +4672,7 @@ async def attack(req: AttackRequest, request: Request, background_tasks: Backgro
         # Eksekusi instan tanpa membuat server nge-lag
         background_tasks.add_task(send_telegram_alert, defender_tg_id, pesan)
     # ============================================
-    
+
     GAME_STATE["players"][attacker_id] = attacker
     GAME_STATE.setdefault("active_attacks", {})
     GAME_STATE["active_attacks"][attack_id] = active_attack
@@ -6801,6 +6805,78 @@ async def join_guild(req: JoinGuildRequest, request: Request):
     await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
 
     return {"success": True, "message": f"Berhasil bergabung dengan {guild['name']}!"}
+
+@app.post("/api/guilds/manage_member")
+async def manage_guild_member(req: ManageGuildMemberRequest, request: Request):
+    await sync_state_from_db()
+
+    player_id, profile = get_or_create_active_player_profile(request)
+    guild_id = profile.get("guild_id")
+
+    if not guild_id or guild_id not in GAME_STATE.get("guilds", {}):
+        raise HTTPException(status_code=400, detail="Kamu tidak memiliki Guild.")
+
+    guild = GAME_STATE["guilds"][guild_id]
+
+    # === SISTEM KEAMANAN MUTLAK ===
+    # Hanya LEADER yang boleh mengeksekusi Kick, Promote, Demote, dan Transfer!
+    if guild.get("leader_id") != player_id:
+        raise HTTPException(status_code=403, detail="Hanya Kapten (Leader) yang memiliki otorisasi ini!")
+
+    if req.target_id == player_id:
+        raise HTTPException(status_code=400, detail="Tidak bisa melakukan aksi ini ke diri sendiri.")
+
+    # Cari target di daftar anggota
+    members = guild.get("members", [])
+    target_index = -1
+    for i, m in enumerate(members):
+        if isinstance(m, dict) and m.get("player_id") == req.target_id:
+            target_index = i
+            break
+
+    if target_index == -1:
+        raise HTTPException(status_code=404, detail="Pemain tidak ditemukan di Guild ini.")
+
+    target_member = members[target_index]
+    target_profile = GAME_STATE["players"].get(req.target_id)
+    target_name = target_profile.get("name", req.target_id) if target_profile else req.target_id
+
+    # === EKSEKUSI AKSI ===
+    if req.action == "promote":
+        if target_member.get("role") == "admin":
+            raise HTTPException(status_code=400, detail="Pemain sudah menjadi Admin.")
+        target_member["role"] = "admin"
+        msg = f"Berhasil! {target_name} dinaikkan pangkat menjadi Admin."
+
+    elif req.action == "demote":
+        if target_member.get("role") != "admin":
+            raise HTTPException(status_code=400, detail="Pemain bukan Admin.")
+        target_member["role"] = "member"
+        msg = f"Pangkat {target_name} telah diturunkan menjadi Member biasa."
+
+    elif req.action == "kick":
+        members.pop(target_index) # Hapus dari array guild
+        if target_profile:
+            target_profile["guild_id"] = None # Hapus logo guild dari profil korban
+            GAME_STATE["players"][req.target_id] = target_profile
+        msg = f"{target_name} telah ditendang dari Guild!"
+
+    elif req.action == "transfer":
+        target_member["role"] = "leader"
+        guild["leader_id"] = req.target_id
+        # Ubah pangkat kita (Leader lama) menjadi Admin
+        for m in members:
+            if isinstance(m, dict) and m.get("player_id") == player_id:
+                m["role"] = "admin"
+                break
+        msg = f"Kepemimpinan Guild berhasil diserahkan kepada {target_name}!"
+        
+    else:
+        raise HTTPException(status_code=400, detail="Aksi tidak valid.")
+
+    await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
+
+    return {"success": True, "message": msg}
 
 @app.get("/api/guilds/my")
 async def get_my_guild(request: Request):
