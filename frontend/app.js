@@ -1263,10 +1263,16 @@ function renderOperationCard(op) {
   const remaining = getOperationRemaining(op);
   const progress = getOperationProgress(op);
 
-  // Pastikan tombol recall muncul jika fase menambang
-  const recallBtn = op.phase === "occupying"
-    ? `<button onclick="recallOperation('${op.id}')" style="background:var(--warn); color:#000; border:none; padding:8px 12px; border-radius:6px; font-weight:bold; cursor:pointer; flex: 1;">Recall Troops</button>`
-    : "";
+  // === TAMPILKAN TOMBOL RECALL/ABORT BERDASARKAN FASE ===
+  let recallBtn = "";
+  if (op.phase === "occupying") {
+    // Tombol kuning untuk menarik pasukan yang sedang menambang
+    recallBtn = `<button onclick="recallOperation('${op.id}')" style="background:var(--warn); color:#000; border:none; padding:8px 12px; border-radius:6px; font-weight:bold; cursor:pointer; flex: 1;">Recall Troops</button>`;
+  } else if (op.phase === "outbound") {
+    // Tombol merah untuk membatalkan serangan di tengah jalan
+    recallBtn = `<button onclick="recallOperation('${op.id}')" style="background:var(--bad); color:#fff; border:none; padding:8px 12px; border-radius:6px; font-weight:bold; cursor:pointer; flex: 1;">Abort Mission</button>`;
+  }
+  // ======================================================
 
   return `
     <div class="operation-card" data-op-id="${op.id}">
