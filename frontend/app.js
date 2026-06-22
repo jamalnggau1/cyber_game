@@ -2663,14 +2663,15 @@ function openBuilding(buildingId) {
       return;
     }
 
+    switchPage("aiPage");
+    return;
+  }
+  // === CEGATAN GUILD GATE ===
   if (buildingId === "guild_gate") {
     openGuildGateSheet();
     return;
   }
-
-    switchPage("aiPage");
-    return;
-  }
+  // ==========================
 
   const levelText = getBuildingStatusText(b);
 
