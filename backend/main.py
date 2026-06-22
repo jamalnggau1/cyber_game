@@ -7,6 +7,8 @@ import math
 import random
 import os
 import time
+import httpx
+from fastapi import BackgroundTasks
 import copy
 import requests
 from backend.database import init_db, load_game_state, save_game_state, PLAYER_ID
@@ -47,6 +49,21 @@ FRONTEND_DIR = BASE_DIR.parent / "frontend"
 
 ADMIN_KEY = os.getenv("ADMIN_KEY", "")
 
+# ==========================================
+# BOT TELEGRAM NOTIFIER (BACKGROUND TASK)
+# ==========================================
+async def send_telegram_alert(chat_id: str, message: str):
+    token = "6765251410:AAH3MVx6ExdjTNXas_KaX6sZ_7fqCFC9dz8"
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    payload = {'chat_id': chat_id, 'text': message}
+    
+    try:
+        # Menggunakan httpx secara asinkron dengan timeout 5 detik
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            await client.post(url, data=payload)
+    except Exception as e:
+        print(f"Gagal kirim notif TG ke {chat_id}: {e}")
+# ==========================================
 
 def require_admin(request: Request):
     key = request.headers.get("X-Admin-Key", "")
@@ -4383,7 +4400,7 @@ async def ai_analyze(request: Request, payload: dict = Body(...)):
     }
 
 @app.post("/api/attack")
-async def attack(req: AttackRequest, request: Request):
+async def attack(req: AttackRequest, request: Request, background_tasks: BackgroundTasks):
     await sync_state_from_db()
 
     attacker_id, attacker = get_or_create_active_player_profile(request)
@@ -4623,6 +4640,35 @@ async def attack(req: AttackRequest, request: Request):
             "No loot secured yet.",
         ],
     }
+
+    # === SISTEM RED ALERT NOTIFIKASI TELEGRAM ===
+    defender_tg_id = None
+    target_id_str = str(req.target_id)
+    
+    # 1. Cek apakah targetnya adalah base pemain lain
+    if target_id_str.startswith("tg_"):
+        defender_tg_id = target_id_str.replace("tg_", "")
+    else:
+        # 2. Cek apakah targetnya tambang yang sedang dikuasai orang lain
+        target_node = GAME_STATE.get("mining_nodes", {}).get(target_id_str, {})
+        owner = target_node.get("owner", "")
+        if owner and str(owner).startswith("tg_"):
+            defender_tg_id = str(owner).replace("tg_", "")
+
+    # Jika korban punya ID Telegram, tembak notifikasi di background!
+    if defender_tg_id:
+        attacker_name = attacker.get("name", "Seorang Commander")
+        
+        pesan = (
+            f"🚨 RED ALERT! 🚨\n\n"
+            f"Markas atau Tambang Anda sedang diserang oleh Commander {attacker_name}!\n"
+            f"Pasukan musuh akan tiba dalam {outbound_seconds} detik.\n\n"
+            f"Buka game SEKARANG untuk melindungi aset Anda!"
+        )
+        
+        # Eksekusi instan tanpa membuat server nge-lag
+        background_tasks.add_task(send_telegram_alert, defender_tg_id, pesan)
+    # ============================================
 
     GAME_STATE["players"][attacker_id] = attacker
     GAME_STATE.setdefault("active_attacks", {})

@@ -7,3 +7,4 @@ requests
 asyncpg
 sqlalchemy
 python-dotenv
+hhtpx
