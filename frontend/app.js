@@ -6289,15 +6289,22 @@ async function silentSync() {
             renderMyGuild(false); 
         }
 
+        // 2. MESIN NOTIFIKASI (DENGAN CCTV CONSOLE)
         const ralliesObj = guildData.guild.rallies || {};
         const rallies = Object.values(ralliesObj);
         
-        // 2. Gunakan serverTime untuk mengecek sisa waktu!
+        console.log(`[CCTV] silentSync berjalan. Ditemukan ${rallies.length} Rally di server.`);
+        console.log(`[CCTV] Waktu Server: ${serverTime}`);
+
         rallies.forEach(r => {
-          // TRIK TESTING: Semua orang (termasuk pembuatnya sendiri) akan dapat notifikasi!
+          console.log(`[CCTV] Cek Rally ${r.id} | Status: ${r.status} | Sisa Waktu: ${r.gathering_ends_at - serverTime} detik`);
+
+          // Gunakan trik Solo Testing (Tanpa cek creator_id)
           if (r.status === "gathering" && r.gathering_ends_at > serverTime) {
-            // PANGGIL KOTAK MERAH!
+            console.log(`[CCTV] KONDISI MEMENUHI SYARAT! Memanggil Kotak Merah untuk ${r.id}...`);
             showRallyToast(r.id, r.creator_name, r.target_name);
+          } else {
+            console.log(`[CCTV] GAGAL MEMENUHI SYARAT. (Status bukan gathering ATAU waktu habis)`);
           }
         });
       }
@@ -7016,6 +7023,7 @@ window.launchRallyApi = async function() {
 let notifiedRallies = new Set();
 
 function showRallyToast(rallyId, creatorName, targetName) {
+  console.log(`[CCTV TOAST] Fungsi showRallyToast DIEKSEKUSI untuk target: ${targetName}`);
   if (notifiedRallies.has(rallyId)) return;
   notifiedRallies.add(rallyId);
 
