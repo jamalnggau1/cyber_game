@@ -4534,3 +4534,29 @@ input[type=number] {
 /* Tambahan untuk teks di tengah layar (Utility Class) */
 .text-center { text-align: center; }
 .p-10 { padding: 10px; }
+/* =========================================
+   MODULE: RALLY TOAST NOTIFICATION 
+   ========================================= */
+.rally-toast {
+    position: fixed;
+    top: -100px; /* Tersembunyi di atas layar */
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90%;
+    max-width: 340px;
+    background: rgba(10, 20, 40, 0.95);
+    border: 1px solid var(--bad);
+    border-radius: 8px;
+    padding: 12px;
+    z-index: 9999;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    box-shadow: 0 4px 15px rgba(255, 68, 68, 0.4);
+    transition: top 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    cursor: pointer;
+}
+.rally-toast.show { top: 20px; } /* Meluncur turun */
+.rally-toast-icon { font-size: 24px; }
+.rally-toast-content h4 { margin: 0 0 4px 0; color: var(--bad); font-size: 14px; }
+.rally-toast-content p { margin: 0; font-size: 12px; color: #ccc; line-height: 1.4; }

@@ -6269,25 +6269,33 @@ async function completeOnboarding() {
 // === FUNGSI SINKRONISASI SENYAP (ANTI-GLITCH) ===
 async function silentSync() {
   try {
-    // 1. Ambil data terbaru dari server diam-diam
     const data = await api("/api/state");
     if (!data) return;
-
-    // 2. Perbarui data global di memori HP (tanpa menggambar ulang layar)
     state = data;
-
-    // 3. HANYA periksa antrean pasukan. 
-    // Fungsi ini sudah punya sensor 'forceRedraw', jadi layar HANYA akan
-    // di-refresh jika ada status pasukan yang berubah (misal: kalah, pulang, dsb).
     syncOperationsFromState();
 
-    // Opsional: Jika Anda punya fungsi untuk update angka resource (uang/energi)
-    // yang tidak bikin glitch, bisa dipanggil di sini. Jika tidak, abaikan.
+    // === CEK NOTIFIKASI RALLY BARU UNTUK TEMAN GUILD ===
+    // Kita cek secara diam-diam apakah ada data "guilds" terbaru di state
+    if (state.player && state.player.guild_id) {
+      // Panggil API info guild secara senyap tanpa loading screen
+      const guildData = await api("/api/guilds/my?_t=" + Date.now());
+      if (guildData && guildData.guild && guildData.guild.rallies) {
+        const rallies = Object.values(guildData.guild.rallies);
+        const nowSec = Date.now() / 1000;
+        
+        rallies.forEach(r => {
+          // Jika rally sedang gathering & bukan milik kita sendiri
+          if (r.status === "gathering" && r.gathering_ends_at > nowSec && r.creator_id !== state.player.id) {
+            showRallyToast(r.id, r.creator_name, r.target_name);
+          }
+        });
+      }
+    }
+    // ===================================================
 
-  } catch (err) {
-    // Biarkan kosong agar error jaringan kecil tidak mengganggu layar pemain
-  }
+  } catch (err) {}
 }
+// ===============================================
 // ===============================================
 
 // ==========================================================
@@ -6573,7 +6581,61 @@ async function renderMyGuild(forceRefresh = false) {
     `;
   }
   // ... (Tab Rally, Reward, Research biarkan seperti sebelumnya) ...
-  else if (currentGuildTab === "rally") { bodyHtml = `<div class="card guild-info-card"><h3 class="text-bad">Guild Rally</h3><p class="muted">Dalam konstruksi.</p></div>`; }
+  else if (currentGuildTab === "rally") {
+    const ralliesObj = guild.rallies || {};
+    const rallies = Object.values(ralliesObj);
+    const nowSec = Date.now() / 1000;
+
+    let rallyHtml = "";
+    if (rallies.length === 0) {
+      rallyHtml = `<div class="p-30 text-center"><p class="muted">Belum ada Rally yang aktif di Guild ini.</p></div>`;
+    } else {
+      rallyHtml = rallies.map(r => {
+        const remain = Math.max(0, Math.ceil(r.gathering_ends_at - nowSec));
+        const isGathering = r.status === "gathering" && remain > 0;
+        const myRally = r.creator_id === state?.player?.id;
+
+        let btn = "";
+        if (myRally) {
+           btn = `<button class="guild-btn-warn" disabled style="width:100%">Menunggu Anggota...</button>`;
+        } else if (isGathering) {
+           btn = `<button class="guild-btn-success text-bold" style="width:100%" onclick="alert('Tombol Join Rally akan kita aktifkan di tahap berikutnya!')">Join Rally</button>`;
+        } else {
+           btn = `<button class="guild-btn-danger" disabled style="width:100%">Pasukan Berangkat</button>`;
+        }
+
+        return `
+          <div class="card guild-info-card" style="text-align:left; border-left: 3px solid var(--bad);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+              <b style="color:var(--bad);">⚔️ Target: ${escapeHtml(r.target_name)}</b>
+              <span class="text-warn font-bold">${formatSeconds(remain)}</span>
+            </div>
+            <p class="muted" style="margin-top:0; font-size:12px;">Commander: ${escapeHtml(r.creator_name)}</p>
+            
+            <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px;">
+              <span>Pasukan Terkumpul:</span>
+              <b>${compactNumber(r.total_units)} / ${compactNumber(r.max_capacity)}</b>
+            </div>
+            <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:12px;">
+              <span>Total Power:</span>
+              <b style="color:var(--good);">${compactNumber(r.total_power)}</b>
+            </div>
+            
+            ${btn}
+          </div>
+        `;
+      }).join("");
+    }
+
+    bodyHtml = `
+      <div style="max-height: 45vh; overflow-y: auto; padding-right: 4px; margin-bottom: 12px;">
+        ${rallyHtml}
+      </div>
+      <div class="sheet-actions">
+        <button onclick="renderMyGuild(true)">Refresh Data</button>
+      </div>
+    `;
+  }
   else if (currentGuildTab === "reward") { bodyHtml = `<div class="card guild-info-card"><h3 class="text-good">Guild Rewards</h3><p class="muted">Dalam konstruksi.</p></div>`; }
   else if (currentGuildTab === "research") { bodyHtml = `<div class="card guild-info-card"><h3 class="text-info">Guild Tech</h3><p class="muted">Dalam konstruksi.</p></div>`; }
 
@@ -6932,5 +6994,43 @@ window.launchRallyApi = async function() {
     isRallyMode = false; // Reset mode
   }
 };
+
+let notifiedRallies = new Set();
+
+function showRallyToast(rallyId, creatorName, targetName) {
+  if (notifiedRallies.has(rallyId)) return;
+  notifiedRallies.add(rallyId);
+
+  let toast = document.getElementById("rallyToastAlert");
+  if (!toast) {
+      toast = document.createElement("div");
+      toast.id = "rallyToastAlert";
+      toast.className = "rally-toast";
+      
+      // Jika diklik, langsung buka tab Rally di Guild!
+      toast.onclick = () => {
+          toast.classList.remove("show");
+          currentGuildTab = "rally";
+          openGuildGateSheet();
+      };
+      document.body.appendChild(toast);
+  }
+
+  toast.innerHTML = `
+      <div class="rally-toast-icon">🚨</div>
+      <div class="rally-toast-content">
+          <h4>Rally Dibuka!</h4>
+          <p>Commander ${escapeHtml(creatorName)} menyerang ${escapeHtml(targetName)}! Klik untuk bergabung.</p>
+      </div>
+  `;
+
+  // Tampilkan animasinya
+  setTimeout(() => toast.classList.add("show"), 100);
+
+  // Sembunyikan otomatis setelah 6 detik
+  setTimeout(() => {
+      toast.classList.remove("show");
+  }, 6000);
+}
 
 document.addEventListener("DOMContentLoaded", initApp);
