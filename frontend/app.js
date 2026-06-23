@@ -6819,9 +6819,16 @@ window.handleJoinRequest = async function(targetId, action) {
 // ==========================================
 // SISTEM RALLY (FRONTEND SETUP)
 // ==========================================
-window.openRallySetup = function(targetId) {
-  if (!state.player || !state.player.guild_id) {
-    alert("Kamu harus bergabung dengan Guild terlebih dahulu untuk membuat Rally!");
+window.openRallySetup = async function(targetId) {
+  // Pengecekan akurat langsung ke server (mengatasi bug state cache)
+  try {
+    const guildData = await api("/api/guilds");
+    if (!guildData.player_guild_id) {
+      alert("Kamu harus bergabung dengan Guild terlebih dahulu untuk membuat Rally!");
+      return;
+    }
+  } catch (err) {
+    alert("Gagal memverifikasi status Guild: " + err.message);
     return;
   }
 
@@ -6848,7 +6855,6 @@ window.openRallySetup = function(targetId) {
         </div>
 
         <div class="sheet-actions">
-          <!-- Tombol ini sekarang mengarah ke pemilihan pasukan! -->
           <button class="guild-btn-danger" onclick="proceedToRallySetup('${targetId}')">Pilih Pasukan Perintis</button>
           <button onclick="closeBuildingSheet()">Batal</button>
         </div>
