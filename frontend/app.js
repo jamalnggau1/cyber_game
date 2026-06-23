@@ -6274,26 +6274,27 @@ async function silentSync() {
     state = data;
     syncOperationsFromState();
 
-    // === CEK NOTIFIKASI RALLY BARU UNTUK TEMAN GUILD ===
+    // === SINKRONISASI GUILD & RALLY ===
     if (state.player && state.player.guild_id) {
-      // Panggil API info guild secara senyap
       const guildData = await api("/api/guilds/my?_t=" + Date.now());
-      if (guildData && guildData.guild && guildData.guild.rallies) {
+      
+      // Gunakan guildData.success sebagai patokan, BUKAN guildData.guild.rallies
+      if (guildData && guildData.success) {
         
-        // === SINKRONISASI GAIB: Timpa Cache Lama dengan yang Baru ===
+        // 1. TIMPA CACHE LAMA SECARA MUTLAK (Agar Rally yang batal ikut terhapus dari memori)
         myGuildDataCache = guildData; 
         
+        // 2. RENDER ULANG LAYAR SECARA GAIB JIKA SEDANG DITATAP PEMAIN
         const sheet = document.getElementById("buildingSheet");
         const title = document.getElementById("buildingSheetTitle");
         
-        // Jika layar Guild sedang terbuka ditatap pemain, render ulang diam-diam!
         if (sheet && sheet.classList.contains("show") && title && title.innerText === "My Guild") {
-            // Gunakan false karena datanya sudah kita ambil di atas
             renderMyGuild(false); 
         }
-        // ============================================================
 
-        const rallies = Object.values(guildData.guild.rallies);
+        // 3. MUNCULKAN NOTIFIKASI TOAST JIKA ADA RALLY BARU
+        const ralliesObj = guildData.guild.rallies || {};
+        const rallies = Object.values(ralliesObj);
         const nowSec = Date.now() / 1000;
         
         rallies.forEach(r => {
@@ -6303,12 +6304,10 @@ async function silentSync() {
         });
       }
     }
-    // ===================================================
+    // ===================================
 
   } catch (err) {}
 }
-// ===============================================
-// ===============================================
 
 // ==========================================================
 // MODULE: GUILD UI SYSTEM
@@ -7128,5 +7127,12 @@ function startGuildRallyTimer() {
     }
   }, 1000);
 }
+// === PELATUK ANTI-TIDUR UNTUK BROWSER ===
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") {
+    // Tarik data seketika saat pemain kembali melihat tab/layar game ini!
+    silentSync(); 
+  }
+});
 
 document.addEventListener("DOMContentLoaded", initApp);
