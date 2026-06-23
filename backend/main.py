@@ -2594,6 +2594,9 @@ class AnalyzeRequest(BaseModel):
 class UpgradeResearchRequest(BaseModel):
     research_id: str
 
+class CancelRallyRequest(BaseModel):
+    rally_id: str
+
 class LaunchRallyRequest(BaseModel):
     target_id: str
     rally_seconds: int  # Akan berisi 300 (5 menit), 600, atau 1800
@@ -6934,6 +6937,70 @@ async def join_guild(req: JoinGuildRequest, request: Request):
 
     await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
     return {"success": True, "message": f"Berhasil bergabung dengan {guild['name']}!"}
+
+@app.post("/api/guilds/rally/cancel")
+async def cancel_rally(req: CancelRallyRequest, request: Request):
+    await sync_state_from_db()
+    
+    player_id, profile = get_or_create_active_player_profile(request)
+    guild_id = profile.get("guild_id")
+    
+    if not guild_id or guild_id not in GAME_STATE.get("guilds", {}):
+        raise HTTPException(status_code=400, detail="Kamu tidak memiliki Guild.")
+        
+    guild = GAME_STATE["guilds"][guild_id]
+    rally = guild.get("rallies", {}).get(req.rally_id)
+    
+    if not rally:
+        raise HTTPException(status_code=404, detail="Rally tidak ditemukan atau sudah selesai.")
+        
+    # Validasi Otorisasi
+    my_role = "member"
+    for m in guild.get("members", []):
+        if isinstance(m, dict) and m.get("player_id") == player_id:
+            my_role = m.get("role", "member")
+            break
+            
+    if rally.get("creator_id") != player_id and my_role not in ["leader", "admin"]:
+        raise HTTPException(status_code=403, detail="Hanya Kapten Rally atau Admin Guild yang bisa membatalkan!")
+        
+    if rally.get("status") != "gathering":
+        raise HTTPException(status_code=400, detail="Rally sudah berangkat menuju target, tidak bisa dibatalkan!")
+
+    # === KEMBALIKAN PASUKAN ===
+    for member in rally.get("members", []):
+        mem_id = member.get("player_id")
+        mem_units = member.get("units", {})
+        
+        # 1. JIKA INI ADALAH PEMBUAT RALLY (Berada di markasnya sendiri)
+        if mem_id == rally.get("creator_id"):
+            mem_profile = GAME_STATE["players"].get(mem_id)
+            if mem_profile:
+                inventory = mem_profile.setdefault("unit_inventory", {})
+                # Bubar barisan, kembali ke Barak (Instan)
+                for u_id, levels in mem_units.items():
+                    if u_id not in inventory:
+                        inventory[u_id] = {}
+                    if isinstance(inventory[u_id], dict):
+                        for lvl, qty in levels.items():
+                            current_qty = int(inventory[u_id].get(str(lvl), 0))
+                            inventory[u_id][str(lvl)] = current_qty + int(qty)
+                GAME_STATE["players"][mem_id] = mem_profile
+                
+        # 2. JIKA INI ADALAH ANGGOTA YANG JOIN (Harus berjalan pulang)
+        else:
+            # (CATATAN: Logika berjalan pulangnya akan kita eksekusi nanti 
+            # bersamaan saat kita merakit fitur Join Rally di tahap berikutnya. 
+            # Yang jelas, mereka TIDAK AKAN di-teleportasi!)
+            pass
+
+    # === HAPUS RALLY DARI GUILD ===
+    del guild["rallies"][req.rally_id]
+    GAME_STATE["guilds"][guild_id] = guild
+    
+    await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
+    
+    return {"success": True, "message": "Rally dibatalkan. Pasukan Perintis membubarkan diri dan kembali ke barak!"}
 
 @app.post("/api/guilds/rally/launch")
 async def launch_rally(request: Request, req: LaunchRallyRequest = Body(...)):

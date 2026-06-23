@@ -6597,8 +6597,14 @@ async function renderMyGuild(forceRefresh = false) {
 
         let btn = "";
         if (myRally) {
-           btn = `<button class="guild-btn-warn" disabled style="width:100%">Menunggu Anggota...</button>`;
+           if (isGathering) {
+               // Tombol Batal untuk si Pembuat Rally
+               btn = `<button class="guild-btn-danger text-bold" style="width:100%" onclick="cancelRallyApi('${r.id}')">Batalkan Rally</button>`;
+           } else {
+               btn = `<button class="guild-btn-danger" disabled style="width:100%">Pasukan Berangkat</button>`;
+           }
         } else if (isGathering) {
+           // Tombol Join untuk anggota lain
            btn = `<button class="guild-btn-success text-bold" style="width:100%" onclick="alert('Tombol Join Rally akan kita aktifkan di tahap berikutnya!')">Join Rally</button>`;
         } else {
            btn = `<button class="guild-btn-danger" disabled style="width:100%">Pasukan Berangkat</button>`;
@@ -7032,5 +7038,25 @@ function showRallyToast(rallyId, creatorName, targetName) {
       toast.classList.remove("show");
   }, 6000);
 }
+
+window.cancelRallyApi = async function(rallyId) {
+  const isSure = confirm("⚠️ Yakin ingin membatalkan Rally ini? Semua pasukan anggota yang sudah bergabung akan langsung dipulangkan ke pangkalan.");
+  if (!isSure) return;
+
+  try {
+    const res = await api("/api/guilds/rally/cancel", {
+      method: "POST",
+      body: JSON.stringify({ rally_id: rallyId })
+    });
+
+    alert(res.message);
+    
+    // Refresh UI Guild dan Tarik ulang data Base untuk mengupdate angka Pasukan
+    renderMyGuild(true);
+    loadState(); 
+  } catch (err) {
+    alert("Gagal membatalkan Rally: " + err.message);
+  }
+};
 
 document.addEventListener("DOMContentLoaded", initApp);
