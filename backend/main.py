@@ -2594,7 +2594,12 @@ class AnalyzeRequest(BaseModel):
 class UpgradeResearchRequest(BaseModel):
     research_id: str
 
-
+class LaunchRallyRequest(BaseModel):
+    target_id: str
+    rally_seconds: int  # Akan berisi 300 (5 menit), 600, atau 1800
+    module_ids: list = []
+    ai_ids: list = []
+    units: dict = {}
 
 class AttackRequest(BaseModel):
     target_id: str
