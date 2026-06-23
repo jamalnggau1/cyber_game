@@ -7051,18 +7051,29 @@ async def get_my_guild(request: Request):
     if my_role in ["leader", "admin"]:
         requests_list = guild.get("join_requests", [])
         for req_id in requests_list:
-            req_profile = GAME_STATE.get("players", {}).get(req_id, {})
-            # Kita sediakan nilai bawaan agar dia tetap muncul meski datanya belum sinkron sempurna
-            req_name = req_profile.get("name", req_id)
-            req_lab = req_profile.get("lab_level", 1)
-            req_power = get_profile_base_power(req_profile) + get_profile_army_power(req_profile) if req_profile else 0
-            
-            join_requests_details.append({
-                "player_id": req_id,
-                "name": req_name,
-                "power": req_power,
-                "lab_level": req_lab
-            })
+            try:
+                # 1. Ambil profil dengan sangat hati-hati
+                req_profile = GAME_STATE.get("players", {}).get(req_id, {})
+                req_name = req_profile.get("name", req_id) if req_profile else req_id
+                req_lab = req_profile.get("lab_level", 1) if req_profile else 1
+                
+                # 2. Hitung power dengan pelindung (Try/Except)
+                req_power = 0
+                if req_profile:
+                    try:
+                        req_power = get_profile_base_power(req_profile) + get_profile_army_power(req_profile)
+                    except Exception:
+                        req_power = 0 # Jika gagal hitung, anggap 0, JANGAN crash!
+                        
+                # 3. Masukkan ke dalam antrean yang akan dikirim ke HP Admin
+                join_requests_details.append({
+                    "player_id": req_id,
+                    "name": req_name,
+                    "power": req_power,
+                    "lab_level": req_lab
+                })
+            except Exception as e:
+                print(f"[ERROR] Gagal memuat data pelamar {req_id}: {e}")
     # ==================================================
     
     return {

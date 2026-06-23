@@ -6444,7 +6444,10 @@ async function renderMyGuild(forceRefresh = false) {
   if (forceRefresh || !myGuildDataCache) {
     showBuildingSheet("My Guild", `<div class="p-30 text-center"><p class="muted">Mengenkripsi sinyal Guild...</p></div>`);
     try {
-      myGuildDataCache = await api("/api/guilds/my");
+      // === PERBAIKAN CACHE BUSTER ===
+      // Menambahkan ?_t=waktu_sekarang agar Browser & Vercel TIDAK berani memberikan data basi!
+      myGuildDataCache = await api("/api/guilds/my?_t=" + new Date().getTime());
+      // ==============================
     } catch (err) {
       alert("Gagal memuat detail Guild: " + err.message);
       closeBuildingSheet();
