@@ -6789,11 +6789,10 @@ async function initApp() {
       console.warn("Scan awal gagal/skip:", err);
     });
 
-    // 5. Jalankan Sinkronisasi Senyap setiap 5 detik (Anti-Glitch)
+    // 5. Jalankan Sinkronisasi Senyap secara MUTLAK setiap 5 detik
     setInterval(() => {
-      if (document.visibilityState === "visible") {
-        silentSync();
-      }
+      // Syarat visibilityState dihapus agar berjalan terus tanpa henti!
+      silentSync();
     }, 5000);
 
   } catch (err) {
