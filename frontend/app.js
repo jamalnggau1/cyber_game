@@ -6287,9 +6287,14 @@ async function silentSync() {
         const ralliesObj = guildData.guild.rallies || {};
         const rallies = Object.values(ralliesObj);
         
+        console.log(`[DEBUG-SYNC] Ditemukan ${rallies.length} Rally di Server.`);
+
         rallies.forEach(r => {
-          // KEMBALIKAN SYARAT ASLI: Hanya Notifikasi Rally milik Teman!
-          if (r.status === "gathering" && r.gathering_ends_at > serverTime && r.creator_id !== state.player.id) {
+          console.log(`[DEBUG-SYNC] Rally: ${r.id} | Status: ${r.status} | Sisa Waktu: ${r.gathering_ends_at - serverTime}s | Creator: ${r.creator_id} | Me: ${state.player.id}`);
+          
+          // KUNCI AMAN: Bungkus ID dengan String() agar tidak ada error tipe data Number vs String!
+          if (r.status === "gathering" && r.gathering_ends_at > serverTime && String(r.creator_id) !== String(state.player.id)) {
+            console.log(`[DEBUG-SYNC] 🚨 SYARAT TEMBUS! Menampilkan Notifikasi!`);
             showRallyToast(r.id, r.creator_name, r.target_name);
           }
         });
@@ -6787,6 +6792,12 @@ async function initApp() {
     scan().catch(err => {
       console.warn("Scan awal gagal/skip:", err);
     });
+
+    // === UJI COBA VISUAL NOTIFIKASI ===
+    setTimeout(() => {
+        console.log("[DEBUG-VISUAL] Memanggil Test Notifikasi...");
+        showRallyToast("test_123", "Sistem Jenderal", "Markas Dummy");
+    }, 3000);
 
     // 5. Jalankan Sinkronisasi Senyap setiap 5 detik (Anti-Glitch)
     setInterval(() => {
