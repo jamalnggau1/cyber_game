@@ -6274,17 +6274,14 @@ async function silentSync() {
     state = data;
     syncOperationsFromState();
 
-    // === SINKRONISASI GUILD & RALLY ===
     if (state.player && state.player.guild_id) {
       const guildData = await api("/api/guilds/my?_t=" + Date.now());
-      
-      // Gunakan guildData.success sebagai patokan, BUKAN guildData.guild.rallies
       if (guildData && guildData.success) {
-        
-        // 1. TIMPA CACHE LAMA SECARA MUTLAK (Agar Rally yang batal ikut terhapus dari memori)
         myGuildDataCache = guildData; 
         
-        // 2. RENDER ULANG LAYAR SECARA GAIB JIKA SEDANG DITATAP PEMAIN
+        // 1. Dapatkan jam server yang absolut!
+        const serverTime = guildData.server_time || (Date.now() / 1000);
+        
         const sheet = document.getElementById("buildingSheet");
         const title = document.getElementById("buildingSheetTitle");
         
@@ -6292,20 +6289,17 @@ async function silentSync() {
             renderMyGuild(false); 
         }
 
-        // 3. MUNCULKAN NOTIFIKASI TOAST JIKA ADA RALLY BARU
         const ralliesObj = guildData.guild.rallies || {};
         const rallies = Object.values(ralliesObj);
-        const nowSec = Date.now() / 1000;
         
+        // 2. Gunakan serverTime untuk mengecek sisa waktu!
         rallies.forEach(r => {
-          if (r.status === "gathering" && r.gathering_ends_at > nowSec && r.creator_id !== state.player.id) {
+          if (r.status === "gathering" && r.gathering_ends_at > serverTime && r.creator_id !== state.player.id) {
             showRallyToast(r.id, r.creator_name, r.target_name);
           }
         });
       }
     }
-    // ===================================
-
   } catch (err) {}
 }
 
@@ -6595,15 +6589,20 @@ async function renderMyGuild(forceRefresh = false) {
   else if (currentGuildTab === "rally") {
     const ralliesObj = guild.rallies || {};
     const rallies = Object.values(ralliesObj);
-    const nowSec = Date.now() / 1000;
+    
+    // GUNAKAN JAM SERVER!
+    const serverTime = myGuildDataCache.server_time || (Date.now() / 1000);
 
     let rallyHtml = "";
     if (rallies.length === 0) {
       rallyHtml = `<div class="p-30 text-center"><p class="muted">Belum ada Rally yang aktif di Guild ini.</p></div>`;
     } else {
       rallyHtml = rallies.map(r => {
-        const remain = Math.max(0, Math.ceil(r.gathering_ends_at - nowSec));
+        // Hitung sisa waktu menggunakan jam server
+        const remain = Math.max(0, Math.ceil(r.gathering_ends_at - serverTime));
         const isGathering = r.status === "gathering" && remain > 0;
+        
+        // PASTI AMAN: Hanya yang ID-nya sama persis yang dianggap Pembuat!
         const myRally = r.creator_id === state?.player?.id;
 
         let btn = "";
@@ -6651,7 +6650,6 @@ async function renderMyGuild(forceRefresh = false) {
       </div>
     `;
 
-    // Nyalakan mesin animasi penghitung waktu mundur
     setTimeout(startGuildRallyTimer, 100);
   }
   else if (currentGuildTab === "reward") { bodyHtml = `<div class="card guild-info-card"><h3 class="text-good">Guild Rewards</h3><p class="muted">Dalam konstruksi.</p></div>`; }
@@ -7073,16 +7071,21 @@ window.cancelRallyApi = async function(rallyId) {
 // ==========================================
 // MESIN ANIMASI WAKTU RALLY (FRONT-END ONLY)
 // ==========================================
+// ==========================================
+// MESIN ANIMASI WAKTU RALLY (DIKALIBRASI SERVER)
+// ==========================================
 let guildRallyTimer = null;
 
 function startGuildRallyTimer() {
-  // Bersihkan timer lama agar tidak tumpang tindih
   if (guildRallyTimer) clearInterval(guildRallyTimer);
+  
+  if (!myGuildDataCache || !myGuildDataCache.server_time) return;
+  
+  // Hitung selisih jam antara Server dan PC/HP pemain
+  const timeOffset = myGuildDataCache.server_time - (Date.now() / 1000);
   
   guildRallyTimer = setInterval(() => {
     const sheet = document.getElementById("buildingSheet");
-    
-    // Matikan mesin jika layar ditutup atau pemain pindah ke tab lain (Hemat Baterai HP)
     if (!sheet || !sheet.classList.contains("show") || currentGuildTab !== "rally") {
       clearInterval(guildRallyTimer);
       guildRallyTimer = null;
@@ -7092,7 +7095,9 @@ function startGuildRallyTimer() {
     if (!myGuildDataCache || !myGuildDataCache.guild || !myGuildDataCache.guild.rallies) return;
     
     const rallies = Object.values(myGuildDataCache.guild.rallies);
-    const nowSec = Date.now() / 1000;
+    
+    // Gunakan jam PC yang sudah dikoreksi dengan jam Server!
+    const currentServerTime = (Date.now() / 1000) + timeOffset; 
     let needsRefresh = false;
 
     rallies.forEach(r => {
@@ -7100,28 +7105,23 @@ function startGuildRallyTimer() {
       const btnBox = document.getElementById(`rallyBtn_${r.id}`);
       
       if (remainBox) {
-        const remain = Math.max(0, Math.ceil(r.gathering_ends_at - nowSec));
+        const remain = Math.max(0, Math.ceil(r.gathering_ends_at - currentServerTime));
         
-        // Ubah teks angka langsung di layar (tanpa server)
         if (remain > 0) {
           remainBox.innerText = formatSeconds(remain);
         } else if (remain <= 0 && r.status === "gathering") {
-          // WAKTU HABIS! Kunci statusnya agar tidak berulang kali menembak server
           r.status = "marching"; 
           remainBox.innerText = "Berangkat...";
-          
           if (btnBox) {
             btnBox.disabled = true;
             btnBox.innerText = "Pasukan Berangkat";
             btnBox.className = "guild-btn-danger";
           }
-          
           needsRefresh = true;
         }
       }
     });
 
-    // Jika ada Rally yang baru saja menyentuh 0 detik, barulah kita minta data baru dari server!
     if (needsRefresh) {
        renderMyGuild(true);
     }

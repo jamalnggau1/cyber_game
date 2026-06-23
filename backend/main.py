@@ -6961,11 +6961,13 @@ async def cancel_rally(req: CancelRallyRequest, request: Request):
             my_role = m.get("role", "member")
             break
             
-    if rally.get("creator_id") != player_id and my_role not in ["leader", "admin"]:
-        raise HTTPException(status_code=403, detail="Hanya Kapten Rally atau Admin Guild yang bisa membatalkan!")
+    # === HANYA PEMBUAT YANG BISA MEMBATALKAN ===
+    if rally.get("creator_id") != player_id:
+        raise HTTPException(status_code=403, detail="Akses Ditolak! Hanya Kapten (Pembuat) yang bisa membatalkan Rally ini.")
         
     if rally.get("status") != "gathering":
         raise HTTPException(status_code=400, detail="Rally sudah berangkat menuju target, tidak bisa dibatalkan!")
+    # ============================================
 
     # === KEMBALIKAN PASUKAN ===
     for member in rally.get("members", []):
@@ -7258,7 +7260,8 @@ async def get_my_guild(request: Request):
         "guild": guild,
         "members": member_details,
         "my_role": my_role,
-        "join_requests": join_requests_details
+        "join_requests": join_requests_details,
+        "server_time": time.time()  # <--- KUNCI PENYELESAIAN BUG WAKTU!
     }
 
 @app.middleware("http")
