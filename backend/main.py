@@ -2594,6 +2594,8 @@ class AnalyzeRequest(BaseModel):
 class UpgradeResearchRequest(BaseModel):
     research_id: str
 
+
+
 class AttackRequest(BaseModel):
     target_id: str
     module_ids: List[str] = Field(min_length=1, max_length=6)
@@ -6927,6 +6929,104 @@ async def join_guild(req: JoinGuildRequest, request: Request):
 
     await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
     return {"success": True, "message": f"Berhasil bergabung dengan {guild['name']}!"}
+
+@app.post("/api/guilds/rally/launch")
+async def launch_rally(req: LaunchRallyRequest, request: Request):
+    await sync_state_from_db()
+    
+    player_id, attacker = get_or_create_active_player_profile(request)
+    guild_id = attacker.get("guild_id")
+    
+    if not guild_id or guild_id not in GAME_STATE.get("guilds", {}):
+        raise HTTPException(status_code=400, detail="Kamu harus memiliki Guild untuk membuka Rally.")
+        
+    guild = GAME_STATE["guilds"][guild_id]
+    
+    # 1. Validasi Target (Harus Markas Pemain Asli)
+    target = GAME_STATE.get("players", {}).get(req.target_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="Target markas musuh tidak ditemukan.")
+        
+    if req.target_id == player_id:
+        raise HTTPException(status_code=400, detail="Tidak bisa menyerang markas sendiri.")
+        
+    if target.get("guild_id") == guild_id:
+        raise HTTPException(status_code=400, detail="Tidak bisa menyerang anggota Guild sendiri!")
+
+    # 2. Hitung Kekuatan Pasukan Perintis (Milik Pembuat Rally)
+    if len(req.module_ids) > 6:
+        raise HTTPException(status_code=400, detail="Max 6 modules")
+        
+    unit_calc = calculate_attack_unit_power(attacker, req.units)
+    total_units = unit_calc["total_units"]
+    unit_power = unit_calc["attack_unit_power"]
+    
+    if total_units <= 0:
+        raise HTTPException(status_code=400, detail="Kamu harus mengirim minimal 1 unit sebagai Pasukan Perintis!")
+        
+    max_deploy = get_max_deploy_units_for_profile(attacker)
+    if total_units > max_deploy:
+        raise HTTPException(status_code=400, detail=f"Pasukan melebihi limit. Max deploy kamu: {max_deploy}")
+        
+    energy_cost = max(10, 10 + int(total_units / 25))
+    if attacker.get("energy", 0) < energy_cost:
+        raise HTTPException(status_code=400, detail="Energy tidak cukup untuk membuka Rally.")
+        
+    # 3. Kunci Pasukan & Potong Energy
+    attacker["energy"] = int(attacker.get("energy", 0)) - energy_cost
+    attacker = remove_deployed_units_from_inventory(attacker, req.units)
+    
+    # 4. Buat Ruang Tunggu Rally di Database Guild
+    now = time.time()
+    rally_id = f"rally_{int(now)}_{random.randint(1000, 9999)}"
+    
+    # Kapasitas maksimal Rally (Misal: 50.000 dasar + 10.000 per level Guild)
+    max_rally_capacity = 50000 + (guild.get("level", 1) * 10000)
+    
+    new_rally = {
+        "id": rally_id,
+        "status": "gathering", # Fase 1: Menunggu anggota lain
+        "creator_id": player_id,
+        "creator_name": attacker.get("name", "Commander"),
+        "target_id": req.target_id,
+        "target_name": target.get("name", "Unknown Base"),
+        "target_distance": float(target.get("distance", 10)),
+        
+        "created_at": now,
+        "gathering_ends_at": now + req.rally_seconds,
+        "max_capacity": max_rally_capacity,
+        
+        "total_units": total_units,
+        "total_power": unit_power,
+        
+        # Daftar anggota yang ikut menyumbang pasukan
+        "members": [
+            {
+                "player_id": player_id,
+                "name": attacker.get("name", "Commander"),
+                "units": copy.deepcopy(req.units),
+                "total_units": total_units,
+                "power": unit_power,
+                "module_ids": req.module_ids,
+                "ai_ids": req.ai_ids,
+                "joined_at": now
+            }
+        ]
+    }
+    
+    guild.setdefault("rallies", {})
+    guild["rallies"][rally_id] = new_rally
+    
+    GAME_STATE["players"][player_id] = attacker
+    GAME_STATE["guilds"][guild_id] = guild
+    
+    await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
+    
+    return {
+        "success": True, 
+        "message": "Rally berhasil dibuka! Menunggu pasukan anggota lain.", 
+        "rally_id": rally_id
+    }
 
 @app.post("/api/guilds/manage_member")
 async def manage_guild_member(req: ManageGuildMemberRequest, request: Request):
