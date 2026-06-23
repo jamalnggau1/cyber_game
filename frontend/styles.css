@@ -4515,3 +4515,9 @@ input[type=number] {
 
 /* Utilitas Jarak (Margin) */
 .mt-16 { margin-top: 16px; }
+/* MODULE: GUILD PENDING REQUESTS */
+.guild-pending-box { background: rgba(255, 165, 0, 0.1); border: 1px dashed var(--warn); padding: 8px; border-radius: 6px; margin-bottom: 12px; }
+.guild-pending-header { color: var(--warn); font-size: 13px; font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid rgba(255, 165, 0, 0.3); padding-bottom: 4px; }
+.guild-pending-item { display: flex; justify-content: space-between; align-items: center; background: var(--bg2); padding: 8px; border-radius: 4px; margin-bottom: 6px; border: 1px solid var(--border); }
+.guild-pending-info { display: flex; flex-direction: column; }
+.guild-pending-actions { display: flex; gap: 6px; }

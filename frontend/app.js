@@ -6479,6 +6479,33 @@ async function renderMyGuild(forceRefresh = false) {
     `;
   } 
   else if (currentGuildTab === "member") {
+    // 1. RENDER ANTREAN PELAMAR (Hanya untuk Admin & Leader)
+    let pendingHtml = "";
+    const joinRequests = myGuildDataCache.join_requests || [];
+
+    if ((myRole === 'leader' || myRole === 'admin') && joinRequests.length > 0) {
+      let reqItems = joinRequests.map(req => `
+        <div class="guild-pending-item">
+          <div class="guild-pending-info">
+            <span class="guild-member-name">${escapeHtml(req.name)}</span>
+            <span class="guild-member-power">${compactNumber(req.power)} Pwr | Lab Lv.${req.lab_level}</span>
+          </div>
+          <div class="guild-pending-actions">
+            <button class="guild-btn-sm guild-btn-success" onclick="handleJoinRequest('${req.player_id}', 'approve')">Terima</button>
+            <button class="guild-btn-sm guild-btn-danger" onclick="handleJoinRequest('${req.player_id}', 'reject')">Tolak</button>
+          </div>
+        </div>
+      `).join("");
+
+      pendingHtml = `
+        <div class="guild-pending-box">
+          <div class="guild-pending-header">Menunggu Persetujuan (${joinRequests.length})</div>
+          ${reqItems}
+        </div>
+      `;
+    }
+
+    // 2. RENDER ANGGOTA RESMI
     let membersHtml = "";
     members.forEach(m => {
       let roleBadge = "";
@@ -6518,6 +6545,7 @@ async function renderMyGuild(forceRefresh = false) {
 
     bodyHtml = `
       <div style="max-height: 45vh; overflow-y: auto; padding-right: 4px; margin-bottom: 12px;">
+        ${pendingHtml}
         ${membersHtml}
       </div>
       <div class="sheet-actions">
@@ -6753,6 +6781,19 @@ window.submitGuildSettings = async function() {
     renderMyGuild(true); // Tarik data baru dari server dan buka kembali layar info
   } catch (err) {
     alert("Gagal menyimpan pengaturan: " + err.message);
+  }
+};
+
+window.handleJoinRequest = async function(targetId, action) {
+  try {
+    const data = await api("/api/guilds/handle_request", {
+      method: "POST",
+      body: JSON.stringify({ target_id: targetId, action: action })
+    });
+    alert(data.message);
+    renderMyGuild(true); // Auto-refresh UI setelah klik terima/tolak
+  } catch (err) {
+    alert("Gagal memproses lamaran: " + err.message);
   }
 };
 

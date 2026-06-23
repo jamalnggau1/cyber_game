@@ -2546,6 +2546,10 @@ class ManageGuildMemberRequest(BaseModel):
     target_id: str
     action: str  # Isinya nanti: "kick", "promote", "demote", atau "transfer"
 
+class HandleJoinRequest(BaseModel):
+    target_id: str
+    action: str  # Isinya nanti HANYA boleh "approve" atau "reject"
+
 class GuildSettingsRequest(BaseModel):
     description: str = Field(default="", max_length=150)
     logo_id: str
@@ -6772,6 +6776,71 @@ async def create_guild(req: CreateGuildRequest, request: Request):
         "resources": profile["resources"]
     }
 # ==========================================================
+@app.post("/api/guilds/handle_request")
+async def handle_guild_request(req: HandleJoinRequest, request: Request):
+    await sync_state_from_db()
+
+    player_id, profile = get_or_create_active_player_profile(request)
+    guild_id = profile.get("guild_id")
+
+    if not guild_id or guild_id not in GAME_STATE.get("guilds", {}):
+        raise HTTPException(status_code=400, detail="Kamu tidak berada di Guild.")
+
+    guild = GAME_STATE["guilds"][guild_id]
+
+    # Cek jabatan kita
+    my_role = "member"
+    for m in guild.get("members", []):
+        if isinstance(m, dict) and m.get("player_id") == player_id:
+            my_role = m.get("role", "member")
+            break
+
+    # Gembok Keamanan: Hanya Leader & Admin yang bisa buka pintu
+    if my_role not in ["leader", "admin"]:
+        raise HTTPException(status_code=403, detail="Hanya Admin yang memiliki hak ini.")
+
+    requests_list = guild.get("join_requests", [])
+    if req.target_id not in requests_list:
+        raise HTTPException(status_code=404, detail="Pelamar tidak ditemukan dalam antrean.")
+
+    if req.action == "approve":
+        if len(guild.get("members", [])) >= guild.get("max_members", 50):
+            raise HTTPException(status_code=400, detail="Kapasitas Guild sudah penuh!")
+
+        target_profile = GAME_STATE.get("players", {}).get(req.target_id)
+        if not target_profile:
+            raise HTTPException(status_code=404, detail="Profil pelamar tidak ditemukan.")
+
+        # Cek jika pelamar diam-diam sudah masuk guild lain saat menunggu
+        if target_profile.get("guild_id"):
+            requests_list.remove(req.target_id) # Hapus dari antrean kita
+            raise HTTPException(status_code=400, detail="Pemain ini sudah bergabung dengan Guild lain.")
+
+        # Eksekusi Approve
+        target_profile["guild_id"] = guild_id
+        GAME_STATE["players"][req.target_id] = target_profile
+        
+        guild["members"].append({
+            "player_id": req.target_id,
+            "role": "member",
+            "joined_at": time.time()
+        })
+        requests_list.remove(req.target_id)
+        msg = "Pemain berhasil diterima masuk ke Guild!"
+
+    elif req.action == "reject":
+        # Eksekusi Reject (Cukup buang namanya dari antrean)
+        requests_list.remove(req.target_id)
+        msg = "Lamaran pemain telah ditolak dan dihapus."
+        
+    else:
+        raise HTTPException(status_code=400, detail="Aksi tidak valid.")
+
+    guild["join_requests"] = requests_list
+    GAME_STATE["guilds"][guild_id] = guild
+    await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
+
+    return {"success": True, "message": msg}
 
 @app.post("/api/guilds/settings")
 async def update_guild_settings(req: GuildSettingsRequest, request: Request):
@@ -6981,11 +7050,28 @@ async def get_my_guild(request: Request):
     # Cari tahu apa jabatan pemain yang sedang merequest ini
     my_role = next((m["role"] for m in member_details if m["player_id"] == player_id), "member")
     
+    # === TAMBAHAN: Tarik data pelamar jika kita adalah Admin/Leader ===
+    join_requests_details = []
+    if my_role in ["leader", "admin"]:
+        requests_list = guild.get("join_requests", [])
+        for req_id in requests_list:
+            req_profile = GAME_STATE.get("players", {}).get(req_id, {})
+            if req_profile:
+                req_power = get_profile_base_power(req_profile) + get_profile_army_power(req_profile)
+                join_requests_details.append({
+                    "player_id": req_id,
+                    "name": req_profile.get("name", req_id),
+                    "power": req_power,
+                    "lab_level": req_profile.get("lab_level", 1)
+                })
+    # ===================================================================
+
     return {
         "success": True,
         "guild": guild,
         "members": member_details,
-        "my_role": my_role
+        "my_role": my_role,
+        "join_requests": join_requests_details # Tambahkan ini agar dikirim ke HP pemain!
     }
 
 @app.middleware("http")
