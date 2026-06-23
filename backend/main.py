@@ -2597,6 +2597,10 @@ class UpgradeResearchRequest(BaseModel):
 class CancelRallyRequest(BaseModel):
     rally_id: str
 
+class JoinRallyRequest(BaseModel):
+    rally_id: str
+    units: dict = {}
+
 class LaunchRallyRequest(BaseModel):
     target_id: str
     rally_seconds: int  # Akan berisi 300 (5 menit), 600, atau 1800
@@ -7003,6 +7007,77 @@ async def cancel_rally(req: CancelRallyRequest, request: Request):
     await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
     
     return {"success": True, "message": "Rally dibatalkan. Pasukan Perintis membubarkan diri dan kembali ke barak!"}
+
+@app.post("/api/guilds/rally/join")
+async def join_rally(request: Request, req: JoinRallyRequest = Body(...)):
+    await sync_state_from_db()
+    
+    player_id, profile = get_or_create_active_player_profile(request)
+    guild_id = profile.get("guild_id")
+    
+    if not guild_id or guild_id not in GAME_STATE.get("guilds", {}):
+        raise HTTPException(status_code=400, detail="Kamu tidak memiliki Guild.")
+        
+    guild = GAME_STATE["guilds"][guild_id]
+    rally = guild.get("rallies", {}).get(req.rally_id)
+    
+    if not rally:
+        raise HTTPException(status_code=404, detail="Rally tidak ditemukan atau sudah dibatalkan oleh Kapten.")
+        
+    if rally.get("status") != "gathering":
+        raise HTTPException(status_code=400, detail="Rally sudah berangkat, kamu terlambat!")
+        
+    # 1. Cek apakah pemain ini SUDAH bergabung sebelumnya
+    for member in rally.get("members", []):
+        if member.get("player_id") == player_id:
+            raise HTTPException(status_code=400, detail="Kamu sudah berada di dalam gerbong Rally ini!")
+            
+    # 2. Hitung jumlah & kekuatan pasukan yang ingin dikirim
+    unit_calc = calculate_attack_unit_power(profile, req.units)
+    total_units = unit_calc["total_units"]
+    unit_power = unit_calc["attack_unit_power"]
+    
+    if total_units <= 0:
+        raise HTTPException(status_code=400, detail="Pilih minimal 1 unit untuk bergabung!")
+        
+    # 3. Cek apakah gerbong Rally masih muat
+    current_total_units = rally.get("total_units", 0)
+    max_capacity = rally.get("max_capacity", 50000)
+    if current_total_units + total_units > max_capacity:
+        raise HTTPException(status_code=400, detail=f"Kapasitas penuh! Sisa ruang di gerbong ini hanya {max_capacity - current_total_units} unit.")
+        
+    # 4. Potong Energy Aldi (Syarat berjalan)
+    energy_cost = max(10, 10 + int(total_units / 25))
+    if profile.get("energy", 0) < energy_cost:
+        raise HTTPException(status_code=400, detail="Energy tidak cukup untuk bergabung.")
+        
+    profile["energy"] = int(profile.get("energy", 0)) - energy_cost
+    
+    # 5. Potong Pasukan dari Markas Aldi
+    profile = remove_deployed_units_from_inventory(profile, req.units)
+    
+    # 6. Masukkan Pasukan Aldi ke dalam Gerbong Rally Kusu
+    now = time.time()
+    new_member = {
+        "player_id": player_id,
+        "name": profile.get("name", "Commander"),
+        "units": copy.deepcopy(req.units),
+        "total_units": total_units,
+        "power": unit_power,
+        "joined_at": now
+    }
+    
+    rally["members"].append(new_member)
+    rally["total_units"] = current_total_units + total_units
+    rally["total_power"] = rally.get("total_power", 0) + unit_power
+    
+    # Simpan Perubahan
+    GAME_STATE["players"][player_id] = profile
+    GAME_STATE["guilds"][guild_id] = guild
+    
+    await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
+    
+    return {"success": True, "message": f"Berhasil bergabung! {total_units} unit kamu sekarang berada di dalam Rally."}
 
 @app.post("/api/guilds/rally/launch")
 async def launch_rally(request: Request, req: LaunchRallyRequest = Body(...)):

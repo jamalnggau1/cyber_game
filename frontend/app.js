@@ -6613,7 +6613,7 @@ async function renderMyGuild(forceRefresh = false) {
                btn = `<button id="rallyBtn_${r.id}" class="guild-btn-danger" disabled style="width:100%">Pasukan Berangkat</button>`;
            }
         } else if (isGathering) {
-           btn = `<button id="rallyBtn_${r.id}" class="guild-btn-success text-bold" style="width:100%" onclick="alert('Tombol Join Rally akan kita aktifkan di tahap berikutnya!')">Join Rally</button>`;
+           btn = `<button id="rallyBtn_${r.id}" class="guild-btn-success text-bold" style="width:100%" onclick="openJoinRallySetup('${r.id}')">Join Rally</button>`;
         } else {
            btn = `<button id="rallyBtn_${r.id}" class="guild-btn-danger" disabled style="width:100%">Pasukan Berangkat</button>`;
         }
@@ -7068,12 +7068,136 @@ window.cancelRallyApi = async function(rallyId) {
     alert("Gagal membatalkan Rally: " + err.message);
   }
 };
+
 // ==========================================
-// MESIN ANIMASI WAKTU RALLY (FRONT-END ONLY)
+// SISTEM JOIN RALLY (FRONTEND)
 // ==========================================
-// ==========================================
-// MESIN ANIMASI WAKTU RALLY (DIKALIBRASI SERVER)
-// ==========================================
+window.currentJoinRallyId = null;
+
+// Helper khusus agar tidak merusak Attack Setup biasa
+window.changeJoinUnit = function(unitId, level, delta, rallyId) {
+   const key = unitStackKey(unitId, level);
+   if (!key) return;
+   const current = Number(selectedUnits[key] || 0);
+   selectedUnits[key] = clampAttackUnitAmount(unitId, level, current + Number(delta || 0));
+   openJoinRallySetup(rallyId);
+};
+
+window.setJoinUnitMax = function(unitId, level, rallyId) {
+   const key = unitStackKey(unitId, level);
+   if (!key) return;
+   selectedUnits[key] = getAttackOwnedAmount(unitId, level);
+   openJoinRallySetup(rallyId);
+};
+
+window.openJoinRallySetup = function(rallyId) {
+  if (!myGuildDataCache || !myGuildDataCache.guild) return;
+  const rally = myGuildDataCache.guild.rallies[rallyId];
+  if (!rally) return;
+
+  // Reset pilihan pasukan jika ini adalah pertama kali klik Rally ini
+  if (window.currentJoinRallyId !== rallyId) {
+      selectedUnits = {};
+      window.currentJoinRallyId = rallyId;
+  }
+
+  const maxDeploy = state.max_deploy_units || 100;
+  let totalUnits = 0;
+  Object.values(selectedUnits).forEach(v => totalUnits += Number(v||0));
+
+  // Render daftar pasukan yang dimiliki Aldi (Tanpa Module/AI, karena Kapten yang pegang AI)
+  const unitList = state.units.map(u => {
+    const rows = (u.levels || []).filter(lv => lv.unlocked && lv.owned > 0).map(lv => {
+      const key = unitStackKey(u.id, lv.level);
+      const selected = selectedUnits[key] || 0;
+
+      return `
+        <div class="attack-unit-card">
+          <div class="attack-unit-head">
+            <div>
+              <b>${u.name} Lv.${lv.level}</b>
+              <small>Owned: ${lv.owned}</small>
+            </div>
+            <input class="unit-amount attack-unit-input" type="number" min="0" max="${lv.owned}" value="${selected}" readonly />
+          </div>
+          <div class="unit-pick-actions">
+            <button onclick="changeJoinUnit('${u.id}', ${lv.level}, -1, '${rallyId}')">-1</button>
+            <button onclick="changeJoinUnit('${u.id}', ${lv.level}, 1, '${rallyId}')">+1</button>
+            <button onclick="changeJoinUnit('${u.id}', ${lv.level}, 10, '${rallyId}')">+10</button>
+            <button onclick="setJoinUnitMax('${u.id}', ${lv.level}, '${rallyId}')">MAX</button>
+          </div>
+        </div>
+      `;
+    }).join("");
+    return rows;
+  }).join("");
+
+  const sisaRuang = rally.max_capacity - rally.total_units;
+
+  showBuildingSheet(
+    "Kirim Pasukan Bantuan",
+    `
+      <div class="attack-target-box">
+        <h3>Target: ${escapeHtml(rally.target_name)}</h3>
+        <div style="color:var(--good); font-weight:bold; margin-bottom:4px;">Kapten: ${escapeHtml(rally.creator_name)}</div>
+        <div class="muted">Sisa Kapasitas Gerbong: ${compactNumber(sisaRuang)} Unit</div>
+      </div>
+
+      <div class="attack-section">
+        <h3>Pilih Pasukan</h3>
+        <p class="muted">Deploy: ${totalUnits}/${maxDeploy} · Energy akan terpotong saat berangkat.</p>
+        ${unitList || '<p class="muted">Kamu tidak memiliki pasukan yang siap tempur di markas.</p>'}
+      </div>
+
+      <div class="sheet-actions">
+        <button class="guild-btn-success text-bold" onclick="submitJoinRally('${rallyId}')">Konfirmasi & Gabung</button>
+        <button onclick="window.currentJoinRallyId = null; renderMyGuild(false)">Batal</button>
+      </div>
+    `
+  );
+};
+
+window.submitJoinRally = async function(rallyId) {
+  if (isLaunchingAttack) return;
+  isLaunchingAttack = true;
+
+  try {
+    const payload = {
+      rally_id: rallyId,
+      units: buildUnitPayload() // Mengambil data pasukan dari selectedUnits
+    };
+
+    // Cek apakah pemain memilih 0 unit
+    const hasUnits = Object.values(payload.units).some(levels => 
+        Object.values(levels).some(qty => Number(qty) > 0)
+    );
+
+    if (!hasUnits) {
+      alert("Pilih minimal 1 unit untuk bergabung!");
+      isLaunchingAttack = false;
+      return;
+    }
+
+    // Tembak API yang sudah kita buat di main.py tadi
+    const res = await api("/api/guilds/rally/join", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+
+    alert(res.message);
+    window.currentJoinRallyId = null;
+    
+    // Refresh Layar Guild
+    await loadState();
+    renderMyGuild(true); 
+
+  } catch (err) {
+    alert("Gagal bergabung: " + err.message);
+  } finally {
+    isLaunchingAttack = false;
+  }
+};
+
 let guildRallyTimer = null;
 
 function startGuildRallyTimer() {
