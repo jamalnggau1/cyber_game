@@ -6936,7 +6936,7 @@ async def join_guild(req: JoinGuildRequest, request: Request):
     return {"success": True, "message": f"Berhasil bergabung dengan {guild['name']}!"}
 
 @app.post("/api/guilds/rally/launch")
-async def launch_rally(req: LaunchRallyRequest, request: Request):
+async def launch_rally(request: Request, req: LaunchRallyRequest = Body(...)):
     await sync_state_from_db()
     
     player_id, attacker = get_or_create_active_player_profile(request)
