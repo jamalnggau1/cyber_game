@@ -6947,18 +6947,24 @@ async def launch_rally(request: Request, req: LaunchRallyRequest = Body(...)):
         
     guild = GAME_STATE["guilds"][guild_id]
     
-    # 1. Validasi Target (Harus Markas Pemain Asli)
-    target = GAME_STATE.get("players", {}).get(req.target_id)
+    # === PERBAIKAN: Bersihkan kata "player_" dari target_id ===
+    clean_target_id = req.target_id
+    if clean_target_id.startswith("player_"):
+        clean_target_id = clean_target_id.replace("player_", "")
+    # ===========================================================
+        
+    # 1. Validasi Target (Gunakan clean_target_id untuk mencari di Database)
+    target = GAME_STATE.get("players", {}).get(clean_target_id)
     if not target:
         raise HTTPException(status_code=404, detail="Target markas musuh tidak ditemukan.")
         
-    if req.target_id == player_id:
+    if clean_target_id == player_id:
         raise HTTPException(status_code=400, detail="Tidak bisa menyerang markas sendiri.")
         
     if target.get("guild_id") == guild_id:
         raise HTTPException(status_code=400, detail="Tidak bisa menyerang anggota Guild sendiri!")
 
-    # 2. Hitung Kekuatan Pasukan Perintis (Milik Pembuat Rally)
+    # 2. Hitung Kekuatan Pasukan Perintis
     if len(req.module_ids) > 6:
         raise HTTPException(status_code=400, detail="Max 6 modules")
         
@@ -6985,15 +6991,15 @@ async def launch_rally(request: Request, req: LaunchRallyRequest = Body(...)):
     now = time.time()
     rally_id = f"rally_{int(now)}_{random.randint(1000, 9999)}"
     
-    # Kapasitas maksimal Rally (Misal: 50.000 dasar + 10.000 per level Guild)
     max_rally_capacity = 50000 + (guild.get("level", 1) * 10000)
     
     new_rally = {
         "id": rally_id,
-        "status": "gathering", # Fase 1: Menunggu anggota lain
+        "status": "gathering", 
         "creator_id": player_id,
         "creator_name": attacker.get("name", "Commander"),
-        "target_id": req.target_id,
+        # Tetap simpan req.target_id asli ("player_tg_xxx") agar icon pedang di Map Front-End tidak error
+        "target_id": req.target_id, 
         "target_name": target.get("name", "Unknown Base"),
         "target_distance": float(target.get("distance", 10)),
         
@@ -7004,7 +7010,6 @@ async def launch_rally(request: Request, req: LaunchRallyRequest = Body(...)):
         "total_units": total_units,
         "total_power": unit_power,
         
-        # Daftar anggota yang ikut menyumbang pasukan
         "members": [
             {
                 "player_id": player_id,
