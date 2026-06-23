@@ -6885,6 +6885,11 @@ async def join_guild(req: JoinGuildRequest, request: Request):
     player_id, profile = get_or_create_active_player_profile(request)
     profile = ensure_player_profile_schema(profile)
 
+    # === PERBAIKAN: Simpan profil pelamar agar tidak jadi "Hantu" ===
+    GAME_STATE.setdefault("players", {})
+    GAME_STATE["players"][player_id] = profile
+    # ================================================================
+
     if profile.get("guild_id"):
         raise HTTPException(status_code=400, detail="Kamu sudah berada di sebuah Guild!")
 
@@ -6899,7 +6904,6 @@ async def join_guild(req: JoinGuildRequest, request: Request):
 
     join_mode = guild.get("join_mode", "auto")
 
-    # === JIKA MODE PERLU PERSETUJUAN (APPROVAL) ===
     if join_mode == "approval":
         requests_list = guild.setdefault("join_requests", [])
         if player_id in requests_list:
@@ -6911,7 +6915,6 @@ async def join_guild(req: JoinGuildRequest, request: Request):
         
         return {"success": True, "message": "Permintaan bergabung telah dikirim! Menunggu persetujuan Admin."}
         
-    # === JIKA MODE BEBAS MASUK (AUTO) ===
     guild["members"].append({
         "player_id": player_id,
         "role": "member",
@@ -7009,10 +7012,8 @@ async def get_my_guild(request: Request):
         
     guild = GAME_STATE["guilds"][guild_id]
     
-    # Kumpulkan data lengkap setiap anggota dari database player
     member_details = []
     for member in guild.get("members", []):
-        # Proteksi jika data member masih format lama (string)
         if isinstance(member, str):
             mem_id = member
             mem_role = "leader" if mem_id == guild.get("leader_id") else "member"
@@ -7024,7 +7025,6 @@ async def get_my_guild(request: Request):
         if not mem_profile:
             continue
             
-        # Hitung power anggota (Base Power + Army Power)
         mem_power = get_profile_base_power(mem_profile) + get_profile_army_power(mem_profile)
         
         member_details.append({
@@ -7035,43 +7035,42 @@ async def get_my_guild(request: Request):
             "role": mem_role
         })
         
-    # Urutkan: Leader di atas, lalu Admin, lalu Member (berdasarkan Power)
     def sort_key(x):
         role_weight = {"leader": 3, "admin": 2, "member": 1}
         return (role_weight.get(x["role"], 1), x["power"])
         
     member_details.sort(key=sort_key, reverse=True)
-    
-    # Update total power guild terbaru secara dinamis
     total_power = sum(m["power"] for m in member_details)
     guild["power"] = total_power
     GAME_STATE["guilds"][guild_id] = guild
     
-    # Cari tahu apa jabatan pemain yang sedang merequest ini
     my_role = next((m["role"] for m in member_details if m["player_id"] == player_id), "member")
     
-    # === TAMBAHAN: Tarik data pelamar jika kita adalah Admin/Leader ===
+    # === PERBAIKAN: LOGIKA ANTI-GHOST UNTUK PELAMAR ===
     join_requests_details = []
     if my_role in ["leader", "admin"]:
         requests_list = guild.get("join_requests", [])
         for req_id in requests_list:
             req_profile = GAME_STATE.get("players", {}).get(req_id, {})
-            if req_profile:
-                req_power = get_profile_base_power(req_profile) + get_profile_army_power(req_profile)
-                join_requests_details.append({
-                    "player_id": req_id,
-                    "name": req_profile.get("name", req_id),
-                    "power": req_power,
-                    "lab_level": req_profile.get("lab_level", 1)
-                })
-    # ===================================================================
-
+            # Kita sediakan nilai bawaan agar dia tetap muncul meski datanya belum sinkron sempurna
+            req_name = req_profile.get("name", req_id)
+            req_lab = req_profile.get("lab_level", 1)
+            req_power = get_profile_base_power(req_profile) + get_profile_army_power(req_profile) if req_profile else 0
+            
+            join_requests_details.append({
+                "player_id": req_id,
+                "name": req_name,
+                "power": req_power,
+                "lab_level": req_lab
+            })
+    # ==================================================
+    
     return {
         "success": True,
         "guild": guild,
         "members": member_details,
         "my_role": my_role,
-        "join_requests": join_requests_details # Tambahkan ini agar dikirim ke HP pemain!
+        "join_requests": join_requests_details
     }
 
 @app.middleware("http")
