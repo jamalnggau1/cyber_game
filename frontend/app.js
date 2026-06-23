@@ -6275,16 +6275,28 @@ async function silentSync() {
     syncOperationsFromState();
 
     // === CEK NOTIFIKASI RALLY BARU UNTUK TEMAN GUILD ===
-    // Kita cek secara diam-diam apakah ada data "guilds" terbaru di state
     if (state.player && state.player.guild_id) {
-      // Panggil API info guild secara senyap tanpa loading screen
+      // Panggil API info guild secara senyap
       const guildData = await api("/api/guilds/my?_t=" + Date.now());
       if (guildData && guildData.guild && guildData.guild.rallies) {
+        
+        // === SINKRONISASI GAIB: Timpa Cache Lama dengan yang Baru ===
+        myGuildDataCache = guildData; 
+        
+        const sheet = document.getElementById("buildingSheet");
+        const title = document.getElementById("buildingSheetTitle");
+        
+        // Jika layar Guild sedang terbuka ditatap pemain, render ulang diam-diam!
+        if (sheet && sheet.classList.contains("show") && title && title.innerText === "My Guild") {
+            // Gunakan false karena datanya sudah kita ambil di atas
+            renderMyGuild(false); 
+        }
+        // ============================================================
+
         const rallies = Object.values(guildData.guild.rallies);
         const nowSec = Date.now() / 1000;
         
         rallies.forEach(r => {
-          // Jika rally sedang gathering & bukan milik kita sendiri
           if (r.status === "gathering" && r.gathering_ends_at > nowSec && r.creator_id !== state.player.id) {
             showRallyToast(r.id, r.creator_name, r.target_name);
           }
@@ -6992,7 +7004,7 @@ window.launchRallyApi = async function() {
 
     // Otomatis buka jendela Guild dan arahkan ke Tab Rally!
     currentGuildTab = "rally";
-    openGuildGateSheet();
+    renderMyGuild(true);
 
   } catch (err) {
     alert("Gagal membuka Rally: " + err.message);
@@ -7018,7 +7030,7 @@ function showRallyToast(rallyId, creatorName, targetName) {
       toast.onclick = () => {
           toast.classList.remove("show");
           currentGuildTab = "rally";
-          openGuildGateSheet();
+          renderMyGuild(true);
       };
       document.body.appendChild(toast);
   }
