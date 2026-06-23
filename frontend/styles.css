@@ -4521,3 +4521,16 @@ input[type=number] {
 .guild-pending-item { display: flex; justify-content: space-between; align-items: center; background: var(--bg2); padding: 8px; border-radius: 4px; margin-bottom: 6px; border: 1px solid var(--border); }
 .guild-pending-info { display: flex; flex-direction: column; }
 .guild-pending-actions { display: flex; gap: 6px; }
+/* =========================================
+   MODULE: RALLY SYSTEM COMPONENTS 
+   ========================================= */
+
+.rally-setup-title { color: var(--bad); margin-bottom: 10px; }
+.rally-setup-desc { font-size: 13px; margin-bottom: 20px; }
+.rally-time-label { display: block; text-align: left; margin-bottom: 8px; color: #ccc; }
+.rally-time-grid { display: flex; gap: 10px; justify-content: center; margin-bottom: 20px; }
+.rally-time-option { flex: 1; background: var(--bg2); padding: 10px; border-radius: 6px; border: 1px solid var(--border); cursor: pointer; }
+
+/* Tambahan untuk teks di tengah layar (Utility Class) */
+.text-center { text-align: center; }
+.p-10 { padding: 10px; }

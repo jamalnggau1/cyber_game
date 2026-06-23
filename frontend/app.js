@@ -5377,6 +5377,13 @@ function selectRadarSignal(targetId) {
     );
   });
 
+  // === LOGIKA PINTAR: Cek apakah target ini adalah Pemain Nyata ===
+  const isPlayerTarget = String(target.id).startsWith("tg_") || target.kind === "player";
+  const rallyButtonHtml = isPlayerTarget 
+    ? `<button class="guild-btn-danger" onclick="openRallySetup('${target.id}')">Rally</button>` 
+    : ``;
+  // ================================================================
+
   showBuildingSheet(
     target.name,
     `
@@ -5399,6 +5406,7 @@ function selectRadarSignal(targetId) {
       ${row("Firewall", target.firewall || "Basic Firewall")}
 
       <div class="sheet-actions">
+        ${rallyButtonHtml}
         <button onclick="openAttackSetupFromRadar('${target.id}')">Attack</button>
         <button onclick="closeBuildingSheet(); scoutPopup('${target.id}')">Scout</button>
       </div>
