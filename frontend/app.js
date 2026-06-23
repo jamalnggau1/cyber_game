@@ -6266,24 +6266,21 @@ async function completeOnboarding() {
   }
 }
 
-// === FUNGSI SINKRONISASI SENYAP (DENGAN CCTV MAX) ===
+// === FUNGSI SINKRONISASI SENYAP (FINAL & BERSIH) ===
 async function silentSync() {
-  console.log("[CCTV] 🔍 silentSync mulai mengecek server...");
   try {
     const data = await api("/api/state");
-    if (!data) {
-        console.log("[CCTV] ❌ Gagal mendapat data state.");
-        return;
-    }
+    if (!data) return;
     state = data;
     syncOperationsFromState();
 
-    if (state.player && state.player.guild_id) {
-      console.log("[CCTV] 🏰 Player punya Guild, menarik data Guild...");
+    // === KUNCI PERBAIKAN: Hapus syarat state.player.guild_id ===
+    // Langsung tarik data Guild. Jika player tidak punya Guild,
+    // biarkan API gagal dan jatuh ke catch tanpa merusak game.
+    try {
       const guildData = await api("/api/guilds/my?_t=" + Date.now());
       
       if (guildData && guildData.success) {
-        console.log(`[CCTV] ✅ Data Guild didapat! Ditemukan ${Object.keys(guildData.guild.rallies || {}).length} Rally di server.`);
         myGuildDataCache = guildData; 
         const serverTime = guildData.server_time || (Date.now() / 1000);
         
@@ -6291,25 +6288,18 @@ async function silentSync() {
         const rallies = Object.values(ralliesObj);
         
         rallies.forEach(r => {
-          console.log(`[CCTV] Mengecek Rally ${r.id}... Status: ${r.status}, Sisa Waktu: ${r.gathering_ends_at - serverTime}s`);
-          
-          // TRIK TESTING: Tetap biarkan semua orang dapat notif
-          if (r.status === "gathering" && r.gathering_ends_at > serverTime) {
-            console.log(`[CCTV] 🚨 KONDISI TERPENUHI! Menembakkan Kotak Merah untuk Target: ${r.target_name}`);
+          // KEMBALIKAN SYARAT ASLI: Hanya Notifikasi Rally milik Teman!
+          if (r.status === "gathering" && r.gathering_ends_at > serverTime && r.creator_id !== state.player.id) {
             showRallyToast(r.id, r.creator_name, r.target_name);
-          } else {
-            console.log(`[CCTV] ⚠️ Rally ${r.id} diabaikan (waktu habis / sudah berangkat).`);
           }
         });
-      } else {
-        console.log("[CCTV] ❌ API Guild gagal memberikan status success.");
       }
-    } else {
-      console.log("[CCTV] ⚠️ Player tidak punya guild_id di state.");
+    } catch (guildErr) {
+      // Diamkan saja (Berarti player ini memang belum gabung Guild manapun)
     }
-  } catch (err) {
-    console.error("[CCTV] 💥 ERROR FATAL di silentSync:", err);
-  }
+    // =============================================================
+
+  } catch (err) {}
 }
 
 // ==========================================================
@@ -6798,11 +6788,11 @@ async function initApp() {
       console.warn("Scan awal gagal/skip:", err);
     });
 
-    // 5. Jalankan Sinkronisasi Senyap (Timer dipaksa berdetak!)
+    // 5. Jalankan Sinkronisasi Senyap setiap 5 detik (Anti-Glitch)
     setInterval(() => {
-      console.log("[CCTV] ⏱️ Timer 5 detik berdetak! Memanggil silentSync...");
-      // PASTIKAN TIDAK ADA LAGI "if (document.visibilityState)" DI SINI!
-      silentSync();
+      if (document.visibilityState === "visible") {
+        silentSync();
+      }
     }, 5000);
 
   } catch (err) {
@@ -7023,7 +7013,6 @@ window.launchRallyApi = async function() {
 let notifiedRallies = new Set();
 
 function showRallyToast(rallyId, creatorName, targetName) {
-  console.log(`[CCTV TOAST] Fungsi showRallyToast DIEKSEKUSI untuk target: ${targetName}`);
   if (notifiedRallies.has(rallyId)) return;
   notifiedRallies.add(rallyId);
 
