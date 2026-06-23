@@ -6266,50 +6266,50 @@ async function completeOnboarding() {
   }
 }
 
-// === FUNGSI SINKRONISASI SENYAP (ANTI-GLITCH) ===
+// === FUNGSI SINKRONISASI SENYAP (DENGAN CCTV MAX) ===
 async function silentSync() {
+  console.log("[CCTV] 🔍 silentSync mulai mengecek server...");
   try {
     const data = await api("/api/state");
-    if (!data) return;
+    if (!data) {
+        console.log("[CCTV] ❌ Gagal mendapat data state.");
+        return;
+    }
     state = data;
     syncOperationsFromState();
 
     if (state.player && state.player.guild_id) {
+      console.log("[CCTV] 🏰 Player punya Guild, menarik data Guild...");
       const guildData = await api("/api/guilds/my?_t=" + Date.now());
+      
       if (guildData && guildData.success) {
+        console.log(`[CCTV] ✅ Data Guild didapat! Ditemukan ${Object.keys(guildData.guild.rallies || {}).length} Rally di server.`);
         myGuildDataCache = guildData; 
-        
-        // 1. Dapatkan jam server yang absolut!
         const serverTime = guildData.server_time || (Date.now() / 1000);
         
-        const sheet = document.getElementById("buildingSheet");
-        const title = document.getElementById("buildingSheetTitle");
-        
-        if (sheet && sheet.classList.contains("show") && title && title.innerText === "My Guild") {
-            renderMyGuild(false); 
-        }
-
-        // 2. MESIN NOTIFIKASI (DENGAN CCTV CONSOLE)
         const ralliesObj = guildData.guild.rallies || {};
         const rallies = Object.values(ralliesObj);
         
-        console.log(`[CCTV] silentSync berjalan. Ditemukan ${rallies.length} Rally di server.`);
-        console.log(`[CCTV] Waktu Server: ${serverTime}`);
-
         rallies.forEach(r => {
-          console.log(`[CCTV] Cek Rally ${r.id} | Status: ${r.status} | Sisa Waktu: ${r.gathering_ends_at - serverTime} detik`);
-
-          // Gunakan trik Solo Testing (Tanpa cek creator_id)
+          console.log(`[CCTV] Mengecek Rally ${r.id}... Status: ${r.status}, Sisa Waktu: ${r.gathering_ends_at - serverTime}s`);
+          
+          // TRIK TESTING: Tetap biarkan semua orang dapat notif
           if (r.status === "gathering" && r.gathering_ends_at > serverTime) {
-            console.log(`[CCTV] KONDISI MEMENUHI SYARAT! Memanggil Kotak Merah untuk ${r.id}...`);
+            console.log(`[CCTV] 🚨 KONDISI TERPENUHI! Menembakkan Kotak Merah untuk Target: ${r.target_name}`);
             showRallyToast(r.id, r.creator_name, r.target_name);
           } else {
-            console.log(`[CCTV] GAGAL MEMENUHI SYARAT. (Status bukan gathering ATAU waktu habis)`);
+            console.log(`[CCTV] ⚠️ Rally ${r.id} diabaikan (waktu habis / sudah berangkat).`);
           }
         });
+      } else {
+        console.log("[CCTV] ❌ API Guild gagal memberikan status success.");
       }
+    } else {
+      console.log("[CCTV] ⚠️ Player tidak punya guild_id di state.");
     }
-  } catch (err) {}
+  } catch (err) {
+    console.error("[CCTV] 💥 ERROR FATAL di silentSync:", err);
+  }
 }
 
 // ==========================================================
@@ -6798,11 +6798,11 @@ async function initApp() {
       console.warn("Scan awal gagal/skip:", err);
     });
 
-    // 5. Jalankan Sinkronisasi Senyap setiap 5 detik (Anti-Glitch)
+    // 5. Jalankan Sinkronisasi Senyap (Timer dipaksa berdetak!)
     setInterval(() => {
-      if (document.visibilityState === "visible") {
-        silentSync();
-      }
+      console.log("[CCTV] ⏱️ Timer 5 detik berdetak! Memanggil silentSync...");
+      // PASTIKAN TIDAK ADA LAGI "if (document.visibilityState)" DI SINI!
+      silentSync();
     }, 5000);
 
   } catch (err) {
