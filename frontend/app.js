@@ -6598,23 +6598,21 @@ async function renderMyGuild(forceRefresh = false) {
         let btn = "";
         if (myRally) {
            if (isGathering) {
-               // Tombol Batal untuk si Pembuat Rally
-               btn = `<button class="guild-btn-danger text-bold" style="width:100%" onclick="cancelRallyApi('${r.id}')">Batalkan Rally</button>`;
+               btn = `<button id="rallyBtn_${r.id}" class="guild-btn-danger text-bold" style="width:100%" onclick="cancelRallyApi('${r.id}')">Batalkan Rally</button>`;
            } else {
-               btn = `<button class="guild-btn-danger" disabled style="width:100%">Pasukan Berangkat</button>`;
+               btn = `<button id="rallyBtn_${r.id}" class="guild-btn-danger" disabled style="width:100%">Pasukan Berangkat</button>`;
            }
         } else if (isGathering) {
-           // Tombol Join untuk anggota lain
-           btn = `<button class="guild-btn-success text-bold" style="width:100%" onclick="alert('Tombol Join Rally akan kita aktifkan di tahap berikutnya!')">Join Rally</button>`;
+           btn = `<button id="rallyBtn_${r.id}" class="guild-btn-success text-bold" style="width:100%" onclick="alert('Tombol Join Rally akan kita aktifkan di tahap berikutnya!')">Join Rally</button>`;
         } else {
-           btn = `<button class="guild-btn-danger" disabled style="width:100%">Pasukan Berangkat</button>`;
+           btn = `<button id="rallyBtn_${r.id}" class="guild-btn-danger" disabled style="width:100%">Pasukan Berangkat</button>`;
         }
 
         return `
           <div class="card guild-info-card" style="text-align:left; border-left: 3px solid var(--bad);">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
               <b style="color:var(--bad);">⚔️ Target: ${escapeHtml(r.target_name)}</b>
-              <span class="text-warn font-bold">${formatSeconds(remain)}</span>
+              <span id="rallyTimer_${r.id}" class="text-warn font-bold">${formatSeconds(remain)}</span>
             </div>
             <p class="muted" style="margin-top:0; font-size:12px;">Commander: ${escapeHtml(r.creator_name)}</p>
             
@@ -6641,6 +6639,9 @@ async function renderMyGuild(forceRefresh = false) {
         <button onclick="renderMyGuild(true)">Refresh Data</button>
       </div>
     `;
+
+    // Nyalakan mesin animasi penghitung waktu mundur
+    setTimeout(startGuildRallyTimer, 100);
   }
   else if (currentGuildTab === "reward") { bodyHtml = `<div class="card guild-info-card"><h3 class="text-good">Guild Rewards</h3><p class="muted">Dalam konstruksi.</p></div>`; }
   else if (currentGuildTab === "research") { bodyHtml = `<div class="card guild-info-card"><h3 class="text-info">Guild Tech</h3><p class="muted">Dalam konstruksi.</p></div>`; }
@@ -7058,5 +7059,62 @@ window.cancelRallyApi = async function(rallyId) {
     alert("Gagal membatalkan Rally: " + err.message);
   }
 };
+// ==========================================
+// MESIN ANIMASI WAKTU RALLY (FRONT-END ONLY)
+// ==========================================
+let guildRallyTimer = null;
+
+function startGuildRallyTimer() {
+  // Bersihkan timer lama agar tidak tumpang tindih
+  if (guildRallyTimer) clearInterval(guildRallyTimer);
+  
+  guildRallyTimer = setInterval(() => {
+    const sheet = document.getElementById("buildingSheet");
+    
+    // Matikan mesin jika layar ditutup atau pemain pindah ke tab lain (Hemat Baterai HP)
+    if (!sheet || !sheet.classList.contains("show") || currentGuildTab !== "rally") {
+      clearInterval(guildRallyTimer);
+      guildRallyTimer = null;
+      return;
+    }
+
+    if (!myGuildDataCache || !myGuildDataCache.guild || !myGuildDataCache.guild.rallies) return;
+    
+    const rallies = Object.values(myGuildDataCache.guild.rallies);
+    const nowSec = Date.now() / 1000;
+    let needsRefresh = false;
+
+    rallies.forEach(r => {
+      const remainBox = document.getElementById(`rallyTimer_${r.id}`);
+      const btnBox = document.getElementById(`rallyBtn_${r.id}`);
+      
+      if (remainBox) {
+        const remain = Math.max(0, Math.ceil(r.gathering_ends_at - nowSec));
+        
+        // Ubah teks angka langsung di layar (tanpa server)
+        if (remain > 0) {
+          remainBox.innerText = formatSeconds(remain);
+        } else if (remain <= 0 && r.status === "gathering") {
+          // WAKTU HABIS! Kunci statusnya agar tidak berulang kali menembak server
+          r.status = "marching"; 
+          remainBox.innerText = "Berangkat...";
+          
+          if (btnBox) {
+            btnBox.disabled = true;
+            btnBox.innerText = "Pasukan Berangkat";
+            btnBox.className = "guild-btn-danger";
+          }
+          
+          needsRefresh = true;
+        }
+      }
+    });
+
+    // Jika ada Rally yang baru saja menyentuh 0 detik, barulah kita minta data baru dari server!
+    if (needsRefresh) {
+       renderMyGuild(true);
+    }
+  }, 1000);
+}
 
 document.addEventListener("DOMContentLoaded", initApp);
