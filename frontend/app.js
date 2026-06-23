@@ -6294,7 +6294,9 @@ async function silentSync() {
         
         // 2. Gunakan serverTime untuk mengecek sisa waktu!
         rallies.forEach(r => {
-          if (r.status === "gathering" && r.gathering_ends_at > serverTime && r.creator_id !== state.player.id) {
+          // TRIK TESTING: Semua orang (termasuk pembuatnya sendiri) akan dapat notifikasi!
+          if (r.status === "gathering" && r.gathering_ends_at > serverTime) {
+            // PANGGIL KOTAK MERAH!
             showRallyToast(r.id, r.creator_name, r.target_name);
           }
         });
