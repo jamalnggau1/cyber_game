@@ -1,5 +1,7 @@
 let state = null;
 let buildingsData = null;
+let isRallyMode = false;
+let selectedRallyTime = 300;
 const clearedTargetIds = new Set();
 let gameMessages = [];
 let currentUnitFactoryView = null;
@@ -5723,6 +5725,7 @@ function openAttackSetupFromRadar(targetId) {
   const target = radarTargets.find(t => t.id === targetId);
   if (!target) return;
 
+  isRallyMode = false; // PASTIKAN MODE RALLY MATI UNTUK SERANGAN BIASA
   selectedTarget = target.id;
 
   // default awal biar tidak kosong
@@ -5803,20 +5806,25 @@ function showAttackSetupSheet(target) {
   const maxDeploy = state.max_deploy_units || 100;
   const selectedUnitPower = getSelectedUnitPower();
   
+  // === LOGIKA TOMBOL DINAMIS (ATTACK vs RALLY) ===
+  const actionButtonHtml = isRallyMode
+    ? `<button class="guild-btn-danger" onclick="launchRallyApi()">Luncurkan Rally</button>`
+    : `<button onclick="launchAttack()">Launch Attack</button>`;
+
   showBuildingSheet(
-    "Attack Setup",
+    isRallyMode ? "Rally Setup" : "Attack Setup",
     `
       <div class="attack-target-box">
         <h3>${target.name}</h3>
+        ${isRallyMode ? `<div style="color:var(--warn); font-weight:bold; margin-bottom:8px;">Waktu Kumpul: ${selectedRallyTime / 60} Menit</div>` : ''}
         ${row("Distance", `${target.distance} Trace Unit`)}
         ${row("Signal", target.signal_strength)}
         ${row("Lab Tier", target.lab_tier)}
-        
         ${row("Firewall", target.firewall || "Basic Firewall")}
       </div>
 
       <div class="attack-section">
-        <h3>1. Units</h3>
+        <h3>1. Vanguard Units</h3>
         <p class="muted">Deploy: ${totalUnits}/${maxDeploy} · Unit Power: ${selectedUnitPower}</p>
         ${unitList}
       </div>
@@ -5834,7 +5842,7 @@ function showAttackSetupSheet(target) {
       </div>
 
       <div class="sheet-actions">
-        <button onclick="launchAttack()">Launch Attack</button>
+        ${actionButtonHtml}
         <button onclick="closeBuildingSheet()">Cancel</button>
       </div>
     `
@@ -6805,6 +6813,117 @@ window.handleJoinRequest = async function(targetId, action) {
     renderMyGuild(true); // Auto-refresh UI setelah klik terima/tolak
   } catch (err) {
     alert("Gagal memproses lamaran: " + err.message);
+  }
+};
+
+// ==========================================
+// SISTEM RALLY (FRONTEND SETUP)
+// ==========================================
+window.openRallySetup = function(targetId) {
+  if (!state.player || !state.player.guild_id) {
+    alert("Kamu harus bergabung dengan Guild terlebih dahulu untuk membuat Rally!");
+    return;
+  }
+
+  showBuildingSheet(
+    "Persiapan Rally",
+    `
+      <div class="text-center p-10">
+        <h3 class="rally-setup-title">Deklarasi Serangan Gabungan</h3>
+        <p class="muted rally-setup-desc">
+          Pilih waktu persiapan. Selama waktu ini, anggota Guild lain bisa mengirimkan pasukan mereka untuk bergabung dengan pasukanmu.
+        </p>
+
+        <label class="rally-time-label">Waktu Persiapan:</label>
+        <div class="rally-time-grid">
+          <label class="rally-time-option">
+            <input type="radio" name="rallyTime" value="300" checked> 5 Menit
+          </label>
+          <label class="rally-time-option">
+            <input type="radio" name="rallyTime" value="600"> 10 Menit
+          </label>
+          <label class="rally-time-option">
+            <input type="radio" name="rallyTime" value="1800"> 30 Menit
+          </label>
+        </div>
+
+        <div class="sheet-actions">
+          <!-- Tombol ini sekarang mengarah ke pemilihan pasukan! -->
+          <button class="guild-btn-danger" onclick="proceedToRallySetup('${targetId}')">Pilih Pasukan Perintis</button>
+          <button onclick="closeBuildingSheet()">Batal</button>
+        </div>
+      </div>
+    `
+  );
+};
+
+window.proceedToRallySetup = function(targetId) {
+  const timeInput = document.querySelector('input[name="rallyTime"]:checked');
+  if (!timeInput) return;
+
+  selectedRallyTime = parseInt(timeInput.value, 10);
+  isRallyMode = true; // NYALAKAN MODE RALLY!
+
+  const target = radarTargets.find(t => t.id === targetId);
+  if (!target) return;
+
+  selectedTarget = target.id;
+  selectedUnits = {};
+  selectedModules = new Set();
+  selectedAi = new Set();
+
+  showAttackSetupSheet(target); // Buka layar pasukan
+};
+
+window.launchRallyApi = async function() {
+  if (isLaunchingAttack) return;
+  isLaunchingAttack = true;
+
+  try {
+    if (!selectedTarget) {
+      alert("Pilih target dulu.");
+      return;
+    }
+
+    const payload = {
+      target_id: selectedTarget,
+      rally_seconds: selectedRallyTime,
+      module_ids: [...selectedModules],
+      ai_ids: [...selectedAi],
+      units: buildUnitPayload()
+    };
+
+    const totalUnits = Object.values(selectedUnits).reduce((a, b) => a + Number(b || 0), 0);
+
+    if (totalUnits <= 0) {
+      alert("Pilih minimal 1 unit sebagai Pasukan Perintis.");
+      return;
+    }
+
+    if (selectedModules.size <= 0) {
+      alert("Pilih minimal 1 module.");
+      return;
+    }
+
+    const res = await api("/api/guilds/rally/launch", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+
+    closeBuildingSheet();
+    await loadState();
+
+    alert(res.message);
+
+    // Otomatis buka jendela Guild dan arahkan ke Tab Rally!
+    currentGuildTab = "rally";
+    openGuildGateSheet();
+
+  } catch (err) {
+    alert("Gagal membuka Rally: " + err.message);
+  } finally {
+    isLaunchingAttack = false;
+    isRallyMode = false; // Reset mode
   }
 };
 
