@@ -470,6 +470,14 @@ function addScoutOperation(scoutResult, finalLogText, targetId) {
 
 function getOperationPhaseText(op) {
   const now = Date.now();
+  // === TAMBAHAN BARU: TEKS UNTUK RALLY JOIN ===
+  if (op.type === "rally_join") {
+    if (now < Number(op.endsAt || 0)) {
+      return "Marching to Rally Point"; // Teks saat sedang berjalan
+    }
+    return "Waiting at Rally Point";    // Teks saat sudah sampai markas Kapten
+  }
+  // ============================================
 
   if (op.type === "scout") {
     if (now < Number(op.reachedAt || 0)) {

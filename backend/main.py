@@ -6993,12 +6993,52 @@ async def cancel_rally(req: CancelRallyRequest, request: Request):
                             inventory[u_id][str(lvl)] = current_qty + int(qty)
                 GAME_STATE["players"][mem_id] = mem_profile
                 
+        # === KEMBALIKAN PASUKAN ===
+    for member in rally.get("members", []):
+        mem_id = member.get("player_id")
+        mem_units = member.get("units", {})
+        op_id = member.get("op_id") # ID perjalanan saat dia join tadi
+        
+        # 1. JIKA INI ADALAH PEMBUAT RALLY (Berada di markasnya sendiri)
+        if mem_id == rally.get("creator_id"):
+            mem_profile = GAME_STATE["players"].get(mem_id)
+            if mem_profile:
+                inventory = mem_profile.setdefault("unit_inventory", {})
+                # Bubar barisan instan (karena memang sudah di markas sendiri)
+                for u_id, levels in mem_units.items():
+                    if u_id not in inventory:
+                        inventory[u_id] = {}
+                    if isinstance(inventory[u_id], dict):
+                        for lvl, qty in levels.items():
+                            current_qty = int(inventory[u_id].get(str(lvl), 0))
+                            inventory[u_id][str(lvl)] = current_qty + int(qty)
+                GAME_STATE["players"][mem_id] = mem_profile
+                
         # 2. JIKA INI ADALAH ANGGOTA YANG JOIN (Harus berjalan pulang)
         else:
-            # (CATATAN: Logika berjalan pulangnya akan kita eksekusi nanti 
-            # bersamaan saat kita merakit fitur Join Rally di tahap berikutnya. 
-            # Yang jelas, mereka TIDAK AKAN di-teleportasi!)
-            pass
+            now = time.time()
+            return_seconds = 45 # Waktu tempuh perjalanan pulang
+            ret_op_id = f"ret_rally_{int(now)}_{mem_id}"
+            
+            # Jika dia masih di jalan (outbound), hapus dari antrean lama
+            if op_id and op_id in GAME_STATE.get("active_attacks", {}):
+                del GAME_STATE["active_attacks"][op_id]
+                
+            # Buat Antrean Pulang 
+            # (Kita sengaja pakai type "attack" agar saat waktunya habis, Frontend otomatis memulihkan pasukannya ke markas!)
+            GAME_STATE.setdefault("active_attacks", {})
+            GAME_STATE["active_attacks"][ret_op_id] = {
+                "id": ret_op_id,
+                "player_id": mem_id,
+                "type": "attack",  
+                "phase": "returning",
+                "status": "running",
+                "target_id": rally.get("creator_id"),
+                "target_name": f"Rally: {rally.get('creator_name')}",
+                "return_at": now + return_seconds,
+                "return_seconds": return_seconds,
+                "units": copy.deepcopy(mem_units) # Bawa datanya agar Server tahu apa yang harus dikembalikan
+            }
 
     # === HAPUS RALLY DARI GUILD ===
     del guild["rallies"][req.rally_id]
@@ -7056,6 +7096,40 @@ async def join_rally(request: Request, req: JoinRallyRequest = Body(...)):
     # 5. Potong Pasukan dari Markas Aldi
     profile = remove_deployed_units_from_inventory(profile, req.units)
     
+    # === TAMBAHAN BARU: LOGIKA BERJALAN KE TITIK KUMPUL ===
+    now = time.time()
+    travel_seconds = 45 # Waktu tempuh ke markas Kapten (bisa Anda ubah)
+    op_id = f"join_{int(now)}_{player_id}"
+    
+    new_member = {
+        "player_id": player_id,
+        "name": profile.get("name", "Commander"),
+        "units": copy.deepcopy(req.units),
+        "total_units": total_units,
+        "power": unit_power,
+        "joined_at": now,
+        "op_id": op_id # Simpan ID perjalanan ini!
+    }
+    
+    rally["members"].append(new_member)
+    rally["total_units"] = current_total_units + total_units
+    rally["total_power"] = rally.get("total_power", 0) + unit_power
+    
+    # 6. Masukkan Perjalanan ke Command Queue Pemain!
+    GAME_STATE.setdefault("active_attacks", {})
+    GAME_STATE["active_attacks"][op_id] = {
+        "id": op_id,
+        "player_id": player_id,
+        "type": "rally_join", # Tipe khusus untuk Rally
+        "phase": "outbound",
+        "status": "running",
+        "target_id": rally.get("creator_id"),
+        "target_name": f"Base: {rally.get('creator_name')}",
+        "impact_at": now + travel_seconds,
+        "units": copy.deepcopy(req.units),
+        "rally_id": req.rally_id
+    }
+    # ====================================================
     # 6. Masukkan Pasukan Aldi ke dalam Gerbong Rally Kusu
     now = time.time()
     new_member = {
