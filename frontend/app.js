@@ -7375,28 +7375,34 @@ function getMissionTabContent() {
   }
 }
 
-// === TAMPILAN KERANGKA DAILY MISSIONS ===
+// === TAMPILAN DAILY MISSIONS (TERKONEKSI DENGAN SERVER) ===
 function renderDailyMissionsHtml() {
-  // Ini adalah data dummy (sementara) agar kita bisa melihat tampilannya.
-  // Nanti data ini akan kita tarik otomatis dari server (main.py).
+  // Ambil data tracker harian dari state server (atau buat kosong jika belum ada)
+  const tracker = (state.player && state.player.daily_tracker) ? state.player.daily_tracker : { progress: {}, claimed: [] };
+
+  // Data UI Misi (Hadiah dan Max disamakan dengan Server agar sinkron secara visual)
   const dailyMissions = [
-    { id: "d1", title: "Radar Operator", desc: "Lakukan Scan Area di Radar Tower sebanyak 3 kali.", progress: 1, max: 3, reward: "500 Credits", status: "active" },
-    { id: "d2", title: "Army Deployment", desc: "Latih 50 unit pasukan baru di Unit Factory.", progress: 50, max: 50, reward: "250 Nano Parts", status: "claimable" },
-    { id: "d3", title: "Resource Gathering", desc: "Tambang 1,000 resource dari node musuh.", progress: 1000, max: 1000, reward: "15 Energy", status: "claimed" }
+    { id: "d1", title: "Radar Operator", desc: "Lakukan Scan Area di Radar Tower sebanyak 3 kali.", max: 3, reward: "500 Credits" },
+    { id: "d2", title: "Army Deployment", desc: "Latih 10 unit pasukan Breaker baru di Unit Factory.", max: 10, reward: "250 Nano Parts" },
+    { id: "d3", title: "Resource Gathering", desc: "Kumpulkan 1,000 resource (Tahap Simulasi).", max: 1000, reward: "15 Energy" }
   ];
 
   const missionHtml = dailyMissions.map(m => {
+    // Membaca realita dari kacamata server
+    const currentProgress = Math.min(tracker.progress[m.id] || 0, m.max);
+    const isFinished = currentProgress >= m.max;
+    const isClaimed = tracker.claimed && tracker.claimed.includes(m.id);
+
     let btnHtml = "";
-    let progressHtml = `<b style="color:var(--text-main); font-size:14px;">${m.progress} / ${m.max}</b>`;
+    let progressHtml = `<b style="color:var(--text-main); font-size:14px;">${currentProgress} / ${m.max}</b>`;
     let borderStyle = "border-left: 3px solid var(--border);";
 
-    // Logika Tombol berdasarkan Status
-    if (m.status === "claimable") {
-        borderStyle = "border-left: 3px solid var(--good);";
-        btnHtml = `<button class="guild-btn-success text-bold" style="width:100%;" onclick="alert('API Claim Reward sedang disiapkan!')">Claim Reward</button>`;
-    } else if (m.status === "claimed") {
+    if (isClaimed) {
         btnHtml = `<button disabled style="width:100%;">Claimed</button>`;
         progressHtml = `<b style="color:var(--good); font-size:14px;">Selesai</b>`;
+    } else if (isFinished) {
+        borderStyle = "border-left: 3px solid var(--good);";
+        btnHtml = `<button class="guild-btn-success text-bold" style="width:100%;" onclick="submitClaimDailyMission('${m.id}')">Claim Reward</button>`;
     } else {
         btnHtml = `<button style="width:100%;" onclick="switchPage('basePage')">Go To Base</button>`;
     }
@@ -7427,5 +7433,26 @@ function renderDailyMissionsHtml() {
     </div>
   `;
 }
+
+// === API KLAIM MISI KE SERVER ===
+window.submitClaimDailyMission = async function(missionId) {
+  try {
+    const res = await api("/api/missions/daily/claim", {
+      method: "POST",
+      body: JSON.stringify({ mission_id: missionId })
+    });
+    
+    // Tampilkan sukses
+    alert(res.message);
+    
+    // Tarik ulang data terbaru dari server untuk memperbarui UI dan Top Bar Resource
+    await loadState();
+    renderMissionPage();
+    renderPlayerStatus(); 
+
+  } catch (err) {
+    alert("Gagal klaim: " + err.message);
+  }
+};
 
 document.addEventListener("DOMContentLoaded", initApp);

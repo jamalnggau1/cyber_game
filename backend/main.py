@@ -720,6 +720,14 @@ GAME_STATE: Dict[str, Any] = {
     },
 }
 
+# === DATABASE MISI HARIAN (KEKUASAAN ABSOLUT SERVER) ===
+# Frontend tidak punya hak mengatur jumlah hadiah di sini!
+DAILY_MISSIONS_DB = {
+    "d1": {"max": 3, "reward_type": "credits", "reward_qty": 500},
+    "d2": {"max": 10, "reward_type": "nano_parts", "reward_qty": 250},
+    "d3": {"max": 1000, "reward_type": "energy", "reward_qty": 15}
+}
+
 DB_LOOP = None
 _PENDING_SAVE_STATE = None
 _SAVE_TASK = None
@@ -2542,6 +2550,9 @@ generate_targets()
 # ==========================================================
 # API models
 # ==========================================================
+class ClaimMissionRequest(BaseModel):
+    mission_id: str
+
 class ManageGuildMemberRequest(BaseModel):
     target_id: str
     action: str  # Isinya nanti: "kick", "promote", "demote", atau "transfer"
@@ -3371,6 +3382,54 @@ async def get_recovery(request: Request):
         "total_disabled": sum(int(item["disabled"]) for item in items),
     }
 
+@app.post("/api/missions/daily/claim")
+async def claim_daily_mission(request: Request, req: ClaimMissionRequest = Body(...)):
+    await sync_state_from_db()
+    player_id, profile = get_or_create_active_player_profile(request)
+
+    # 1. Validasi Keberadaan Misi
+    mission = DAILY_MISSIONS_DB.get(req.mission_id)
+    if not mission:
+        raise HTTPException(status_code=404, detail="Misi tidak valid.")
+
+    # 2. Sinkronisasi Tanggal Hari Ini (Reset Harian)
+    today_str = time.strftime("%Y-%m-%d")
+    daily_tracker = profile.setdefault("daily_tracker", {})
+
+    if daily_tracker.get("date") != today_str:
+        daily_tracker["date"] = today_str
+        daily_tracker["progress"] = {}
+        daily_tracker["claimed"] = []
+
+    # 3. ANTI-EXPLOIT: Cek apakah sudah diklaim sebelumnya?
+    if req.mission_id in daily_tracker.get("claimed", []):
+        raise HTTPException(status_code=400, detail="Reward misi ini sudah diklaim hari ini!")
+
+    # 4. ANTI-EXPLOIT: Cek apakah progres di server benar-benar sudah selesai?
+    current_progress = daily_tracker.get("progress", {}).get(req.mission_id, 0)
+    if current_progress < mission["max"]:
+        raise HTTPException(status_code=400, detail="Akses Ditolak! Progress misi di server belum selesai.")
+
+    # 5. BERIKAN HADIAH (Sesuai takaran brankas server)
+    r_type = mission["reward_type"]
+    r_qty = mission["reward_qty"]
+
+    if r_type == "credits":
+        profile["credits"] = profile.get("credits", 0) + r_qty
+    elif r_type == "nano_parts":
+        profile["nano_parts"] = profile.get("nano_parts", 0) + r_qty
+    elif r_type == "energy":
+        profile["energy"] = profile.get("energy", 0) + r_qty
+
+    # 6. Catat Klaim & Simpan State
+    daily_tracker.setdefault("claimed", []).append(req.mission_id)
+    GAME_STATE["players"][player_id] = profile
+    await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
+
+    return {
+        "success": True, 
+        "message": f"Klaim Berhasil! Menambahkan +{r_qty} {r_type.replace('_', ' ').title()}"
+    }
 
 @app.post("/api/recovery/recover")
 async def recover_unit(req: RecoverUnitRequest, request: Request):
