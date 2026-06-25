@@ -6832,18 +6832,28 @@ async function initApp() {
       console.warn("Scan awal gagal/skip:", err);
     });
 
-    // === UJI COBA VISUAL NOTIFIKASI ===
-    setTimeout(() => {
-        console.log("[DEBUG-VISUAL] Memanggil Test Notifikasi...");
-        showRallyToast("test_123", "Sistem Jenderal", "Markas Dummy");
-    }, 3000);
+    // === SISTEM PENGHEMAT SERVER VERCEL (AFK DETECTOR) ===
+    let idleSeconds = 0;
 
-    // 5. Jalankan Sinkronisasi Senyap setiap 5 detik (Anti-Glitch)
+    // Reset timer jika pemain menyentuh layar atau main game
+    document.addEventListener("click", () => idleSeconds = 0);
+    document.addEventListener("touchstart", () => idleSeconds = 0);
+    document.addEventListener("scroll", () => idleSeconds = 0);
+
+    // Mesin Sinkronisasi (Berdetak tiap 5 detik)
     setInterval(() => {
-      if (document.visibilityState === "visible") {
-        silentSync();
+      idleSeconds += 5;
+      
+      // Jika pemain AFK (tidak sentuh layar) lebih dari 3 menit (180 detik)
+      // Mesin berhenti menembak server Vercel untuk menghemat kuota!
+      if (idleSeconds > 180) {
+          return; 
       }
+      
+      // Jika aktif, lakukan sinkronisasi normal
+      silentSync();
     }, 5000);
+    // =====================================================
 
   } catch (err) {
     // Tangkap error jika server sedang bermasalah
@@ -7444,10 +7454,15 @@ window.submitClaimDailyMission = async function(missionId) {
     // Tampilkan sukses
     alert(res.message);
     
-    // Tarik ulang data terbaru dari server untuk memperbarui UI dan Top Bar Resource
+    // Tarik ulang data terbaru dari server
     await loadState();
+    
+    // Refresh Layar Misi (Tombol akan otomatis berubah jadi "Selesai")
     renderMissionPage();
-    renderPlayerStatus(); 
+    
+    // (BARIS renderPlayerStatus() YANG MEMBUAT ERROR SUDAH KITA HAPUS)
+    // Catatan: Baris resource di atas layar akan otomatis ter-update sendirinya 
+    // dalam hitungan detik berkat mesin silentSync Anda!
 
   } catch (err) {
     alert("Gagal klaim: " + err.message);

@@ -3582,7 +3582,7 @@ async def state(request: Request):
     player_view["daily_tracker"] = profile.get("daily_tracker", {"progress": {}, "claimed": []})
 
     GAME_STATE["players"][player_id] = profile
-    await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
+    # await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
     # === SISIPIKAN VARIABEL INI ===
     player_active_attacks = {
         op_id: op for op_id, op in GAME_STATE.get("active_attacks", {}).items()
@@ -5597,6 +5597,29 @@ async def train_unit(req: TrainUnitRequest, request: Request):
     profile["unit_inventory"].setdefault(req.unit_id, {})
     profile["unit_inventory"][req.unit_id].setdefault(level_key, 0)
     profile["unit_inventory"][req.unit_id][level_key] += int(req.amount)
+
+    # ========================================================
+    # === SENSOR PELACAK MISI HARIAN: ARMY DEPLOYMENT (d2) ===
+    # Hanya melacak jika unit yang dilatih adalah "breaker"
+    if req.unit_id == "breaker":
+        today_str = time.strftime("%Y-%m-%d")
+        daily_tracker = profile.setdefault("daily_tracker", {})
+        
+        # Cek & Reset jika berganti hari (Waktu Server)
+        if daily_tracker.get("date") != today_str:
+            daily_tracker["date"] = today_str
+            daily_tracker["progress"] = {}
+            daily_tracker["claimed"] = []
+            
+        current_prog = daily_tracker.setdefault("progress", {}).get("d2", 0)
+        max_prog = DAILY_MISSIONS_DB.get("d2", {}).get("max", 10)
+        
+        if current_prog < max_prog:
+            # Tambahkan jumlah yang dilatih, tapi jangan melebihi batas max
+            added_amount = int(req.amount)
+            new_prog = min(max_prog, current_prog + added_amount)
+            daily_tracker["progress"]["d2"] = new_prog
+    # ========================================================
 
     GAME_STATE["players"][player_id] = profile
 
