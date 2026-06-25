@@ -4643,9 +4643,16 @@ async function openSettingsSheet() {
     const s = data.settings;
 
     showBuildingSheet(
-      "Settings",
+      "Settings & Strategy",
       `
         <div class="settings-card">
+          <h3 class="text-good" style="margin-top: 0;">Strategy & Build</h3>
+          <div class="settings-options" style="flex-direction: column; gap: 8px; margin-bottom: 16px;">
+            <button style="width: 100%; text-align: left;" onclick="closeBuildingSheet(); openBuildTypesSheet()">📖 Build Types (Academy)</button>
+            <button style="width: 100%; text-align: left;" onclick="closeBuildingSheet(); openCounterGuideSheet()">⚔️ Counter Guide</button>
+            <button style="width: 100%; text-align: left;" onclick="closeBuildingSheet(); openModuleLibrarySheet()">📦 Module Library</button>
+            <button style="width: 100%; text-align: left;" onclick="closeBuildingSheet(); openDefenseSetupSheet('build')">🛡️ Defense Setup</button>
+          </div>
           <h3>Language</h3>
           <div class="settings-options">
             <button class="${s.language === "id" ? "active-setting" : ""}" onclick="updateSetting('language', 'id')">Indonesia</button>
@@ -4657,7 +4664,6 @@ async function openSettingsSheet() {
             <button class="${s.sound ? "active-setting" : ""}" onclick="updateSetting('sound', ${!s.sound})">
               Sound: ${s.sound ? "ON" : "OFF"}
             </button>
-
             <button class="${s.vibration ? "active-setting" : ""}" onclick="updateSetting('vibration', ${!s.vibration})">
               Vibration: ${s.vibration ? "ON" : "OFF"}
             </button>
@@ -4669,11 +4675,6 @@ async function openSettingsSheet() {
               Reduced Motion: ${s.reduced_motion ? "ON" : "OFF"}
             </button>
           </div>
-
-          <p class="muted" style="margin-top:12px;">
-            Untuk saat ini settings masih basic. Nanti bahasa, sound, efek animasi,
-            dan notifikasi bisa benar-benar dihubungkan ke seluruh game.
-          </p>
         </div>
 
         <div class="sheet-actions">
@@ -6157,6 +6158,10 @@ function switchPage(id) {
   if (id === "radarPage") {
     loadContestedNodes();
   }
+  // === TAMBAHAN MISI ===
+  if (id === "missionPage") {
+    renderMissionPage();
+  }
 }
 
 let onboardingLanguageDraft = "id";
@@ -7314,5 +7319,28 @@ document.addEventListener("visibilitychange", () => {
     silentSync(); 
   }
 });
+
+// ==========================================
+// MODULE: MISSION PAGE
+// ==========================================
+function renderMissionPage() {
+  const box = el("missionPageContent");
+  if (!box) return;
+
+  // Kita daur ulang kartu "Beginner Mission" yang sudah ada sebelumnya
+  const beginnerMissionHtml = renderBeginnerMissionCard();
+
+  box.innerHTML = `
+    <div class="mission-list">
+      ${beginnerMissionHtml || `
+        <div class="card p-20 text-center">
+          <span style="font-size: 24px; display:block; margin-bottom:8px;">✅</span>
+          <b>Semua misi utama selesai!</b>
+          <p class="muted" style="margin-bottom:0;">Tunggu update misi berikutnya dari CyberCore HQ.</p>
+        </div>
+      `}
+    </div>
+  `;
+}
 
 document.addEventListener("DOMContentLoaded", initApp);
