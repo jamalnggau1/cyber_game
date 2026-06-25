@@ -3722,6 +3722,27 @@ async def scan(request: Request):
     GAME_STATE["player"]["scanner_level"] = scanner_level
     GAME_STATE["player"]["scout_level"] = scanner_level
 
+    # =======================================================
+    # === SENSOR PELACAK MISI HARIAN: RADAR OPERATOR (d1) ===
+    
+    today_str = time.strftime("%Y-%m-%d")
+    daily_tracker = profile.setdefault("daily_tracker", {})
+    
+    # 1. Cek & Reset jika berganti hari (Waktu Server)
+    if daily_tracker.get("date") != today_str:
+        daily_tracker["date"] = today_str
+        daily_tracker["progress"] = {}
+        daily_tracker["claimed"] = []
+        
+    # 2. Tambahkan progres misi d1 (Hanya jika belum mencapai max)
+    # (Aman menggunakan .get() agar tidak error jika DAILY_MISSIONS_DB belum terbaca sempurna)
+    current_prog = daily_tracker.setdefault("progress", {}).get("d1", 0)
+    max_prog = DAILY_MISSIONS_DB.get("d1", {}).get("max", 3)
+    
+    if current_prog < max_prog:
+        daily_tracker["progress"]["d1"] = current_prog + 1
+    # =======================================================
+
     GAME_STATE["players"][player_id] = profile
     GAME_STATE["scan_counter"] = GAME_STATE.get("scan_counter", 0) + 1
 

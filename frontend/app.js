@@ -7377,18 +7377,16 @@ function getMissionTabContent() {
 
 // === TAMPILAN DAILY MISSIONS (TERKONEKSI DENGAN SERVER) ===
 function renderDailyMissionsHtml() {
-  // Ambil data tracker harian dari state server (atau buat kosong jika belum ada)
   const tracker = (state.player && state.player.daily_tracker) ? state.player.daily_tracker : { progress: {}, claimed: [] };
 
-  // Data UI Misi (Hadiah dan Max disamakan dengan Server agar sinkron secara visual)
+  // === PERBAIKAN UX: Tambahkan Target Halaman & Teks Tombol ===
   const dailyMissions = [
-    { id: "d1", title: "Radar Operator", desc: "Lakukan Scan Area di Radar Tower sebanyak 3 kali.", max: 3, reward: "500 Credits" },
-    { id: "d2", title: "Army Deployment", desc: "Latih 10 unit pasukan Breaker baru di Unit Factory.", max: 10, reward: "250 Nano Parts" },
-    { id: "d3", title: "Resource Gathering", desc: "Kumpulkan 1,000 resource (Tahap Simulasi).", max: 1000, reward: "15 Energy" }
+    { id: "d1", title: "Radar Operator", desc: "Lakukan Scan Area di Radar Tower sebanyak 3 kali.", max: 3, reward: "500 Credits", targetPage: "radarPage", actionBtn: "Open Radar" },
+    { id: "d2", title: "Army Deployment", desc: "Latih 10 unit pasukan Breaker baru di Unit Factory.", max: 10, reward: "250 Nano Parts", targetPage: "basePage", actionBtn: "Go To Base" },
+    { id: "d3", title: "Resource Gathering", desc: "Kumpulkan 1,000 resource (Tahap Simulasi).", max: 1000, reward: "15 Energy", targetPage: "basePage", actionBtn: "Go To Base" }
   ];
 
   const missionHtml = dailyMissions.map(m => {
-    // Membaca realita dari kacamata server
     const currentProgress = Math.min(tracker.progress[m.id] || 0, m.max);
     const isFinished = currentProgress >= m.max;
     const isClaimed = tracker.claimed && tracker.claimed.includes(m.id);
@@ -7404,7 +7402,8 @@ function renderDailyMissionsHtml() {
         borderStyle = "border-left: 3px solid var(--good);";
         btnHtml = `<button class="guild-btn-success text-bold" style="width:100%;" onclick="submitClaimDailyMission('${m.id}')">Claim Reward</button>`;
     } else {
-        btnHtml = `<button style="width:100%;" onclick="switchPage('basePage')">Go To Base</button>`;
+        // === TOMBOL SHORTCUT DINAMIS ===
+        btnHtml = `<button style="width:100%;" onclick="switchPage('${m.targetPage}')">${m.actionBtn}</button>`;
     }
 
     return `
