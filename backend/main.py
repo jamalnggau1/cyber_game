@@ -3579,6 +3579,7 @@ async def state(request: Request):
     player_view["ai_core_level"] = get_ai_slot_limit_for_profile(profile)
     player_view["unit_inventory"] = profile.get("unit_inventory", {})
     player_view["unit_tech"] = profile.get("unit_tech", {})
+    player_view["daily_tracker"] = profile.get("daily_tracker", {"progress": {}, "claimed": []})
 
     GAME_STATE["players"][player_id] = profile
     await save_game_state(copy.deepcopy(GAME_STATE), PLAYER_ID)
