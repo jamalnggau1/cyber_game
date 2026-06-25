@@ -7398,9 +7398,8 @@ function renderDailyMissionsHtml() {
     { 
       id: "d2", title: "Army Deployment", desc: "Latih 10 unit pasukan Breaker baru di Unit Factory.", max: 10, reward: "250 Nano Parts", 
       actionBtn: "Go To Train", 
-      // CATATAN: Ini akan memindahkan pemain ke layar Base, lalu langsung membuka UI Factory!
-      // Jika fungsi buka factory Anda namanya berbeda, silakan ganti tulisan 'openBuildingSheet' di bawah ini.
-      onClickCode: "switchPage('basePage'); openBuildingSheet('unit_factory')" 
+      // PERBAIKAN: Menggunakan nama fungsi asli Anda yaitu openBuilding
+      onClickCode: "switchPage('basePage'); openBuilding('unit_factory')" 
     },
     { 
       id: "d3", title: "Resource Gathering", desc: "Kumpulkan 1,000 resource (Tahap Simulasi).", max: 1000, reward: "15 Energy", 
