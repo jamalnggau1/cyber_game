@@ -274,7 +274,7 @@ function separateRadarPosition(rawX, rawY, minGap = 62) {
   return { x, y };
 }
 
-function openNexusNode(nodeId) {
+window.openNexusNode = function(nodeId) {
   const node = contestedNodes.find(n => n.id === nodeId);
   if (!node) return;
 
@@ -292,13 +292,39 @@ function openNexusNode(nodeId) {
       ${row("Reward", node.reward)}
 
       <div class="sheet-actions">
-        <button disabled>Enter Nexus War Soon</button>
-        <button disabled>Guild Rally Soon</button>
+        <button class="guild-btn-danger text-bold" onclick="launchNexusRally('${node.id}')">Guild Rally</button>
+        <button onclick="closeBuildingSheet(); scoutPopup('${node.id}')">Scout</button>
         <button onclick="openNexusWarSheet()">Back</button>
       </div>
     `
   );
-}
+};
+
+// === FUNGSI JEMBATAN AGAR NEXUS BISA MASUK KE LAYAR RALLY ===
+window.launchNexusRally = function(nodeId) {
+  const node = contestedNodes.find(n => n.id === nodeId);
+  if (!node) return;
+
+  // Pastikan array radarTargets tersedia
+  window.radarTargets = window.radarTargets || [];
+
+  // Suntikkan data Nexus ke dalam radar lokal HP pemain sementara waktu
+  // agar mesin Rally Setup mengenali Nexus ini sebagai target yang sah!
+  const existing = window.radarTargets.find(t => t.id === node.id);
+  if (!existing) {
+      window.radarTargets.push({
+          id: node.id,
+          name: node.name,
+          distance: 100, // Anggap jarak ke tengah map (Nexus) adalah 100 Trace Unit
+          signal_strength: "Massive Nexus Energy",
+          lab_tier: "Nexus Core",
+          firewall: "Impenetrable Nexus Wall"
+      });
+  }
+
+  // Buka layar persiapan Rally seperti biasa!
+  openRallySetup(node.id);
+};
 
 function addGameMessage(source, title, text, meta = {}) {
   const msg = {

@@ -7173,14 +7173,22 @@ async def launch_rally(request: Request, req: LaunchRallyRequest = Body(...)):
         
     # 1. Validasi Target (Gunakan clean_target_id untuk mencari di Database)
     target = GAME_STATE.get("players", {}).get(clean_target_id)
+    
+    # === TAMBAHAN NEXUS WAR: Jika bukan player, cari di daftar Nexus! ===
     if not target:
-        raise HTTPException(status_code=404, detail="Target markas musuh tidak ditemukan.")
+        # Asumsi data nexus Anda disimpan di GAME_STATE["contested_nodes"] (berupa list)
+        nexus_list = GAME_STATE.get("contested_nodes", [])
+        for nx in nexus_list:
+            if nx.get("id") == clean_target_id:
+                target = nx
+                break
+    # ====================================================================
+    
+    if not target:
+        raise HTTPException(status_code=404, detail="Target markas / Nexus tidak ditemukan.")
         
     if clean_target_id == player_id:
         raise HTTPException(status_code=400, detail="Tidak bisa menyerang markas sendiri.")
-        
-    if target.get("guild_id") == guild_id:
-        raise HTTPException(status_code=400, detail="Tidak bisa menyerang anggota Guild sendiri!")
 
     # 2. Hitung Kekuatan Pasukan Perintis
     if len(req.module_ids) > 6:
