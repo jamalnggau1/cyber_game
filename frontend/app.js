@@ -7321,24 +7321,109 @@ document.addEventListener("visibilitychange", () => {
 });
 
 // ==========================================
-// MODULE: MISSION PAGE
+// MODULE: MISSION PAGE (DAILY, MAIN, SIDE)
 // ==========================================
+let currentMissionTab = "daily"; // Tab default saat menu Misi dibuka
+
+window.switchMissionTab = function(tab) {
+  currentMissionTab = tab;
+  renderMissionPage();
+};
+
 function renderMissionPage() {
   const box = el("missionPageContent");
   if (!box) return;
 
-  // Kita daur ulang kartu "Beginner Mission" yang sudah ada sebelumnya
-  const beginnerMissionHtml = renderBeginnerMissionCard();
-
   box.innerHTML = `
-    <div class="mission-list">
-      ${beginnerMissionHtml || `
-        <div class="card p-20 text-center">
-          <span style="font-size: 24px; display:block; margin-bottom:8px;">✅</span>
-          <b>Semua misi utama selesai!</b>
-          <p class="muted" style="margin-bottom:0;">Tunggu update misi berikutnya dari CyberCore HQ.</p>
+    <div class="facility-tabs" style="margin-bottom: 16px;">
+      <button class="${currentMissionTab === 'daily' ? 'active' : ''}" onclick="switchMissionTab('daily')">Daily</button>
+      <button class="${currentMissionTab === 'main' ? 'active' : ''}" onclick="switchMissionTab('main')">Main</button>
+      <button class="${currentMissionTab === 'side' ? 'active' : ''}" onclick="switchMissionTab('side')">Side</button>
+    </div>
+
+    <div id="missionTabContent">
+      ${getMissionTabContent()}
+    </div>
+  `;
+}
+
+function getMissionTabContent() {
+  if (currentMissionTab === "daily") {
+    return renderDailyMissionsHtml();
+  } else if (currentMissionTab === "main") {
+    const beginnerHtml = renderBeginnerMissionCard();
+    return `
+      <p class="muted">Selesaikan misi utama untuk membuka fitur bangunan dan menaikkan level Commander.</p>
+      <div class="mission-list" style="margin-top: 12px;">
+        ${beginnerHtml || `
+          <div class="card p-20 text-center">
+            <span style="font-size: 24px; display:block; margin-bottom:8px;">✅</span>
+            <b>Semua misi utama selesai!</b>
+            <p class="muted" style="margin-bottom:0;">Tunggu update ekspansi dari CyberCore HQ.</p>
+          </div>
+        `}
+      </div>
+    `;
+  } else if (currentMissionTab === "side") {
+    return `
+      <div class="card p-20 text-center">
+        <span style="font-size: 24px; display:block; margin-bottom:8px;">📜</span>
+        <b>Side Missions</b>
+        <p class="muted" style="margin-bottom:0;">Misi sampingan untuk mendapatkan blueprint dan modul khusus sedang dalam konstruksi.</p>
+      </div>
+    `;
+  }
+}
+
+// === TAMPILAN KERANGKA DAILY MISSIONS ===
+function renderDailyMissionsHtml() {
+  // Ini adalah data dummy (sementara) agar kita bisa melihat tampilannya.
+  // Nanti data ini akan kita tarik otomatis dari server (main.py).
+  const dailyMissions = [
+    { id: "d1", title: "Radar Operator", desc: "Lakukan Scan Area di Radar Tower sebanyak 3 kali.", progress: 1, max: 3, reward: "500 Credits", status: "active" },
+    { id: "d2", title: "Army Deployment", desc: "Latih 50 unit pasukan baru di Unit Factory.", progress: 50, max: 50, reward: "250 Nano Parts", status: "claimable" },
+    { id: "d3", title: "Resource Gathering", desc: "Tambang 1,000 resource dari node musuh.", progress: 1000, max: 1000, reward: "15 Energy", status: "claimed" }
+  ];
+
+  const missionHtml = dailyMissions.map(m => {
+    let btnHtml = "";
+    let progressHtml = `<b style="color:var(--text-main); font-size:14px;">${m.progress} / ${m.max}</b>`;
+    let borderStyle = "border-left: 3px solid var(--border);";
+
+    // Logika Tombol berdasarkan Status
+    if (m.status === "claimable") {
+        borderStyle = "border-left: 3px solid var(--good);";
+        btnHtml = `<button class="guild-btn-success text-bold" style="width:100%;" onclick="alert('API Claim Reward sedang disiapkan!')">Claim Reward</button>`;
+    } else if (m.status === "claimed") {
+        btnHtml = `<button disabled style="width:100%;">Claimed</button>`;
+        progressHtml = `<b style="color:var(--good); font-size:14px;">Selesai</b>`;
+    } else {
+        btnHtml = `<button style="width:100%;" onclick="switchPage('basePage')">Go To Base</button>`;
+    }
+
+    return `
+      <div class="card" style="margin-bottom: 12px; ${borderStyle}">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 8px;">
+          <div style="padding-right: 12px;">
+            <h3 style="margin:0 0 4px 0;">${m.title}</h3>
+            <p class="muted" style="margin:0 0 8px 0; font-size: 12px; line-height: 1.4;">${m.desc}</p>
+            <div style="font-size: 12px; color: var(--warn); font-weight: bold;">🎁 Reward: ${m.reward}</div>
+          </div>
+          <div style="text-align:right; white-space: nowrap;">
+            ${progressHtml}
+          </div>
         </div>
-      `}
+        <div>
+          ${btnHtml}
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  return `
+    <p class="muted">Misi harian di-reset setiap pukul 00:00 waktu server. Selesaikan untuk mendapatkan suplai rutin.</p>
+    <div class="daily-mission-list" style="margin-top: 12px; max-height: 60vh; overflow-y: auto; padding-right: 4px;">
+      ${missionHtml}
     </div>
   `;
 }
