@@ -7403,7 +7403,7 @@ function renderDailyMissionsHtml() {
     },
     { 
       id: "d3", title: "Resource Gathering", desc: "Kumpulkan 1,000 resource (Tahap Simulasi).", max: 1000, reward: "15 Energy", 
-      actionBtn: "Go To Base", onClickCode: "switchPage('basePage')" 
+      actionBtn: "Go To Mining", onClickCode: "switchPage('radarPage')" 
     }
   ];
 

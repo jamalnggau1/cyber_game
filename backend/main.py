@@ -5416,6 +5416,28 @@ async def attack_return(attack_id: str, request: Request):
 
     attacker = add_units_to_inventory(attacker, surviving_units)
 
+    # ========================================================
+    # === SENSOR PELACAK MISI HARIAN: RESOURCE GATHERING (d3) ===
+    total_gained = sum(int(v or 0) for v in pending_reward.values())
+    
+    if total_gained > 0:
+        today_str = time.strftime("%Y-%m-%d")
+        daily_tracker = attacker.setdefault("daily_tracker", {})
+        
+        if daily_tracker.get("date") != today_str:
+            daily_tracker["date"] = today_str
+            daily_tracker["progress"] = {}
+            daily_tracker["claimed"] = []
+            
+        current_prog = daily_tracker.setdefault("progress", {}).get("d3", 0)
+        max_prog = DAILY_MISSIONS_DB.get("d3", {}).get("max", 1000)
+        
+        if current_prog < max_prog:
+            attacker["daily_tracker"]["progress"]["d3"] = min(max_prog, current_prog + total_gained)
+    # ========================================================
+
+    active_attack["phase"] = "completed"
+
     active_attack["phase"] = "completed"
     active_attack["status"] = "completed"
     active_attack["return_resolved"] = True
