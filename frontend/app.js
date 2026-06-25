@@ -41,8 +41,8 @@ async function initTelegramMiniApp() {
   tg.expand();
 
   try {
-    tg.setHeaderColor("#050a18");
-    tg.setBackgroundColor("#050a18");
+    tg.setHeaderColor("#4A86CF");
+    tg.setBackgroundColor("#4A86CF");
   } catch (err) {
     console.log("Telegram color setup skipped:", err);
   }
@@ -7481,9 +7481,3 @@ window.submitClaimDailyMission = async function(missionId) {
 };
 
 document.addEventListener("DOMContentLoaded", initApp);
-const tg = window.Telegram.WebApp;
-
-tg.ready();
-
-tg.setHeaderColor('#4A86CF');
-tg.setBackgroundColor('#4A86CF');
