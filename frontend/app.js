@@ -7389,11 +7389,23 @@ function getMissionTabContent() {
 function renderDailyMissionsHtml() {
   const tracker = (state.player && state.player.daily_tracker) ? state.player.daily_tracker : { progress: {}, claimed: [] };
 
-  // === PERBAIKAN UX: Tambahkan Target Halaman & Teks Tombol ===
+  // === PERBAIKAN UX: Gunakan onClickCode agar tombol bisa memanggil fungsi spesifik ===
   const dailyMissions = [
-    { id: "d1", title: "Radar Operator", desc: "Lakukan Scan Area di Radar Tower sebanyak 3 kali.", max: 3, reward: "500 Credits", targetPage: "radarPage", actionBtn: "Open Radar" },
-    { id: "d2", title: "Army Deployment", desc: "Latih 10 unit pasukan Breaker baru di Unit Factory.", max: 10, reward: "250 Nano Parts", targetPage: "basePage", actionBtn: "Go To Base" },
-    { id: "d3", title: "Resource Gathering", desc: "Kumpulkan 1,000 resource (Tahap Simulasi).", max: 1000, reward: "15 Energy", targetPage: "basePage", actionBtn: "Go To Base" }
+    { 
+      id: "d1", title: "Radar Operator", desc: "Lakukan Scan Area di Radar Tower sebanyak 3 kali.", max: 3, reward: "500 Credits", 
+      actionBtn: "Open Radar", onClickCode: "switchPage('radarPage')" 
+    },
+    { 
+      id: "d2", title: "Army Deployment", desc: "Latih 10 unit pasukan Breaker baru di Unit Factory.", max: 10, reward: "250 Nano Parts", 
+      actionBtn: "Go To Train", 
+      // CATATAN: Ini akan memindahkan pemain ke layar Base, lalu langsung membuka UI Factory!
+      // Jika fungsi buka factory Anda namanya berbeda, silakan ganti tulisan 'openBuildingSheet' di bawah ini.
+      onClickCode: "switchPage('basePage'); openBuildingSheet('unit_factory')" 
+    },
+    { 
+      id: "d3", title: "Resource Gathering", desc: "Kumpulkan 1,000 resource (Tahap Simulasi).", max: 1000, reward: "15 Energy", 
+      actionBtn: "Go To Base", onClickCode: "switchPage('basePage')" 
+    }
   ];
 
   const missionHtml = dailyMissions.map(m => {
@@ -7413,7 +7425,7 @@ function renderDailyMissionsHtml() {
         btnHtml = `<button class="guild-btn-success text-bold" style="width:100%;" onclick="submitClaimDailyMission('${m.id}')">Claim Reward</button>`;
     } else {
         // === TOMBOL SHORTCUT DINAMIS ===
-        btnHtml = `<button style="width:100%;" onclick="switchPage('${m.targetPage}')">${m.actionBtn}</button>`;
+        btnHtml = `<button style="width:100%;" onclick="${m.onClickCode}">${m.actionBtn}</button>`;
     }
 
     return `
