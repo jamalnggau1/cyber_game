@@ -7479,11 +7479,11 @@ window.submitClaimDailyMission = async function(missionId) {
     alert("Gagal klaim: " + err.message);
   }
 };
+
+document.addEventListener("DOMContentLoaded", initApp);
 const tg = window.Telegram.WebApp;
 
 tg.ready();
-tg.expand();
 
-tg.setHeaderColor("#3390EC");
-
-document.addEventListener("DOMContentLoaded", initApp);
+tg.setHeaderColor('#4A86CF');
+tg.setBackgroundColor('#4A86CF');
