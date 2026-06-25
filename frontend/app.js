@@ -7242,6 +7242,9 @@ window.submitJoinRally = async function(rallyId) {
   }
 };
 
+// ==========================================
+// MESIN ANIMASI WAKTU RALLY (SMART SENSOR)
+// ==========================================
 let guildRallyTimer = null;
 
 function startGuildRallyTimer() {
@@ -7249,7 +7252,6 @@ function startGuildRallyTimer() {
   
   if (!myGuildDataCache || !myGuildDataCache.server_time) return;
   
-  // Hitung selisih jam antara Server dan PC/HP pemain
   const timeOffset = myGuildDataCache.server_time - (Date.now() / 1000);
   
   guildRallyTimer = setInterval(() => {
@@ -7260,13 +7262,22 @@ function startGuildRallyTimer() {
       return;
     }
 
-    if (!myGuildDataCache || !myGuildDataCache.guild || !myGuildDataCache.guild.rallies) return;
+    // === PERBAIKAN 1: Aman dari Error jika Rally kosong ===
+    const ralliesObj = (myGuildDataCache.guild && myGuildDataCache.guild.rallies) ? myGuildDataCache.guild.rallies : {};
+    const rallies = Object.values(ralliesObj);
     
-    const rallies = Object.values(myGuildDataCache.guild.rallies);
-    
-    // Gunakan jam PC yang sudah dikoreksi dengan jam Server!
     const currentServerTime = (Date.now() / 1000) + timeOffset; 
     let needsRefresh = false;
+
+    // === PERBAIKAN 2: Sensor Cerdas Anti-Nyangkut ===
+    // Mesin akan menghitung jumlah kartu Rally yang ada di layar saat ini
+    const visibleCards = document.querySelectorAll('[id^="rallyTimer_"]').length;
+    
+    // Jika jumlah kartu di layar BEDA dengan jumlah data di server (misal: di layar masih 1, tapi di server sudah 0)
+    if (visibleCards !== rallies.length) {
+        needsRefresh = true; // Paksa layar untuk menggambar ulang!
+    }
+    // ================================================
 
     rallies.forEach(r => {
       const remainBox = document.getElementById(`rallyTimer_${r.id}`);
@@ -7290,8 +7301,9 @@ function startGuildRallyTimer() {
       }
     });
 
+    // Render layar secara halus (tanpa memanggil server lagi) jika ada perubahan
     if (needsRefresh) {
-       renderMyGuild(true);
+       renderMyGuild(false);
     }
   }, 1000);
 }
