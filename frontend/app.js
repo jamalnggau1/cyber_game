@@ -7482,6 +7482,8 @@ window.submitClaimDailyMission = async function(missionId) {
 const tg = window.Telegram.WebApp;
 
 tg.ready();
+tg.expand();
+
 tg.setHeaderColor("#3390EC");
 
 document.addEventListener("DOMContentLoaded", initApp);
