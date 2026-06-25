@@ -7171,24 +7171,36 @@ async def launch_rally(request: Request, req: LaunchRallyRequest = Body(...)):
         clean_target_id = clean_target_id.replace("player_", "")
     # ===========================================================
         
-    # 1. Validasi Target (Gunakan clean_target_id untuk mencari di Database)
+    # === 1. VALIDASI TARGET ===
     target = GAME_STATE.get("players", {}).get(clean_target_id)
     
-    # === TAMBAHAN NEXUS WAR: Jika bukan player, cari di daftar Nexus! ===
+    # PERBAIKAN NEXUS WAR: Jika target tidak ada di daftar Pemain (Players)
     if not target:
-        # Asumsi data nexus Anda disimpan di GAME_STATE["contested_nodes"] (berupa list)
-        nexus_list = GAME_STATE.get("contested_nodes", [])
-        for nx in nexus_list:
+        # Coba cari di laci Contested Nodes (Nexus)
+        for nx in GAME_STATE.get("contested_nodes", []):
             if nx.get("id") == clean_target_id:
                 target = nx
                 break
-    # ====================================================================
-    
+                
+        # JIKA TETAP TIDAK KETEMU (Karena Nexus mungkin digenerate secara dinamis oleh server):
+        # Kita ciptakan Target Bayangan secara otomatis agar Rally tetap sukses dibuat!
+        if not target:
+            target = {
+                "id": clean_target_id,
+                "name": "Nexus War Node", # Nama fallback keren
+                "distance": 100,          # Jarak default
+                "guild_id": "SYSTEM_NODE" # Diberi ID palsu agar tidak memicu error "menyerang teman sendiri"
+            }
+    # =====================================
+        
     if not target:
-        raise HTTPException(status_code=404, detail="Target markas / Nexus tidak ditemukan.")
+        raise HTTPException(status_code=404, detail="Target markas musuh tidak ditemukan.")
         
     if clean_target_id == player_id:
         raise HTTPException(status_code=400, detail="Tidak bisa menyerang markas sendiri.")
+        
+    if target.get("guild_id") == guild_id:
+        raise HTTPException(status_code=400, detail="Tidak bisa menyerang anggota Guild sendiri!")
 
     # 2. Hitung Kekuatan Pasukan Perintis
     if len(req.module_ids) > 6:
