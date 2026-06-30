@@ -4561,28 +4561,81 @@ input[type=number] {
 .rally-toast-content h4 { margin: 0 0 4px 0; color: var(--bad); font-size: 14px; }
 .rally-toast-content p { margin: 0; font-size: 12px; color: #ccc; line-height: 1.4; }
 /* ==========================================
-   PERBAIKAN TOP BAR (MENEMPEL MUTLAK KE ATAP)
+   PERBAIKAN FINAL TOP BAR (TATA LETAK FLEKSIBEL)
    ========================================== */
+body, html {
+  margin: 0;
+  padding: 0;
+}
+
 .mobile-topbar {
-  position: fixed !important; 
-  top: 0 !important;      /* Paksa menempel ke atap layar 0 piksel */
-  left: 0 !important;
-  right: 0 !important;
-  margin: 0 !important;   /* Hancurkan margin siluman dari kelas lama */
-  z-index: 999;
-  background: #050a18 !important; 
-  
-  /* PERBAIKAN: Padding atas kita pangkas habis menjadi 2px agar Avatar naik */
-  /* Urutan: atas, kanan, bawah, kiri */
-  padding: 2px 12px 10px 12px !important; 
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  background-color: #050a18; /* Sesuai dengan warna Telegram di app.js */
+  padding: 8px 12px;
   box-sizing: border-box;
+  z-index: 999;
+  border: none; /* Hilangkan garis agar menyatu dengan atap Telegram */
 }
 
 .topbar-row {
-  margin: 0 !important;   /* Pastikan baris dalam tidak punya margin */
-  padding: 0 !important;
   display: flex;
   align-items: center;
-  justify-content: space-between; 
+  justify-content: space-between;
   width: 100%;
+  gap: 12px; /* Jarak aman antar elemen */
+}
+
+/* === WADAH RESOURCE (BISA DIGESER HORIZONTAL) === */
+.top-resource-inline {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: nowrap;
+  overflow-x: auto; /* Biarkan bisa digeser horizontal jika layar sempit */
+  flex-grow: 1; /* Ambil sisa ruang kosong di tengah */
+  scrollbar-width: none; /* Sembunyikan scrollbar di Firefox */
+}
+.top-resource-inline::-webkit-scrollbar {
+  display: none; /* Sembunyikan scrollbar di Chrome/Safari */
+}
+
+/* Kunci elemen agar tidak saling gencet */
+.profile-avatar-button, .settings-orb {
+  flex-shrink: 0; 
+}
+.top-resource-inline > span, .top-resource-inline > div {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* === LENCANA LEVEL AVATAR === */
+.profile-avatar-button {
+  position: relative;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+.avatar-level-badge {
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #050a18;
+  border: 1px solid #0ff;
+  color: #0ff;
+  font-size: 10px;
+  font-weight: bold;
+  padding: 2px 6px;
+  border-radius: 8px;
+  z-index: 10;
+  white-space: nowrap;
+}
+
+/* Dorong halaman agar tidak tertutup Top Bar */
+main, .app {
+  padding-top: 70px;
 }
