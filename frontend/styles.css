@@ -4560,3 +4560,29 @@ input[type=number] {
 .rally-toast-icon { font-size: 24px; }
 .rally-toast-content h4 { margin: 0 0 4px 0; color: var(--bad); font-size: 14px; }
 .rally-toast-content p { margin: 0; font-size: 12px; color: #ccc; line-height: 1.4; }
+/* ==========================================
+   PERBAIKAN TOP BAR (MENEMPEL MUTLAK KE ATAP)
+   ========================================== */
+.mobile-topbar {
+  position: fixed !important; 
+  top: 0 !important;      /* Paksa menempel ke atap layar 0 piksel */
+  left: 0 !important;
+  right: 0 !important;
+  margin: 0 !important;   /* Hancurkan margin siluman dari kelas lama */
+  z-index: 999;
+  background: #050a18 !important; 
+  
+  /* PERBAIKAN: Padding atas kita pangkas habis menjadi 2px agar Avatar naik */
+  /* Urutan: atas, kanan, bawah, kiri */
+  padding: 2px 12px 10px 12px !important; 
+  box-sizing: border-box;
+}
+
+.topbar-row {
+  margin: 0 !important;   /* Pastikan baris dalam tidak punya margin */
+  padding: 0 !important;
+  display: flex;
+  align-items: center;
+  justify-content: space-between; 
+  width: 100%;
+}
