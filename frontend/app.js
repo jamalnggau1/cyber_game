@@ -2283,6 +2283,12 @@ function renderBaseBuildings() {
   const baseGrid = el("baseGrid");
   if (!baseGrid || !buildingsData) return;
 
+  // === OBAT LAYOUT TERGENCET ===
+  // Kita bersihkan class bawaan yang merusak dan memaksanya menjadi blok penuh
+  baseGrid.className = ""; 
+  baseGrid.style.display = "block";
+  baseGrid.style.width = "100%";
+
   const order = [
     "radar_tower",
     "unit_factory",
@@ -2298,14 +2304,8 @@ function renderBaseBuildings() {
     if (!b) return "";
 
     const levelText = getBuildingStatusText(b);
+    const lockedClass = b.locked ? "locked-building" : (getBuildingLevel(b) <= 0 ? "needs-build-building" : "");
 
-    const lockedClass = b.locked
-      ? "locked-building"
-      : getBuildingLevel(b) <= 0
-        ? "needs-build-building"
-        : "";
-
-    // === LOGIKA TOMBOL PINTAR ===
     let actionText = "OPEN";
     let btnClass = "cyber-btn"; 
     
@@ -2313,25 +2313,21 @@ function renderBaseBuildings() {
         actionText = "LOCKED";
     } else if (getBuildingLevel(b) <= 0) {
         actionText = "BUILD";
-        btnClass = "cyber-btn magenta-btn"; // Tombol warna ungu menyala jika butuh dibangun
+        btnClass = "cyber-btn magenta-btn"; 
     } else if (id === "radar_tower") {
         actionText = "SCAN";
-        btnClass = "cyber-btn magenta-btn"; // Tombol khusus Radar
+        btnClass = "cyber-btn magenta-btn"; 
     } else if (id === "unit_factory") {
         actionText = "TRAIN";
     } else {
         actionText = "UPGRADE";
     }
 
-    // OPERASI GANTI KULIT LOVABLE
-    // Mengganti class lama dengan "cyber-card", "card-title", "card-level", dan "cyber-btn"
     return `
       <div class="cyber-card ${lockedClass}" onclick="openBuilding('${id}')">
         <img src="${b.asset}" alt="${b.name}" style="width: 52px; height: 52px; object-fit: contain; margin-bottom: 8px; filter: drop-shadow(0 0 10px var(--cyan-dim));">
-        
         <div class="card-title">${b.name}</div>
         <div class="card-level">${levelText}</div>
-        
         <button class="${btnClass}" onclick="event.stopPropagation(); openBuilding('${id}')">
           ${actionText}
         </button>
@@ -2339,9 +2335,9 @@ function renderBaseBuildings() {
     `;
   }).join("");
 
-  // Membungkus kartu dengan grid 3-kolom milik Lovable
+  // Memisahkan Kartu Misi dan Grid Bangunan agar tidak rebutan tempat
   baseGrid.innerHTML = `
-    <div style="margin-bottom: 16px;">
+    <div style="margin-bottom: 16px; width: 100%;">
        ${renderBeginnerMissionCard()}
     </div>
     <div class="building-grid">
