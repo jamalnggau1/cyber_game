@@ -2305,20 +2305,48 @@ function renderBaseBuildings() {
         ? "needs-build-building"
         : "";
 
+    // === LOGIKA TOMBOL PINTAR ===
+    let actionText = "OPEN";
+    let btnClass = "cyber-btn"; 
+    
+    if (b.locked) {
+        actionText = "LOCKED";
+    } else if (getBuildingLevel(b) <= 0) {
+        actionText = "BUILD";
+        btnClass = "cyber-btn magenta-btn"; // Tombol warna ungu menyala jika butuh dibangun
+    } else if (id === "radar_tower") {
+        actionText = "SCAN";
+        btnClass = "cyber-btn magenta-btn"; // Tombol khusus Radar
+    } else if (id === "unit_factory") {
+        actionText = "TRAIN";
+    } else {
+        actionText = "UPGRADE";
+    }
+
+    // OPERASI GANTI KULIT LOVABLE
+    // Mengganti class lama dengan "cyber-card", "card-title", "card-level", dan "cyber-btn"
     return `
-      <div class="building-slot">
-        <div class="building ${id} ${lockedClass}" onclick="openBuilding('${id}')">
-          <img src="${b.asset}" alt="${b.name}">
-          <div class="building-name">${b.name}</div>
-          <div class="building-level">${getBuildingStatusText(b)}</div>
-        </div>
+      <div class="cyber-card ${lockedClass}" onclick="openBuilding('${id}')">
+        <img src="${b.asset}" alt="${b.name}" style="width: 52px; height: 52px; object-fit: contain; margin-bottom: 8px; filter: drop-shadow(0 0 10px var(--cyan-dim));">
+        
+        <div class="card-title">${b.name}</div>
+        <div class="card-level">${levelText}</div>
+        
+        <button class="${btnClass}" onclick="event.stopPropagation(); openBuilding('${id}')">
+          ${actionText}
+        </button>
       </div>
     `;
   }).join("");
 
+  // Membungkus kartu dengan grid 3-kolom milik Lovable
   baseGrid.innerHTML = `
-    ${renderBeginnerMissionCard()}
-    ${buildingCards}
+    <div style="margin-bottom: 16px;">
+       ${renderBeginnerMissionCard()}
+    </div>
+    <div class="building-grid">
+       ${buildingCards}
+    </div>
   `;
 }
 
