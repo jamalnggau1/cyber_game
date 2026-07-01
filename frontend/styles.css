@@ -5072,16 +5072,15 @@ body, html {
 }
 .iso-icon-wrapper.main-size { width: 130px; height: 130px; }
 
-/* 3. DUDUKAN (Besar, Kuat, Menopang dari Bawah) */
+/* ==========================================
+   3. SISTEM DUDUKAN MODULAR (SPESIFIK PER BANGUNAN)
+   ========================================== */
+
+/* ATURAN DASAR (Hanya berisi posisi tengah & gambar) */
 .cyber-pedestal {
   position: absolute; 
-  bottom: -26px !important; /* Ditarik sedikit lebih ke bawah karena ukurannya membesar */
   left: 50%;
   transform: translateX(-50%); 
-  width: 175px !important;  /* Diperbesar agar kakinya pas (dari sebelumnya 155px) */
-  height: 105px !important; /* Tingginya disesuaikan agar tidak gepeng */
-  max-width: none !important; 
-  max-height: none !important;
   background-image: url('assets/pedestal.png') !important; 
   background-size: contain;
   background-position: center bottom;
@@ -5090,13 +5089,67 @@ body, html {
   border: none !important; 
   background-color: transparent !important; 
   box-shadow: none !important;
+  max-width: none !important; 
+  max-height: none !important;
 }
 
-/* Ukuran Dudukan Khusus untuk Main Lab */
+/* --- PENGATURAN UKURAN MASING-MASING BANGUNAN --- */
+
+/* Default (Jika ada bangunan baru yang belum diatur) */
+.iso-node .cyber-pedestal {
+  width: 155px !important;  
+  height: 95px !important; 
+  bottom: -22px !important; 
+}
+
+/* 1. Main Lab (Paling Besar) */
+.main_lab .cyber-pedestal,
 .main-size .cyber-pedestal { 
-  width: 215px !important;  /* Diperbesar ekstra untuk lab utama */
+  width: 215px !important; 
   height: 130px !important; 
   bottom: -32px !important; 
+}
+
+/* 2. Unit Factory (Agak Lebar) */
+.unit_factory .cyber-pedestal {
+  width: 170px !important;
+  height: 105px !important;
+  bottom: -26px !important;
+}
+
+/* 3. Guild Gate (Gerbang Lebar) */
+.guild_gate .cyber-pedestal {
+  width: 180px !important;
+  height: 110px !important;
+  bottom: -28px !important;
+}
+
+/* 4. Radar Tower (Tinggi & Ramping) */
+.radar_tower .cyber-pedestal {
+  width: 150px !important;
+  height: 90px !important;
+  bottom: -20px !important;
+}
+
+/* 5. AI Core */
+.ai_core .cyber-pedestal {
+  width: 160px !important; 
+  height: 95px !important; 
+  bottom: -24px !important; 
+}
+
+/* 6. Research Lab */
+.research_lab .cyber-pedestal {
+  width: 165px !important; 
+  height: 100px !important; 
+  bottom: -25px !important; 
+}
+
+/* 7. Recovery Center */
+.recovery_center .cyber-pedestal {
+  width: 155px !important; 
+  height: 95px !important; 
+  bottom: -22px !important; 
 }
 
 /* 4. GAMBAR BANGUNAN (Bersandar pada Wadah) */
