@@ -4562,6 +4562,118 @@ input[type=number] {
 .rally-toast-content p { margin: 0; font-size: 12px; color: #ccc; line-height: 1.4; }
 
 /* ==========================================
+   TEMA CYBERCORE: FINAL ISOMETRIC MASTERPIECE
+   ========================================== */
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap');
+
+/* WADAH PETA ABSOLUT */
+.base-map-iso {
+  position: relative; 
+  width: 100%; 
+  aspect-ratio: 4 / 5; 
+  border-radius: 16px; 
+  margin-top: 15px;
+  background: 
+    radial-gradient(circle at top, rgba(0, 255, 255, 0.08), transparent 60%),
+    linear-gradient(rgba(0, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 100% 100%, 28px 28px, 28px 28px;
+}
+
+/* GARIS SVG PENGHUBUNG */
+.tech-tree-lines { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
+.tech-tree-lines path { stroke: rgba(57, 243, 255, 0.4); stroke-width: 1.5; fill: none; stroke-dasharray: 6, 6; animation: dataFlow 3s linear infinite; }
+@keyframes dataFlow { to { stroke-dashoffset: -12; } }
+
+/* KARTU BANGUNAN ABSOLUT (Sistem Koordinat Paku) */
+.iso-node-wrapper { 
+  position: absolute; 
+  transform: translate(-50%, -50%); 
+  width: 85px; 
+  display: flex; justify-content: center; 
+  z-index: 2; 
+}
+.iso-node { 
+  display: flex; flex-direction: column; align-items: center; 
+  cursor: pointer; position: relative; width: 100%; 
+  transition: transform 0.2s ease; 
+  background: transparent !important; border: none !important; box-shadow: none !important; 
+}
+.iso-node:active { transform: scale(0.92); }
+
+.iso-icon-wrapper { 
+  position: relative; width: 75px; height: 75px; 
+  display: flex; justify-content: center; align-items: flex-end; 
+  margin-bottom: 12px; /* Memberi ruang aman untuk nama bangunan agar tidak tertabrak */
+}
+.iso-icon-wrapper.main-size { width: 95px !important; height: 95px !important; }
+
+/* DUDUKAN CUSTOM ASET DARI COMMANDER */
+.cyber-pedestal {
+  position: absolute; 
+  bottom: -12px; 
+  left: 50%;
+  transform: translateX(-50%); 
+  width: 88px;  
+  height: 60px; 
+  background-image: url('assets/pedestal.png'); 
+  background-size: contain;
+  background-position: center bottom;
+  background-repeat: no-repeat;
+  z-index: 0; 
+  transition: all 0.3s;
+  border: none !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+.main-size .cyber-pedestal { width: 120px; height: 75px; bottom: -18px; }
+
+/* EFEK BANGUNAN MELAYANG DI ATAS DUDUKAN */
+.iso-icon-wrapper img { 
+  max-width: 100%; max-height: 100%; object-fit: contain; position: relative; z-index: 1;
+  filter: drop-shadow(0 15px 10px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 5px rgba(57, 243, 255, 0.2)); 
+  transition: transform 0.3s, filter 0.3s; 
+}
+.iso-node:hover .iso-icon-wrapper img { 
+  transform: translateY(-5px); 
+  filter: drop-shadow(0 20px 15px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 10px rgba(57, 243, 255, 0.4)); 
+}
+
+/* LABEL KECIL PRESISI */
+.iso-label { 
+  background: rgba(4, 9, 20, 0.9); border: 1px solid rgba(57, 243, 255, 0.2); 
+  border-radius: 6px; padding: 4px 6px; text-align: center; min-width: 55px; 
+  box-shadow: 0 4px 8px rgba(0,0,0,0.8); z-index: 2; transform: translateY(-2px); 
+}
+.iso-name { font-family: 'Inter', sans-serif; font-weight: 700; font-size: 9px; color: #e9f2ff; white-space: nowrap; }
+.iso-level { 
+  display: inline-block; font-family: 'Inter', sans-serif; font-size: 7px; color: #39f3ff; 
+  margin-top: 4px; font-weight: 800; padding: 2px 6px; background: rgba(57, 243, 255, 0.1); 
+  border: 1px solid rgba(57, 243, 255, 0.3); border-radius: 999px; 
+}
+
+/* HOLOGRAM TERKUNCI & GEMBOK DIPAKSA MUNCUL */
+.iso-node.locked-hologram .iso-icon-wrapper img { 
+  opacity: 0.6; filter: grayscale(1) sepia(1) hue-rotate(180deg) brightness(0.6) drop-shadow(0 0 6px rgba(57, 243, 255, 0.3)); transform: none; 
+}
+.iso-node.locked-hologram .cyber-pedestal { 
+  filter: grayscale(1) sepia(1) hue-rotate(180deg) brightness(0.4) !important;
+  opacity: 0.6; border: none !important; background-color: transparent !important; box-shadow: none !important; 
+}
+.iso-node.locked-hologram .iso-label { border-color: rgba(255, 255, 255, 0.15); background: rgba(4, 9, 20, 0.7); }
+.iso-node.locked-hologram .iso-name { color: #8aa1bd; }
+.iso-req { color: #8aa1bd; font-size: 7px; margin-top: 3px; font-weight: 600;}
+.iso-lock-icon { display: block !important; font-size: 11px; color: #8aa1bd; margin-bottom: 2px; }
+
+/* TOMBOL RAKSASA */
+.giant-btn-container { display: flex; align-items: center; gap: 15px; padding: 0 15px; margin-top: 10px; }
+.giant-btn-line { flex: 1; border: none; border-top: 1px dashed rgba(0, 255, 255, 0.4); }
+.giant-action-btn { background: linear-gradient(90deg, rgba(0,255,255,0.05), rgba(0,255,255,0.25), rgba(0,255,255,0.05)); border: 1px solid var(--accent); border-radius: 20px; padding: 12px 25px; display: flex; align-items: center; gap: 10px; cursor: pointer; box-shadow: 0 0 20px rgba(0, 255, 255, 0.15); }
+.giant-action-text { font-family: 'Orbitron', sans-serif; font-size: 16px; font-weight: 700; color: var(--accent); letter-spacing: 1px; }
+.giant-radar-icon { font-size: 20px; color: var(--accent); animation: spinRadar 4s linear infinite; }
+@keyframes spinRadar { 100% { transform: rotate(360deg); } }
+
+/* ==========================================
    TEMA CYBERCORE: FREE-FLOATING ISOMETRIC & TECH TREE
    ========================================== */
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap');
