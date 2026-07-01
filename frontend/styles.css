@@ -5073,16 +5073,16 @@ body, html {
 .iso-icon-wrapper.main-size { width: 95px !important; height: 95px !important; }
 
 /* ==========================================
-   DUDUKAN CUSTOM ASET (PROPORSIONAL & PRESISI)
+   DUDUKAN CUSTOM ASET (KEMBALI KE VERSI SEMPURNA)
    ========================================== */
 .cyber-pedestal {
   position: absolute; 
-  bottom: -14px; /* Menarik dudukan ke atas agar menempel pas di bawah kaki bangunan */
+  bottom: -22px; /* Dikembalikan ke -22px yang sudah pas */
   left: 50%;
   transform: translateX(-50%); 
-  width: 135px;  /* Ukuran proporsional agar tidak kebesaran/kekecilan */
-  height: 80px; 
-  background-image: url('assets/pedestal.png') !important; /* Mengunci gambar agar tidak hilang */
+  width: 140px;  /* Dikembalikan ke 140px yang proporsional */
+  height: 85px; 
+  background-image: url('assets/pedestal.png') !important; 
   background-size: contain;
   background-position: center bottom;
   background-repeat: no-repeat;
@@ -5095,18 +5095,18 @@ body, html {
 
 /* Ukuran Dudukan Khusus untuk Main Lab (Lebih Besar) */
 .main-size .cyber-pedestal { 
-  width: 175px; 
-  height: 105px; 
-  bottom: -18px; 
+  width: 185px; 
+  height: 115px; 
+  bottom: -26px; 
 }
 
-/* GAMBAR BANGUNAN UTAMA (MENAPAK DI PERMUKAAN DUDUKAN) */
+/* GAMBAR BANGUNAN UTAMA (MENAPAK PAS DI DUDUKAN) */
 .iso-icon-wrapper img:not(.cyber-pedestal) { 
   max-width: 100%; 
   max-height: 100%; 
   object-fit: contain; 
   position: absolute; 
-  bottom: 8px; /* Mengunci kaki bangunan tepat di atas piringan dudukan */
+  bottom: 6px; /* Dikembalikan ke 6px */
   left: 50%;
   transform: translateX(-50%); 
   z-index: 1;
@@ -5114,7 +5114,7 @@ body, html {
   transition: transform 0.3s, filter 0.3s;
 }
 
-/* HOVER: BANGUNAN TETAP DIAM DI TEMPAT (HANYA EMISI GLOW YANG MENYALA) */
+/* HOVER: BANGUNAN TETAP DIAM DI TEMPAT */
 .iso-node:hover .iso-icon-wrapper img:not(.cyber-pedestal) {
   transform: translateX(-50%) !important; 
   filter: drop-shadow(0 20px 15px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 10px rgba(57, 243, 255, 0.4)) !important;
@@ -5154,7 +5154,9 @@ body, html {
   border-radius: 999px;
 }
 
-/* HOLOGRAM TERKUNCI (KINI DUDUKAN TETAP UTUH & UKURANNYA SAMA) */
+/* ==========================================
+   HOLOGRAM TERKUNCI (FIXED)
+   ========================================== */
 .iso-node.locked-hologram .iso-icon-wrapper img:not(.cyber-pedestal) { 
   opacity: 0.6; 
   transform: translateX(-50%) !important;
@@ -5162,12 +5164,12 @@ body, html {
 }
 
 .iso-node.locked-hologram .cyber-pedestal { 
-  border-color: rgba(255, 255, 255, 0.15) !important; 
-  /* PERBAIKAN UTAMA: Menggunakan background-color agar gambar pedestal.png TIDAK terhapus */
-  background-color: rgba(255, 255, 255, 0.02) !important; 
-  box-shadow: none !important;
+  /* PERBAIKAN: Hapus background kotak, biarkan murni gambar dudukan yang di-filter gelap */
   filter: grayscale(1) sepia(1) hue-rotate(180deg) brightness(0.4) !important;
   opacity: 0.5 !important;
+  background-color: transparent !important; 
+  border: none !important; 
+  box-shadow: none !important;
 }
 
 .iso-node.locked-hologram .iso-label { 
