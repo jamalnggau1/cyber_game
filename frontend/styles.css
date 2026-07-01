@@ -4962,33 +4962,6 @@ body, html {
 }
 .iso-icon-wrapper.main-size { width: 95px !important; height: 95px !important; }
 
-/* INI DIA DUDUKAN 3D (CINCIN NEON OVAL) YANG MEMBUATNYA TERTANAM */
-.cyber-pedestal {
-  position: absolute; 
-  bottom: -8px; /* <-- Naikkan jadi -8px agar posisinya pas di bawah bangunan */
-  left: 50%;
-  transform: translateX(-50%); 
-  width: 85px;  /* <-- Dikecilkan jadi 85px agar tidak kebesaran */
-  height: 60px; 
-  
-  /* Sisanya biarkan sama persis seperti kode Anda di bawah ini */
-  background-image: url('assets/pedestal.png'); 
-  background-size: contain;
-  background-position: center bottom;
-  background-repeat: no-repeat;
-  z-index: 0; 
-  transition: all 0.3s;
-  border: none !important;
-  background-color: transparent !important;
-  box-shadow: none !important;
-}
-.main-size .cyber-pedestal { width: 78px; height: 78px; bottom: 5px; }
-
-.iso-icon-wrapper img { 
-  max-width: 100%; max-height: 100%; object-fit: contain; position: relative; z-index: 1;
-  filter: drop-shadow(0 15px 10px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 5px rgba(57, 243, 255, 0.2)); 
-}
-
 /* LABEL KECIL PRESISI */
 .iso-label { 
   background: rgba(4, 9, 20, 0.9); 
