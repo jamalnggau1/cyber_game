@@ -2311,7 +2311,8 @@ function renderBaseBuildings() {
     let labelHtml = "";
     if (isLocked) {
       const reqText = getBuildingRequirementText(id) || "Requires Upgrade";
-      labelHtml = `<div class="iso-name">${b.name}</div><div class="iso-req">${reqText}</div>`;
+      // KITA TAMBAHKAN IKON GEMBOK (🔒) DI SINI!
+      labelHtml = `<div class="iso-lock-icon">🔒</div><div class="iso-name">${b.name}</div><div class="iso-req">${reqText}</div>`;
     } else {
       labelHtml = `<div class="iso-name">${b.name}</div><div class="iso-level">Lv.${level}</div>`;
     }
