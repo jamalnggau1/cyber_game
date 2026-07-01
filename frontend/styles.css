@@ -5154,3 +5154,48 @@ body, html {
 .iso-node.locked-hologram .iso-name { color: #8aa1bd; }
 .iso-req { color: #8aa1bd; font-size: 7px; margin-top: 3px; font-weight: 600;}
 .iso-lock-icon { display: none; }
+/* ==========================================
+   FINALISASI: SINKRONISASI SKALA & POSISI BANGUNAN
+   ========================================== */
+
+/* 1. PERBESAR WADAH BANGUNAN AGAR PROPORSIONAL */
+.iso-icon-wrapper { 
+  width: 100px !important;  
+  height: 100px !important; 
+}
+.iso-icon-wrapper.main-size { 
+  width: 130px !important; 
+  height: 130px !important; 
+}
+
+/* 2. UKURAN DUDUKAN (DISESUAIKAN DENGAN WADAH BARU) */
+.cyber-pedestal {
+  width: 125px !important;  
+  height: 75px !important; 
+  max-width: none !important; 
+  max-height: none !important;
+  /* Kordinat ditarik naik karena wadah utamanya bertambah tinggi */
+  bottom: -10px !important; 
+}
+
+/* Ukuran Dudukan Khusus untuk Main Lab */
+.main-size .cyber-pedestal { 
+  width: 165px !important; 
+  height: 100px !important; 
+  bottom: -14px !important; 
+}
+
+/* 3. PAKSA BANGUNAN MEMBESAR & DUDUK PAS DI ATAS PIRINGAN */
+.iso-icon-wrapper img:not(.cyber-pedestal) { 
+  width: 100% !important; 
+  height: 100% !important;
+  max-width: none !important; 
+  max-height: none !important;
+  /* Kordinat diangkat agar kaki bangunan menapak sempurna di dudukan */
+  bottom: 18px !important; 
+}
+
+/* 4. BERI RUANG NAPAS ANTAR BANGUNAN AGAR TIDAK BERTUMPUK */
+.iso-node-wrapper {
+  min-width: 110px !important; 
+}
