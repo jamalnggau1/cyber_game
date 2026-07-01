@@ -5081,10 +5081,6 @@ body, html {
   position: absolute; 
   left: 50%;
   transform: translateX(-50%); 
-  background-image: url('assets/pedestal.png') !important; 
-  background-size: contain;
-  background-position: center bottom;
-  background-repeat: no-repeat;
   z-index: 0; 
   border: none !important; 
   background-color: transparent !important; 
