@@ -5141,8 +5141,8 @@ body, html {
 /* 6. Research Lab */
 .research_lab .cyber-pedestal {
   width: 165px !important; 
-  height: 200px !important; 
-  bottom: -25px !important; 
+  height: 100px !important; 
+  bottom: -15px !important; 
   left: -100px !important; /* Geser 10px ke kiri */
 }
 
