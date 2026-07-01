@@ -2287,66 +2287,56 @@ function renderBaseBuildings() {
   baseGridContainer.style.display = "block";
   baseGridContainer.style.width = "100%";
 
-  const layoutStructure = [
-    ["main_lab"],                                    // Row 1
-    ["radar_tower", "unit_factory"],                 // Row 2
-    ["ai_core", "research_lab", "recovery_center"],  // Row 3
-    ["guild_gate"]                                   // Row 4
-  ];
+  // KOORDINAT MUTLAK (X, Y dalam persentase) - Tidak akan pernah bergeser!
+  const nodePositions = {
+    main_lab: { x: 50, y: 18 },
+    radar_tower: { x: 20, y: 45 },
+    unit_factory: { x: 80, y: 45 },
+    ai_core: { x: 20, y: 75 },
+    research_lab: { x: 50, y: 68 },
+    recovery_center: { x: 80, y: 75 },
+    guild_gate: { x: 50, y: 92 }
+  };
 
-  const buildingCardsHtml = layoutStructure.map(rowArray => {
-    const rowHtml = rowArray.map(id => {
-      const b = buildingsData.buildings[id];
-      if (!b) return "";
+  const order = ["main_lab", "radar_tower", "unit_factory", "ai_core", "research_lab", "recovery_center", "guild_gate"];
 
-      const level = getBuildingLevel(b);
-      const isLocked = b.locked || level <= 0; 
-      
-      let labelHtml = "";
+  const buildingCardsHtml = order.map(id => {
+    const b = buildingsData.buildings[id];
+    if (!b) return "";
 
-      if (isLocked) {
-        const reqText = getBuildingRequirementText(id) || "Requires Upgrade";
-        labelHtml = `
-          <div class="iso-lock-icon">🔒</div>
-          <div class="iso-name">${b.name}</div>
-          <div class="iso-req">${reqText}</div>
-        `;
-      } else {
-        labelHtml = `
-          <div class="iso-name">${b.name}</div>
-          <div class="iso-level">Lv.${level}</div>
-        `;
-      }
+    const pos = nodePositions[id];
+    const level = getBuildingLevel(b);
+    const isLocked = b.locked || level <= 0; 
+    
+    let labelHtml = "";
+    if (isLocked) {
+      const reqText = getBuildingRequirementText(id) || "Requires Upgrade";
+      labelHtml = `<div class="iso-name">${b.name}</div><div class="iso-req">${reqText}</div>`;
+    } else {
+      labelHtml = `<div class="iso-name">${b.name}</div><div class="iso-level">Lv.${level}</div>`;
+    }
 
-      // SUNTIKAN <div class="cyber-pedestal"> SEBELUM GAMBAR
-      return `
-        <div class="iso-node-wrapper">
-          <div class="iso-node ${isLocked ? 'locked-hologram' : ''}" onclick="openBuilding('${id}')">
-            <div class="iso-icon-wrapper ${id === 'main_lab' ? 'main-size' : ''}">
-              <div class="cyber-pedestal"></div>
-              <img src="${b.asset}" alt="${b.name}">
-            </div>
-            <div class="iso-label">
-              ${labelHtml}
-            </div>
+    // Bangunan "dipaku" menggunakan style="left: ${pos.x}%; top: ${pos.y}%;"
+    return `
+      <div class="iso-node-wrapper" style="left: ${pos.x}%; top: ${pos.y}%;">
+        <div class="iso-node ${isLocked ? 'locked-hologram' : ''}" onclick="openBuilding('${id}')">
+          <div class="iso-icon-wrapper ${id === 'main_lab' ? 'main-size' : ''}">
+            <div class="cyber-pedestal"></div>
+            <img src="${b.asset}" alt="${b.name}">
           </div>
+          <div class="iso-label">${labelHtml}</div>
         </div>
-      `;
-    }).join("");
-
-    return `<div class="iso-row">${rowHtml}</div>`;
+      </div>
+    `;
   }).join("");
 
-  // KOORDINAT GARIS YANG SUDAH DIPERBAIKI PRESISI
+  // GARIS SVG MUTLAK (Koordinatnya disamakan persis dengan nodePositions di atas)
   const svgTechTree = `
     <svg class="tech-tree-lines" preserveAspectRatio="none" viewBox="0 0 100 100">
-      <path d="M 50,12 L 25,38 M 50,12 L 75,38" />
-      
-      <path d="M 25,38 L 16,65 M 25,38 L 50,65" />
-      
-      <path d="M 75,38 L 50,65 M 75,38 L 84,65" />
-      
-      <path d="M 50,65 L 50,88" />
+      <path d="M 50,18 L 20,45 M 50,18 L 80,45" />
+      <path d="M 20,45 L 20,75 M 20,45 L 50,68" />
+      <path d="M 80,45 L 50,68 M 80,45 L 80,75" />
+      <path d="M 50,68 L 50,92" />
     </svg>
   `;
 
@@ -2362,16 +2352,14 @@ function renderBaseBuildings() {
   `;
 
   baseGridContainer.innerHTML = `
-    <div style="margin-bottom: 20px; width: 100%; position: relative; z-index: 10;">
+    <div style="margin-bottom: 5px; width: 100%; position: relative; z-index: 10;">
        ${renderBeginnerMissionCard()}
     </div>
     <div class="base-map-iso">
       ${svgTechTree}
-      <div class="base-grid-iso">
-         ${buildingCardsHtml}
-      </div>
-      ${giantRadarBtn}
+      ${buildingCardsHtml}
     </div>
+    ${giantRadarBtn}
   `;
 }
 
