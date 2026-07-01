@@ -4913,12 +4913,15 @@ body, html {
 }
 @keyframes spinRadar { 100% { transform: rotate(360deg); } }
 /* ==========================================
-   EFEK ABU-ABU BANGUNAN TERKUNCI (VERSI SEDERHANA)
+   EFEK ABU-ABU BANGUNAN (TERKUNCI & BELUM DIBANGUN)
    ========================================== */
-.cyber-card.locked-building img {
+.cyber-card.locked-building img,
+.cyber-card.needs-build-building img {
   filter: grayscale(1) sepia(0.2) hue-rotate(180deg) brightness(0.5) !important;
-  opacity: 0.6;
+  opacity: 0.6 !important;
 }
-.cyber-card.locked-building .card-title {
+
+.cyber-card.locked-building .card-title,
+.cyber-card.needs-build-building .card-title {
   color: #8aa1bd !important;
 }
