@@ -2225,10 +2225,10 @@ async function loadState() {
   syncOperationsFromState();
   // ------------------------------------
 
-  const nameBox = el("topbarCommanderName");
-  const levelBox = el("topbarCommanderLevel");
-  if (nameBox) nameBox.innerText = p.commander_name || p.username || "Commander";
-  if (levelBox) levelBox.innerText = `⭐ Komandan Lv.${p.lab_level || 1}`;
+  const statusBox = el("playerStatus");
+  if (statusBox) {
+    statusBox.innerHTML = renderPlayerStatusHtml(p);
+  }
 
   renderModules();
   renderUnits();
