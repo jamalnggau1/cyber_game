@@ -5047,11 +5047,16 @@ body, html {
 
 .cyber-pedestal {
   position: absolute; 
-  bottom: -25px; /* Sedikit diturunkan karena dudukannya membesar */
+  bottom: -25px; 
   left: 50%;
   transform: translateX(-50%); 
-  width: 165px;  /* <-- Diperbesar secara wajar dari 140px */
-  height: 100px; /* <-- Diimbangi tingginya dari 85px */
+  width: 165px;  /* Sekarang ini PASTI akan membesar! */
+  height: 100px; 
+  
+  /* KUNCI KEBEBASANNYA ADA DI 2 BARIS INI: */
+  max-width: none !important; 
+  max-height: none !important;
+
   background-image: url('assets/pedestal.png') !important; 
   background-size: contain;
   background-position: center bottom;
