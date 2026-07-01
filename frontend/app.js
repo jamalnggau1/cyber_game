@@ -2305,29 +2305,13 @@ function renderBaseBuildings() {
 
     const levelText = getBuildingStatusText(b);
     const lockedClass = b.locked ? "locked-building" : (getBuildingLevel(b) <= 0 ? "needs-build-building" : "");
-
-    let actionText = "OPEN";
-    let btnClass = "cyber-btn"; 
     
-    if (b.locked) {
-        actionText = "LOCKED";
-    } else if (getBuildingLevel(b) <= 0) {
-        actionText = "BUILD";
-        btnClass = "cyber-btn magenta-btn"; 
-    } else if (id === "radar_tower") {
-        actionText = "SCAN";
-        btnClass = "cyber-btn magenta-btn"; 
-    } else if (id === "unit_factory") {
-        actionText = "TRAIN";
-    } else {
-        actionText = "UPGRADE";
-    }
-
-    // 1. KITA MUNCULKAN GEMBOK JIKA TERKUNCI
+    // Memunculkan gembok jika terkunci
     const displayTitle = b.locked ? `🔒 ${b.name}` : b.name;
 
+    // Tombol dihapus, area bawah kartu diberi sedikit ruang agar seimbang
     return `
-      <div class="cyber-card ${lockedClass}" onclick="openBuilding('${id}')">
+      <div class="cyber-card ${lockedClass}" onclick="openBuilding('${id}')" style="padding-bottom: 14px;">
         
         <div class="card-level-badge">${levelText}</div>
         
@@ -2335,9 +2319,6 @@ function renderBaseBuildings() {
         
         <div class="card-title" style="font-size: 10px;">${displayTitle}</div>
         
-        <button class="${btnClass}" onclick="event.stopPropagation(); openBuilding('${id}')">
-          ${actionText}
-        </button>
       </div>
     `;
   }).join("");
