@@ -5053,7 +5053,7 @@ body, html {
   bottom: -22px; /* Dikembalikan ke -22px yang sudah pas */
   left: 50%;
   transform: translateX(-50%); 
-  width: 140px;  /* Dikembalikan ke 140px yang proporsional */
+  width: 14000px;  /* Dikembalikan ke 140px yang proporsional */
   height: 85px; 
   background-image: url('assets/pedestal.png') !important; 
   background-size: contain;
