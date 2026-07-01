@@ -5143,6 +5143,7 @@ body, html {
   width: 165px !important; 
   height: 100px !important; 
   bottom: -25px !important; 
+  left: -100px !important; /* Geser 10px ke kiri */
 }
 
 /* 7. Recovery Center */
