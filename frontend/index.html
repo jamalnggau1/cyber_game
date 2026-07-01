@@ -9,32 +9,21 @@
 </head>
 <body>
   <div class="app">
-    <header class="premium-topbar">
-      <div class="premium-topbar-inner">
-        
-        <button class="premium-avatar-btn" onclick="openProfileSheet()">
-          <div class="premium-avatar-frame">
+    <header class="mobile-topbar clean-game-header">
+      <div class="topbar-row profile-header-row header-inline-row">
+        <button class="profile-avatar-button" onclick="openProfileSheet()" title="Profile" aria-label="Profile">
+          <span class="profile-avatar-frame">
             <img class="profile-avatar-img" src="assets/profile/avatar.webp" alt="Profile">
             <img class="profile-border-img" src="assets/borders/topup_basic.webp" alt="">
-          </div>
+            
+            <span class="avatar-level-badge" id="topbarLevelBadge">Lv.?</span>
+            
+          </span>
         </button>
 
-        <div class="premium-topbar-right">
-          
-          <div class="premium-commander-info">
-            <div class="premium-commander-name" id="topbarCommanderName">Loading...</div>
-            <div class="premium-commander-title" id="topbarCommanderLevel">⭐ Lv.?</div>
-          </div>
-          
-          <div class="premium-resource-row">
-            <div id="playerStatus" class="premium-resource-list"></div>
-            
-            <button class="premium-settings-btn" onclick="openSettingsSheet()">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-            </button>
-          </div>
-          
-        </div>
+        <div class="top-resource-inline" id="playerStatus">Loading...</div>
+
+        <button class="settings-orb" onclick="openSettingsSheet()" title="Settings" aria-label="Settings">⚙</button>
       </div>
     </header>
 
