@@ -4946,7 +4946,7 @@ body, html {
 /* NODE BANGUNAN ABSOLUT (Dipaku di koordinat khusus) */
 .iso-node-wrapper { 
   position: absolute; 
-  transform: translate(-50%, -50%); /* Menarik titik pusat bangunan tepat ke tengah koordinat */
+  transform: translate(-50%, -50%); 
   width: 85px; 
   display: flex; justify-content: center; 
   z-index: 2;
@@ -4961,20 +4961,66 @@ body, html {
 }
 .iso-icon-wrapper.main-size { width: 95px !important; height: 95px !important; }
 
-/* UBIN 3D & GAMBAR (Tetap seperti yang Anda suka) */
+/* INI DIA DUDUKAN 3D (CINCIN NEON OVAL) YANG MEMBUATNYA TERTANAM */
 .cyber-pedestal {
-  position: absolute; bottom: 8px; left: 50%;
-  transform: translateX(-50%) rotateX(60deg) rotateZ(45deg); 
-  width: 48px; height: 48px;
-  border: 1px solid rgba(57, 243, 255, 0.3); border-radius: 8px; 
-  background: linear-gradient(135deg, rgba(57, 243, 255, 0.08), transparent);
-  box-shadow: 0 0 10px rgba(57, 243, 255, 0.2) inset, 0 15px 20px rgba(0,0,0,0.8); z-index: 0;
+  position: absolute; 
+  bottom: 2px; 
+  left: 50%;
+  transform: translateX(-50%) rotateX(70deg); /* Memipihkan lingkaran menjadi oval 3D */
+  width: 58px; 
+  height: 58px;
+  border-radius: 50%; 
+  border: 2px solid rgba(57, 243, 255, 0.5);
+  background: radial-gradient(circle, rgba(57, 243, 255, 0.2) 0%, transparent 60%);
+  box-shadow: 0 0 15px rgba(57, 243, 255, 0.5), inset 0 0 10px rgba(57, 243, 255, 0.4); 
+  z-index: 0;
 }
-.main-size .cyber-pedestal { width: 62px; height: 62px; bottom: 10px; }
+.main-size .cyber-pedestal { width: 78px; height: 78px; bottom: 5px; }
 
 .iso-icon-wrapper img { 
   max-width: 100%; max-height: 100%; object-fit: contain; position: relative; z-index: 1;
   filter: drop-shadow(0 15px 10px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 5px rgba(57, 243, 255, 0.2)); 
+}
+
+/* LABEL KECIL PRESISI */
+.iso-label { 
+  background: rgba(4, 9, 20, 0.9); 
+  border: 1px solid rgba(57, 243, 255, 0.2); 
+  border-radius: 6px; 
+  padding: 4px 6px; 
+  text-align: center; 
+  min-width: 55px; 
+  box-shadow: 0 4px 8px rgba(0,0,0,0.8); 
+  z-index: 2; 
+  transform: translateY(-2px); 
+}
+
+.iso-name { font-family: 'Inter', sans-serif; font-weight: 700; font-size: 9px; color: #e9f2ff; white-space: nowrap; }
+
+.iso-level { 
+  display: inline-block; font-family: 'Inter', sans-serif; font-size: 7px; color: #39f3ff; 
+  margin-top: 4px; font-weight: 800; padding: 2px 6px; background: rgba(57, 243, 255, 0.1);
+  border: 1px solid rgba(57, 243, 255, 0.3); border-radius: 999px; 
+}
+
+/* HOLOGRAM TERKUNCI */
+.iso-node.locked-hologram .iso-icon-wrapper img { 
+  opacity: 0.6; 
+  filter: grayscale(1) sepia(1) hue-rotate(180deg) brightness(0.6) drop-shadow(0 0 6px rgba(57, 243, 255, 0.3)); 
+}
+.iso-node.locked-hologram .cyber-pedestal { 
+  border-color: rgba(255, 255, 255, 0.15); background: rgba(255, 255, 255, 0.02); box-shadow: none; 
+}
+.iso-node.locked-hologram .iso-label { border-color: rgba(255, 255, 255, 0.15); background: rgba(4, 9, 20, 0.7); }
+.iso-node.locked-hologram .iso-name { color: #8aa1bd; }
+.iso-req { color: #8aa1bd; font-size: 7px; margin-top: 3px; font-weight: 600;}
+
+/* KITA MUNCULKAN KEMBALI GEMBOKNYA! */
+.iso-lock-icon { 
+  display: block; 
+  font-size: 11px; 
+  color: #8aa1bd; 
+  margin-bottom: 2px; 
 }
 
 /* HOLOGRAM TERKUNCI */
