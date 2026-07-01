@@ -2283,17 +2283,15 @@ function renderBaseBuildings() {
   const baseGridContainer = el("baseGrid");
   if (!baseGridContainer || !buildingsData) return;
 
-  // Hancurkan class lama agar bingkai kaku menghilang selamanya
+  // Pastikan bersih dari class lama
   baseGridContainer.className = "";
-  baseGridContainer.style.display = "block";
-  baseGridContainer.style.width = "100%";
 
-  // Formasi Sarang Lebah (Honeycomb Layout)
+  // Formasi Sarang Lebah yang Anda Inginkan!
   const layoutStructure = [
-    ["main_lab"],                                    // Baris 1: Tengah Atas
-    ["radar_tower", "unit_factory"],                 // Baris 2: Kiri & Kanan
-    ["ai_core", "research_lab", "recovery_center"],  // Baris 3: Tiga Bangunan
-    ["guild_gate"]                                   // Baris 4: Tengah Bawah
+    ["main_lab"],                                    // Baris 1 (Puncak)
+    ["radar_tower", "unit_factory"],                 // Baris 2 (Tengah)
+    ["ai_core", "research_lab", "recovery_center"],  // Baris 3 (Bawah Lebar)
+    ["guild_gate"]                                   // Baris 4 (Dasar)
   ];
 
   const buildingCardsHtml = layoutStructure.map(rowArray => {
@@ -2302,13 +2300,12 @@ function renderBaseBuildings() {
       if (!b) return "";
 
       const level = getBuildingLevel(b);
-      // Logika Kunci: Jika bangunan level 0 atau terkunci, wujud jadi Hologram!
       const isLocked = b.locked || level <= 0; 
       
       let labelHtml = "";
 
       if (isLocked) {
-        // Mode Terkunci (Label Minta Upgrade)
+        // Tampilan Terkunci (Hologram Biru Redup)
         const reqText = getBuildingRequirementText(id) || "Requires Upgrade";
         labelHtml = `
           <div class="iso-lock-icon">🔒</div>
@@ -2316,14 +2313,13 @@ function renderBaseBuildings() {
           <div class="iso-req">${reqText}</div>
         `;
       } else {
-        // Mode Aktif (Label Normal)
+        // Tampilan Aktif
         labelHtml = `
           <div class="iso-name">${b.name}</div>
           <div class="iso-level">Lv.${level}</div>
         `;
       }
 
-      // Memastikan class "locked-hologram" digunakan, BUKAN class lama yang memicu kotak
       return `
         <div class="iso-node-wrapper">
           <div class="iso-node ${isLocked ? 'locked-hologram' : ''}" onclick="openBuilding('${id}')">
@@ -2341,20 +2337,17 @@ function renderBaseBuildings() {
     return `<div class="iso-row">${rowHtml}</div>`;
   }).join("");
 
-  // Ciptakan Garis Tech-Tree Menggunakan Koordinat SVG yang responsif
+  // Garis Penghubung antar bangunan (Tech Tree)
   const svgTechTree = `
     <svg class="tech-tree-lines" preserveAspectRatio="none" viewBox="0 0 100 100">
       <path d="M 50,15 L 30,40 M 50,15 L 70,40" />
-      
       <path d="M 30,40 L 16,65 M 30,40 L 50,65" />
-      
       <path d="M 70,40 L 50,65 M 70,40 L 84,65" />
-      
       <path d="M 50,65 L 50,90" />
     </svg>
   `;
 
-  // Tombol Raksasa Keren di Bawah Markas
+  // Tombol Scan Raksasa
   const giantRadarBtn = `
     <div class="giant-btn-container">
       <hr class="giant-btn-line">
@@ -2366,7 +2359,7 @@ function renderBaseBuildings() {
     </div>
   `;
 
-  // Render Final ke Layar
+  // Cetak ke layar
   baseGridContainer.innerHTML = `
     <div style="margin-bottom: 20px; width: 100%; position: relative; z-index: 10;">
        ${renderBeginnerMissionCard()}

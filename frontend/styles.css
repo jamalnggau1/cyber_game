@@ -4912,3 +4912,48 @@ body, html {
   animation: spinRadar 4s linear infinite;
 }
 @keyframes spinRadar { 100% { transform: rotate(360deg); } }
+/* WADAH PETA & GARIS PENGHUBUNG */
+.base-map-iso {
+  position: relative; width: 100%; padding-bottom: 20px; border-radius: 16px;
+  background: 
+    radial-gradient(circle at top, rgba(0, 255, 255, 0.08), transparent 60%),
+    linear-gradient(rgba(0, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 100% 100%, 28px 28px, 28px 28px;
+}
+.tech-tree-lines { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
+.tech-tree-lines path { stroke: rgba(0, 255, 255, 0.25); stroke-width: 1.5; fill: none; stroke-dasharray: 6, 6; animation: dataFlow 3s linear infinite; }
+@keyframes dataFlow { to { stroke-dashoffset: -12; } }
+
+/* SUSUNAN SARANG LEBAH */
+.base-grid-iso { display: flex; flex-direction: column; gap: 15px; position: relative; z-index: 2; padding: 15px 0; }
+.iso-row { display: flex; justify-content: center; gap: 15px; width: 100%; }
+
+/* NODE BANGUNAN (100% TANPA KARTU/BORDER) */
+.iso-node-wrapper { flex: 1; max-width: 95px; display: flex; justify-content: center; }
+.iso-node { display: flex; flex-direction: column; align-items: center; cursor: pointer; position: relative; background: transparent !important; border: none !important; box-shadow: none !important; transition: transform 0.2s ease; }
+.iso-node:active { transform: scale(0.92); }
+
+.iso-icon-wrapper { position: relative; width: 75px; height: 75px; display: flex; justify-content: center; align-items: flex-end; margin-bottom: 6px; }
+.iso-icon-wrapper.main-size { width: 95px !important; height: 95px !important; }
+.iso-icon-wrapper img { max-width: 100%; max-height: 100%; object-fit: contain; filter: drop-shadow(0 15px 15px rgba(0, 255, 255, 0.15)); }
+
+/* LABEL KECIL */
+.iso-label { background: rgba(5, 10, 24, 0.85); border: 1px solid rgba(0, 255, 255, 0.2); border-radius: 8px; padding: 4px 10px; text-align: center; min-width: 70px; box-shadow: 0 4px 10px rgba(0,0,0,0.6); z-index: 2; }
+.iso-name { font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 11px; color: #fff; white-space: nowrap; }
+.iso-level { font-family: 'Orbitron', sans-serif; font-size: 10px; color: #00FFFF; margin-top: 2px; font-weight: bold; }
+
+/* HOLOGRAM TERKUNCI */
+.iso-node.locked-hologram .iso-icon-wrapper img { opacity: 0.5; filter: grayscale(1) sepia(1) hue-rotate(180deg) brightness(0.8) drop-shadow(0 0 8px rgba(0, 255, 255, 0.4)); }
+.iso-node.locked-hologram .iso-label { border-color: rgba(255, 255, 255, 0.15); background: rgba(5, 10, 24, 0.6); }
+.iso-node.locked-hologram .iso-name { color: #888; }
+.iso-req { color: #555; font-size: 9px; margin-top: 2px; }
+.iso-lock-icon { font-size: 11px; color: #aaa; margin-bottom: 2px; }
+
+/* TOMBOL RAKSASA */
+.giant-btn-container { display: flex; align-items: center; gap: 15px; padding: 0 15px; margin-top: 10px; }
+.giant-btn-line { flex: 1; border: none; border-top: 1px dashed rgba(0, 255, 255, 0.4); }
+.giant-action-btn { background: linear-gradient(90deg, rgba(0,255,255,0.05), rgba(0,255,255,0.25), rgba(0,255,255,0.05)); border: 1px solid #00FFFF; border-radius: 20px; padding: 12px 25px; display: flex; align-items: center; gap: 10px; cursor: pointer; box-shadow: 0 0 20px rgba(0, 255, 255, 0.15); }
+.giant-action-text { font-family: 'Orbitron', sans-serif; font-size: 16px; font-weight: 700; color: #00FFFF; letter-spacing: 1px; }
+.giant-radar-icon { font-size: 20px; color: #00FFFF; animation: spinRadar 4s linear infinite; }
+@keyframes spinRadar { 100% { transform: rotate(360deg); } }
