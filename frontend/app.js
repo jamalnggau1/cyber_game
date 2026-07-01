@@ -2280,87 +2280,69 @@ async function loadBuildings() {
 }
 
 function renderBaseBuildings() {
-  const baseGridContainer = el("baseGrid");
-  if (!baseGridContainer || !buildingsData) return;
+  const baseGrid = el("baseGrid");
+  if (!baseGrid || !buildingsData) return;
 
-  baseGridContainer.className = "";
-  baseGridContainer.style.display = "block";
-  baseGridContainer.style.width = "100%";
+  // === OBAT LAYOUT TERGENCET ===
+  // Kita bersihkan class bawaan yang merusak dan memaksanya menjadi blok penuh
+  baseGrid.className = ""; 
+  baseGrid.style.display = "block";
+  baseGrid.style.width = "100%";
 
-  // KOORDINAT MUTLAK (X, Y dalam persentase) - Tidak akan pernah bergeser!
-  const nodePositions = {
-    main_lab: { x: 50, y: 18 },
-    radar_tower: { x: 20, y: 45 },
-    unit_factory: { x: 80, y: 45 },
-    ai_core: { x: 20, y: 75 },
-    research_lab: { x: 50, y: 68 },
-    recovery_center: { x: 80, y: 75 },
-    guild_gate: { x: 50, y: 92 }
-  };
+  const order = [
+    "radar_tower",
+    "unit_factory",
+    "main_lab",
+    "ai_core",
+    "research_lab",
+    "recovery_center",
+    "guild_gate"
+  ];
 
-  const order = ["main_lab", "radar_tower", "unit_factory", "ai_core", "research_lab", "recovery_center", "guild_gate"];
-
-  const buildingCardsHtml = order.map(id => {
+  const buildingCards = order.map(id => {
     const b = buildingsData.buildings[id];
     if (!b) return "";
 
-    const pos = nodePositions[id];
-    const level = getBuildingLevel(b);
-    const isLocked = b.locked || level <= 0; 
+    const levelText = getBuildingStatusText(b);
+    const lockedClass = b.locked ? "locked-building" : (getBuildingLevel(b) <= 0 ? "needs-build-building" : "");
+
+    let actionText = "OPEN";
+    let btnClass = "cyber-btn"; 
     
-    let labelHtml = "";
-    if (isLocked) {
-      const reqText = getBuildingRequirementText(id) || "Requires Upgrade";
-      // KITA TAMBAHKAN IKON GEMBOK (🔒) DI SINI!
-      labelHtml = `<div class="iso-lock-icon">🔒</div><div class="iso-name">${b.name}</div><div class="iso-req">${reqText}</div>`;
+    if (b.locked) {
+        actionText = "LOCKED";
+    } else if (getBuildingLevel(b) <= 0) {
+        actionText = "BUILD";
+        btnClass = "cyber-btn magenta-btn"; 
+    } else if (id === "radar_tower") {
+        actionText = "SCAN";
+        btnClass = "cyber-btn magenta-btn"; 
+    } else if (id === "unit_factory") {
+        actionText = "TRAIN";
     } else {
-      labelHtml = `<div class="iso-name">${b.name}</div><div class="iso-level">Lv.${level}</div>`;
+        actionText = "UPGRADE";
     }
 
-    // Bangunan "dipaku" menggunakan style="left: ${pos.x}%; top: ${pos.y}%;"
     return `
-      <div class="iso-node-wrapper" style="left: ${pos.x}%; top: ${pos.y}%;">
-        <div class="iso-node ${id} ${isLocked ? 'locked-hologram' : ''}" onclick="openBuilding('${id}')">
-          <div class="iso-icon-wrapper ${id} ${id === 'main_lab' ? 'main-size' : ''}">
-            <img src="assets/pedestal.png" class="cyber-pedestal" alt="pedestal">
-            <img src="${b.asset}" alt="${b.name}">
-          </div>
-          <div class="iso-label">${labelHtml}</div>
-        </div>
+      <div class="cyber-card ${lockedClass}" onclick="openBuilding('${id}')">
+        <img src="${b.asset}" alt="${b.name}" style="width: 52px; height: 52px; object-fit: contain; margin-bottom: 8px; filter: drop-shadow(0 0 10px var(--cyan-dim));">
+        <div class="card-title">${b.name}</div>
+        <div class="card-level">${levelText}</div>
+        <button class="${btnClass}" onclick="event.stopPropagation(); openBuilding('${id}')">
+          ${actionText}
+        </button>
       </div>
     `;
   }).join("");
 
-  // GARIS SVG MUTLAK (Koordinatnya disamakan persis dengan nodePositions di atas)
-  const svgTechTree = `
-    <svg class="tech-tree-lines" preserveAspectRatio="none" viewBox="0 0 100 100">
-      <path d="M 50,18 L 20,45 M 50,18 L 80,45" />
-      <path d="M 20,45 L 20,75 M 20,45 L 50,68" />
-      <path d="M 80,45 L 50,68 M 80,45 L 80,75" />
-      <path d="M 50,68 L 50,92" />
-    </svg>
-  `;
-
-  const giantRadarBtn = `
-    <div class="giant-btn-container">
-      <hr class="giant-btn-line">
-      <button class="giant-action-btn" onclick="switchPage('radarPage')">
-        <span class="giant-radar-icon">◎</span>
-        <span class="giant-action-text">OPEN RADAR ❯</span>
-      </button>
-      <hr class="giant-btn-line">
-    </div>
-  `;
-
-  baseGridContainer.innerHTML = `
-    <div style="margin-bottom: 5px; width: 100%; position: relative; z-index: 10;">
+  // Memisahkan Kartu Misi dan Grid Bangunan agar tidak rebutan tempat
+  baseGrid.innerHTML = `
+    <div style="margin-bottom: 16px; width: 100%;">
        ${renderBeginnerMissionCard()}
     </div>
-    <div class="base-map-iso">
-      ${svgTechTree}
-      ${buildingCardsHtml}
+    <div class="building-grid">
+       ${buildingCards}
     </div>
-    ${giantRadarBtn}
   `;
 }
 
