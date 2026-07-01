@@ -4912,3 +4912,13 @@ body, html {
   animation: spinRadar 4s linear infinite;
 }
 @keyframes spinRadar { 100% { transform: rotate(360deg); } }
+/* ==========================================
+   EFEK ABU-ABU BANGUNAN TERKUNCI (VERSI SEDERHANA)
+   ========================================== */
+.cyber-card.locked-building img {
+  filter: grayscale(1) sepia(0.2) hue-rotate(180deg) brightness(0.5) !important;
+  opacity: 0.6;
+}
+.cyber-card.locked-building .card-title {
+  color: #8aa1bd !important;
+}

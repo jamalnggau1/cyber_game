@@ -2323,11 +2323,16 @@ function renderBaseBuildings() {
         actionText = "UPGRADE";
     }
 
+    // 1. KITA MUNCULKAN GEMBOK JIKA TERKUNCI
+    const displayTitle = b.locked ? `🔒 ${b.name}` : b.name;
+
     return `
       <div class="cyber-card ${lockedClass}" onclick="openBuilding('${id}')">
-        <img src="${b.asset}" alt="${b.name}" style="width: 52px; height: 52px; object-fit: contain; margin-bottom: 8px; filter: drop-shadow(0 0 10px var(--cyan-dim));">
-        <div class="card-title">${b.name}</div>
-        <div class="card-level">${levelText}</div>
+        <img src="${b.asset}" alt="${b.name}" style="width: 78px; height: 78px; object-fit: contain; margin-bottom: 8px; filter: drop-shadow(0 0 10px var(--cyan-dim));">
+        
+        <div class="card-title" style="font-size: 10px;">${displayTitle}</div>
+        <div class="card-level" style="font-size: 8px;">${levelText}</div>
+        
         <button class="${btnClass}" onclick="event.stopPropagation(); openBuilding('${id}')">
           ${actionText}
         </button>
