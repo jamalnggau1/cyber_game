@@ -5140,9 +5140,9 @@ body, html {
 /* 6. Research Lab */
 .research_lab .cyber-pedestal {
   width: 300px !important; 
-  height: 100px !important; 
+  height: 150px !important; 
   bottom: -25px !important; 
-  left: -65px !important; /* Geser 10px ke kiri */
+  left: -55px !important; /* Geser 10px ke kiri */
 }
 
 /* 7. Recovery Center */
