@@ -2283,15 +2283,15 @@ function renderBaseBuildings() {
   const baseGridContainer = el("baseGrid");
   if (!baseGridContainer || !buildingsData) return;
 
-  // Pastikan bersih dari class lama
   baseGridContainer.className = "";
+  baseGridContainer.style.display = "block";
+  baseGridContainer.style.width = "100%";
 
-  // Formasi Sarang Lebah yang Anda Inginkan!
   const layoutStructure = [
-    ["main_lab"],                                    // Baris 1 (Puncak)
-    ["radar_tower", "unit_factory"],                 // Baris 2 (Tengah)
-    ["ai_core", "research_lab", "recovery_center"],  // Baris 3 (Bawah Lebar)
-    ["guild_gate"]                                   // Baris 4 (Dasar)
+    ["main_lab"],                                    // Row 1
+    ["radar_tower", "unit_factory"],                 // Row 2
+    ["ai_core", "research_lab", "recovery_center"],  // Row 3
+    ["guild_gate"]                                   // Row 4
   ];
 
   const buildingCardsHtml = layoutStructure.map(rowArray => {
@@ -2305,7 +2305,6 @@ function renderBaseBuildings() {
       let labelHtml = "";
 
       if (isLocked) {
-        // Tampilan Terkunci (Hologram Biru Redup)
         const reqText = getBuildingRequirementText(id) || "Requires Upgrade";
         labelHtml = `
           <div class="iso-lock-icon">🔒</div>
@@ -2313,17 +2312,18 @@ function renderBaseBuildings() {
           <div class="iso-req">${reqText}</div>
         `;
       } else {
-        // Tampilan Aktif
         labelHtml = `
           <div class="iso-name">${b.name}</div>
           <div class="iso-level">Lv.${level}</div>
         `;
       }
 
+      // SUNTIKAN <div class="cyber-pedestal"> SEBELUM GAMBAR
       return `
         <div class="iso-node-wrapper">
           <div class="iso-node ${isLocked ? 'locked-hologram' : ''}" onclick="openBuilding('${id}')">
             <div class="iso-icon-wrapper ${id === 'main_lab' ? 'main-size' : ''}">
+              <div class="cyber-pedestal"></div>
               <img src="${b.asset}" alt="${b.name}">
             </div>
             <div class="iso-label">
@@ -2337,17 +2337,19 @@ function renderBaseBuildings() {
     return `<div class="iso-row">${rowHtml}</div>`;
   }).join("");
 
-  // Garis Penghubung antar bangunan (Tech Tree)
+  // KOORDINAT GARIS YANG SUDAH DIPERBAIKI PRESISI
   const svgTechTree = `
     <svg class="tech-tree-lines" preserveAspectRatio="none" viewBox="0 0 100 100">
-      <path d="M 50,15 L 30,40 M 50,15 L 70,40" />
-      <path d="M 30,40 L 16,65 M 30,40 L 50,65" />
-      <path d="M 70,40 L 50,65 M 70,40 L 84,65" />
-      <path d="M 50,65 L 50,90" />
+      <path d="M 50,15 L 25,42 M 50,15 L 75,42" />
+      
+      <path d="M 25,42 L 16,72 M 25,42 L 50,72" />
+      
+      <path d="M 75,42 L 50,72 M 75,42 L 84,72" />
+      
+      <path d="M 50,72 L 50,95" />
     </svg>
   `;
 
-  // Tombol Scan Raksasa
   const giantRadarBtn = `
     <div class="giant-btn-container">
       <hr class="giant-btn-line">
@@ -2359,7 +2361,6 @@ function renderBaseBuildings() {
     </div>
   `;
 
-  // Cetak ke layar
   baseGridContainer.innerHTML = `
     <div style="margin-bottom: 20px; width: 100%; position: relative; z-index: 10;">
        ${renderBeginnerMissionCard()}
