@@ -2340,13 +2340,13 @@ function renderBaseBuildings() {
   // KOORDINAT GARIS YANG SUDAH DIPERBAIKI PRESISI
   const svgTechTree = `
     <svg class="tech-tree-lines" preserveAspectRatio="none" viewBox="0 0 100 100">
-      <path d="M 50,15 L 25,42 M 50,15 L 75,42" />
+      <path d="M 50,12 L 25,38 M 50,12 L 75,38" />
       
-      <path d="M 25,42 L 16,72 M 25,42 L 50,72" />
+      <path d="M 25,38 L 16,65 M 25,38 L 50,65" />
       
-      <path d="M 75,42 L 50,72 M 75,42 L 84,72" />
+      <path d="M 75,38 L 50,65 M 75,38 L 84,65" />
       
-      <path d="M 50,72 L 50,95" />
+      <path d="M 50,65 L 50,88" />
     </svg>
   `;
 
