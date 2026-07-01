@@ -2309,15 +2309,15 @@ function renderBaseBuildings() {
     // Memunculkan gembok jika terkunci
     const displayTitle = b.locked ? `🔒 ${b.name}` : b.name;
 
-    // Tombol dihapus, area bawah kartu diberi sedikit ruang agar seimbang
+    // Ruang bawah dirapatkan, gambar dibesarkan maksimal
     return `
-      <div class="cyber-card ${lockedClass}" onclick="openBuilding('${id}')" style="padding-bottom: 14px;">
+      <div class="cyber-card ${lockedClass}" onclick="openBuilding('${id}')" style="padding-bottom: 10px; display: flex; flex-direction: column; align-items: center; justify-content: space-between;">
         
         <div class="card-level-badge">${levelText}</div>
         
-        <img src="${b.asset}" alt="${b.name}" style="width: 78px; height: 78px; object-fit: contain; margin-bottom: 8px; filter: drop-shadow(0 0 10px var(--cyan-dim));">
+        <img src="${b.asset}" alt="${b.name}" style="width: 105px; height: 105px; object-fit: contain; margin-top: 8px; margin-bottom: 5px; filter: drop-shadow(0 10px 10px rgba(0,0,0,0.8)) drop-shadow(0 0 10px rgba(57, 243, 255, 0.2));">
         
-        <div class="card-title" style="font-size: 10px;">${displayTitle}</div>
+        <div class="card-title">${displayTitle}</div>
         
       </div>
     `;

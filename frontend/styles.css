@@ -4929,26 +4929,54 @@ body, html {
 /* ==========================================
    BADGE LEVEL POJOK KIRI ATAS & TYPOGRAPHY PREMIUM
    ========================================== */
+/* --- BADGE LEVEL (EFEK KACA MENYATU & GLOW) --- */
 .card-level-badge {
   position: absolute;
   top: -1px;
   left: -1px;
-  background: rgba(0, 255, 255, 0.1);
-  color: var(--cyan);
+  /* Menggunakan gradasi transparan agar menyatu dengan kartu */
+  background: linear-gradient(135deg, rgba(0, 255, 255, 0.25), rgba(0, 255, 255, 0.02)); 
+  color: #ffffff;
   
-  /* --- FONT PREMIUM TERPASANG --- */
+  /* Font Premium & Efek Pendaran Teks */
   font-family: 'Orbitron', sans-serif !important;
-  font-weight: 800 !important; /* ExtraBold */
+  font-weight: 800 !important; 
   font-size: 9px !important;
   letter-spacing: 0.5px;
+  text-shadow: 0 0 5px rgba(0, 255, 255, 0.8); /* Teks menyala */
   
-  padding: 3px 6px;
+  padding: 4px 8px;
   border-top-left-radius: 12px;
-  border-bottom-right-radius: 8px;
-  border-right: 1px solid var(--cyan-dim);
-  border-bottom: 1px solid var(--cyan-dim);
+  border-bottom-right-radius: 10px;
+  border-right: 1px solid rgba(0, 255, 255, 0.4);
+  border-bottom: 1px solid rgba(0, 255, 255, 0.4);
+  box-shadow: 2px 2px 8px rgba(0,0,0,0.6); /* Kedalaman 3D */
   backdrop-filter: blur(4px);
   z-index: 5;
+}
+
+/* Supaya badge ikut redup jika terkunci */
+.cyber-card.locked-building .card-level-badge,
+.cyber-card.needs-build-building .card-level-badge {
+  color: #8aa1bd;
+  text-shadow: none;
+  background: linear-gradient(135deg, rgba(138, 161, 189, 0.15), transparent);
+  border-right: 1px solid rgba(138, 161, 189, 0.3);
+  border-bottom: 1px solid rgba(138, 161, 189, 0.3);
+}
+
+/* --- NAMA BANGUNAN: Rajdhani Bold (EFEK HOLOGRAM) --- */
+.card-title {
+  font-family: 'Rajdhani', sans-serif !important;
+  font-weight: 700 !important;
+  font-size: 13px !important;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: #ffffff;
+  /* Kunci agar teks menyatu: Bayangan hitam tebal + Pendaran neon tipis */
+  text-shadow: 0 2px 4px rgba(0,0,0,0.9), 0 0 10px rgba(57, 243, 255, 0.6); 
+  text-align: center;
+  width: 100%;
 }
 
 /* Supaya badge ikut redup jika terkunci */
