@@ -5025,3 +5025,15 @@ p, .muted, .info-box, small {
   border-right: 1px solid rgba(138, 161, 189, 0.3);
   border-bottom: 1px solid rgba(138, 161, 189, 0.3);
 }
+/* ==========================================
+   PERBAIKAN 1: AVATAR TOPBAR (TANPA BORDER & NAIK)
+   ========================================== */
+/* 1. Mematikan gambar border khusus di bagian Topbar saja */
+.mobile-topbar .profile-border-img {
+  display: none !important;
+}
+
+/* 2. Menaikkan seluruh tombol avatar (termasuk levelnya) ke atas */
+.mobile-topbar .profile-avatar-button {
+  transform: translateY(-12px) !important; /* Angka minus menariknya ke atas */
+}
