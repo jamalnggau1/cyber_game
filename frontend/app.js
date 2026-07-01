@@ -2229,6 +2229,13 @@ async function loadState() {
     statusBox.innerHTML = renderPlayerStatusHtml(p);
   }
 
+  // --- UPDATE LEVEL AVATAR DARI MAIN LAB ---
+  const topbarLevel = document.getElementById("topbarLevelBadge");
+  if (topbarLevel && buildingsData && buildingsData.buildings["main_lab"]) {
+    const labLv = getBuildingLevel(buildingsData.buildings["main_lab"]);
+    topbarLevel.innerText = `Lv.${labLv}`;
+  }
+
   renderModules();
   renderUnits();
   renderAiInventory();

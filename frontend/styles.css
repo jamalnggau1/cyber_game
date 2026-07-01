@@ -5037,3 +5037,48 @@ p, .muted, .info-box, small {
 .mobile-topbar .profile-avatar-button {
   transform: translateY(-12px) !important; /* Angka minus menariknya ke atas */
 }
+/* ==========================================
+   PERBAIKAN 2: BORDER ELEGANT & LEVEL MENYATU
+   ========================================== */
+/* Membuat cincin gradasi elegan untuk menggantikan border lama */
+.mobile-topbar .profile-avatar-frame {
+  position: relative !important;
+  width: 52px !important;
+  height: 52px !important;
+  border-radius: 50% !important;
+  background: linear-gradient(135deg, #39f3ff, #8a5cff) !important; /* Gradasi Cyan ke Ungu */
+  padding: 2px !important; /* Ketebalan cincin */
+  box-shadow: 0 0 12px rgba(57, 243, 255, 0.4) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Memberi jarak gelap antara cincin dan foto */
+.mobile-topbar .profile-avatar-img {
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 50% !important;
+  border: 2px solid #060912 !important; 
+  object-fit: cover !important;
+  position: static !important;
+}
+
+/* Memaksa badge level tertanam di tengah-bawah avatar */
+.mobile-topbar .avatar-level-badge {
+  position: absolute !important;
+  bottom: -6px !important; 
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  background: linear-gradient(90deg, #0d1324, #111a30) !important;
+  border: 1px solid #39f3ff !important;
+  color: #39f3ff !important;
+  font-family: 'Orbitron', sans-serif !important;
+  font-size: 9px !important;
+  font-weight: 800 !important;
+  padding: 2px 8px !important;
+  border-radius: 12px !important;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.8), 0 0 8px rgba(57, 243, 255, 0.4) !important;
+  z-index: 10 !important;
+  white-space: nowrap !important;
+}
