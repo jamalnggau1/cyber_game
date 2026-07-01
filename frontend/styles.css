@@ -4925,3 +4925,32 @@ body, html {
 .cyber-card.needs-build-building .card-title {
   color: #8aa1bd !important;
 }
+/* ==========================================
+   BADGE LEVEL POJOK KIRI ATAS (REFERENSI UI)
+   ========================================== */
+.card-level-badge {
+  position: absolute;
+  top: -1px;
+  left: -1px;
+  background: rgba(0, 255, 255, 0.1);
+  color: var(--cyan);
+  font-family: 'Orbitron', sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 3px 6px;
+  border-top-left-radius: 12px; /* Menyesuaikan lengkungan kartu */
+  border-bottom-right-radius: 8px;
+  border-right: 1px solid var(--cyan-dim);
+  border-bottom: 1px solid var(--cyan-dim);
+  backdrop-filter: blur(4px);
+  z-index: 5;
+}
+
+/* Supaya badge level ikut meredup menjadi abu-abu jika belum dibangun/terkunci */
+.cyber-card.locked-building .card-level-badge,
+.cyber-card.needs-build-building .card-level-badge {
+  color: #8aa1bd;
+  background: rgba(138, 161, 189, 0.1);
+  border-right: 1px solid rgba(138, 161, 189, 0.3);
+  border-bottom: 1px solid rgba(138, 161, 189, 0.3);
+}
