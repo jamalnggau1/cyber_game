@@ -5140,8 +5140,8 @@ body, html {
 
 /* 6. Research Lab */
 .research_lab .cyber-pedestal {
-  width: 165px !important;
-  height: 100px !important;
+  width: 1654px !important;
+  height: 1300px !important;
   bottom: -25px !important;
   transform: translateY(-10px);
 }
