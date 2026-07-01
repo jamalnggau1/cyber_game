@@ -5033,69 +5033,78 @@ body, html {
 .giant-action-text { font-family: 'Orbitron', sans-serif; font-size: 16px; font-weight: 700; color: #00FFFF; letter-spacing: 1px; }
 .giant-radar-icon { font-size: 20px; color: #00FFFF; animation: spinRadar 4s linear infinite; }
 @keyframes spinRadar { 100% { transform: rotate(360deg); } }
-/* NODE BANGUNAN (100% TANPA KARTU/BORDER) */
-.iso-node-wrapper { flex: 1; max-width: 95px; display: flex; justify-content: center; }
-.iso-node { display: flex; flex-direction: column; align-items: center; cursor: pointer; position: relative; background: transparent !important; border: none !important; box-shadow: none !important; transition: transform 0.2s ease; z-index: 2; }
+/* ==========================================
+   TATA LETAK BANGUNAN (FLEXBOX MURNI)
+   ========================================== */
+
+/* 1. SLOT BANGUNAN (Sistem Grid Flexbox Asli Anda) */
+.iso-node-wrapper { 
+  flex: 1; 
+  max-width: 125px; /* Diperbesar agar muat bangunan raksasa */
+  display: flex; 
+  justify-content: center; 
+}
+
+.iso-node { 
+  display: flex; 
+  flex-direction: column; 
+  align-items: center; 
+  cursor: pointer; 
+  position: relative; 
+  width: 100%; 
+  background: transparent !important; 
+  border: none !important; 
+  box-shadow: none !important; 
+  transition: transform 0.2s ease; 
+  z-index: 2; 
+}
 .iso-node:active { transform: scale(0.92); }
 
+/* 2. WADAH GAMBAR BANGUNAN (Diperbesar ke 100px) */
 .iso-icon-wrapper { 
-  position: relative; width: 75px; height: 75px; 
-  display: flex; justify-content: center; align-items: flex-end; 
-  margin-bottom: 0px; /* Merapatkan jarak antara bangunan dan label */
+  position: relative; 
+  width: 100px; 
+  height: 100px; 
+  display: flex; 
+  justify-content: center; 
+  align-items: flex-end; 
+  margin-bottom: 25px; /* Jarak untuk label di bawahnya */
 }
-.iso-icon-wrapper.main-size { width: 95px !important; height: 95px !important; }
+.iso-icon-wrapper.main-size { width: 130px; height: 130px; }
 
+/* 3. DUDUKAN (Besar, Kuat, Menopang dari Bawah) */
 .cyber-pedestal {
   position: absolute; 
-  bottom: -25px; 
+  bottom: -22px !important; 
   left: 50%;
   transform: translateX(-50%); 
-  width: 165px;  /* Sekarang ini PASTI akan membesar! */
-  height: 100px; 
-  
-  /* KUNCI KEBEBASANNYA ADA DI 2 BARIS INI: */
+  width: 155px !important;  
+  height: 95px !important; 
   max-width: none !important; 
   max-height: none !important;
-
   background-image: url('assets/pedestal.png') !important; 
   background-size: contain;
   background-position: center bottom;
   background-repeat: no-repeat;
   z-index: 0; 
-  transition: all 0.3s;
-  border: none !important;
-  background-color: transparent !important;
+  border: none !important; 
+  background-color: transparent !important; 
   box-shadow: none !important;
 }
+.main-size .cyber-pedestal { width: 195px !important; height: 120px !important; bottom: -28px !important; }
 
-/* Ukuran Dudukan Khusus untuk Main Lab (Lebih Besar) */
-.main-size .cyber-pedestal { 
-  width: 185px; 
-  height: 115px; 
-  bottom: -26px; 
-}
-
-/* GAMBAR BANGUNAN UTAMA (MENAPAK PAS DI DUDUKAN) */
+/* 4. GAMBAR BANGUNAN (Bersandar pada Wadah) */
 .iso-icon-wrapper img:not(.cyber-pedestal) { 
+  position: relative; 
   max-width: 100%; 
   max-height: 100%; 
   object-fit: contain; 
-  position: absolute; 
-  bottom: 6px; /* Dikembalikan ke 6px */
-  left: 50%;
-  transform: translateX(-50%); 
   z-index: 1;
   filter: drop-shadow(0 15px 10px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 5px rgba(57, 243, 255, 0.2)); 
   transition: transform 0.3s, filter 0.3s;
 }
 
-/* HOVER: BANGUNAN TETAP DIAM DI TEMPAT */
-.iso-node:hover .iso-icon-wrapper img:not(.cyber-pedestal) {
-  transform: translateX(-50%) !important; 
-  filter: drop-shadow(0 20px 15px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 10px rgba(57, 243, 255, 0.4)) !important;
-}
-
-/* LABEL ATRIBUT LEVEL & NAMA */
+/* 5. LABEL STATUS (Ditarik ke bawah) */
 .iso-label { 
   background: rgba(4, 9, 20, 0.9); 
   border: 1px solid rgba(57, 243, 255, 0.2); 
@@ -5105,97 +5114,26 @@ body, html {
   min-width: 55px; 
   box-shadow: 0 4px 8px rgba(0,0,0,0.8); 
   z-index: 2; 
-  transform: translateY(-6px);
+  transform: translateY(-15px); 
 }
+.iso-name { font-family: 'Inter', sans-serif; font-weight: 700; font-size: 9px; color: #e9f2ff; white-space: nowrap; }
+.iso-level { display: inline-block; font-family: 'Inter', sans-serif; font-size: 7px; color: #39f3ff; margin-top: 4px; font-weight: 800; padding: 2px 6px; background: rgba(57, 243, 255, 0.1); border: 1px solid rgba(57, 243, 255, 0.3); border-radius: 999px; }
+.iso-req { color: #8aa1bd; font-size: 7px; margin-top: 3px; font-weight: 600;}
+.iso-lock-icon { display: block; font-size: 11px; color: #8aa1bd; margin-bottom: 2px; }
 
-.iso-name { 
-  font-family: 'Inter', sans-serif; 
-  font-weight: 700; 
-  font-size: 9px; 
-  color: #e9f2ff; 
-  white-space: nowrap; 
+/* 6. EFEK HOVER & HOLOGRAM TERKUNCI */
+.iso-node:hover .iso-icon-wrapper img:not(.cyber-pedestal) {
+  transform: translateY(-3px) !important; 
+  filter: drop-shadow(0 20px 15px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 10px rgba(57, 243, 255, 0.4)) !important;
 }
-
-.iso-level { 
-  display: inline-block;
-  font-family: 'Inter', sans-serif; 
-  font-size: 7px; 
-  color: #39f3ff; 
-  margin-top: 4px; 
-  font-weight: 800; 
-  padding: 2px 6px;
-  background: rgba(57, 243, 255, 0.1);
-  border: 1px solid rgba(57, 243, 255, 0.3);
-  border-radius: 999px;
-}
-
-/* ==========================================
-   HOLOGRAM TERKUNCI (FIXED)
-   ========================================== */
 .iso-node.locked-hologram .iso-icon-wrapper img:not(.cyber-pedestal) { 
   opacity: 0.6; 
-  transform: translateX(-50%) !important;
+  transform: none !important;
   filter: grayscale(1) sepia(1) hue-rotate(180deg) brightness(0.6) drop-shadow(0 0 6px rgba(57, 243, 255, 0.3)) !important; 
 }
-
 .iso-node.locked-hologram .cyber-pedestal { 
-  /* PERBAIKAN: Hapus background kotak, biarkan murni gambar dudukan yang di-filter gelap */
-  filter: grayscale(1) sepia(1) hue-rotate(180deg) brightness(0.4) !important;
-  opacity: 0.5 !important;
-  background-color: transparent !important; 
-  border: none !important; 
-  box-shadow: none !important;
+  filter: grayscale(1) sepia(1) hue-rotate(180deg) brightness(0.4) !important; 
+  opacity: 0.5 !important; 
 }
-
-.iso-node.locked-hologram .iso-label { 
-  border-color: rgba(255, 255, 255, 0.15); 
-  background: rgba(4, 9, 20, 0.7); 
-}
+.iso-node.locked-hologram .iso-label { border-color: rgba(255, 255, 255, 0.15); background: rgba(4, 9, 20, 0.7); }
 .iso-node.locked-hologram .iso-name { color: #8aa1bd; }
-.iso-req { color: #8aa1bd; font-size: 7px; margin-top: 3px; font-weight: 600;}
-.iso-lock-icon { display: none; }
-/* ==========================================
-   FINALISASI: SINKRONISASI SKALA & POSISI BANGUNAN
-   ========================================== */
-
-/* 1. PERBESAR WADAH BANGUNAN AGAR PROPORSIONAL */
-.iso-icon-wrapper { 
-  width: 100px !important;  
-  height: 100px !important; 
-}
-.iso-icon-wrapper.main-size { 
-  width: 130px !important; 
-  height: 130px !important; 
-}
-
-/* 2. UKURAN DUDUKAN (DISESUAIKAN DENGAN WADAH BARU) */
-.cyber-pedestal {
-  width: 125px !important;  
-  height: 75px !important; 
-  max-width: none !important; 
-  max-height: none !important;
-  /* Kordinat ditarik naik karena wadah utamanya bertambah tinggi */
-  bottom: -10px !important; 
-}
-
-/* Ukuran Dudukan Khusus untuk Main Lab */
-.main-size .cyber-pedestal { 
-  width: 165px !important; 
-  height: 100px !important; 
-  bottom: -14px !important; 
-}
-
-/* 3. PAKSA BANGUNAN MEMBESAR & DUDUK PAS DI ATAS PIRINGAN */
-.iso-icon-wrapper img:not(.cyber-pedestal) { 
-  width: 100% !important; 
-  height: 100% !important;
-  max-width: none !important; 
-  max-height: none !important;
-  /* Kordinat diangkat agar kaki bangunan menapak sempurna di dudukan */
-  bottom: 18px !important; 
-}
-
-/* 4. BERI RUANG NAPAS ANTAR BANGUNAN AGAR TIDAK BERTUMPUK */
-.iso-node-wrapper {
-  min-width: 110px !important; 
-}
