@@ -4562,376 +4562,17 @@ input[type=number] {
 .rally-toast-content p { margin: 0; font-size: 12px; color: #ccc; line-height: 1.4; }
 
 /* ==========================================
-   TEMA CYBERCORE: LOVABLE REPLICA (PURE CSS)
+   TEMA CYBERCORE: FINAL ABSOLUTE & OVAL PEDESTAL
    ========================================== */
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap');
-
-:root {
-  --bg-main: #050a18;
-  --bg-card: rgba(10, 15, 35, 0.7);
-  --cyan: #00FFFF;
-  --cyan-dim: rgba(0, 255, 255, 0.2);
-  --magenta: #FF00FF;
-  --magenta-dim: rgba(255, 0, 255, 0.2);
-  --text-main: #E0E0E0;
-}
-
-body, html {
-  margin: 0; padding: 0;
-  background-color: var(--bg-main);
-  color: var(--text-main);
-  font-family: 'Rajdhani', sans-serif;
-  overflow-x: hidden;
-  user-select: none;
-}
-
-/* --- 1. TOP BAR (GLASSMORPHISM) --- */
-.premium-topbar {
-  position: fixed;
-  top: 0; left: 0; right: 0;
-  background: rgba(5, 10, 24, 0.85);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border-bottom: 1px solid var(--cyan-dim);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 12px;
-  z-index: 1000;
-  box-shadow: 0 4px 15px rgba(0, 255, 255, 0.05);
-}
-
-.top-avatar {
-  position: relative; width: 42px; height: 42px; flex-shrink: 0;
-}
-.top-avatar img {
-  width: 100%; height: 100%; border-radius: 50%;
-  border: 2px solid var(--cyan);
-  box-shadow: 0 0 10px var(--cyan-dim);
-}
-.top-level {
-  position: absolute; bottom: -5px; left: 50%; transform: translateX(-50%);
-  background: var(--bg-main); color: var(--cyan);
-  font-family: 'Orbitron', sans-serif; font-size: 9px;
-  padding: 2px 6px; border: 1px solid var(--cyan);
-  border-radius: 10px; box-shadow: 0 0 5px var(--cyan);
-}
-
-.top-resources {
-  display: flex; gap: 8px; flex-grow: 1; margin-left: 12px;
-  overflow-x: auto; scrollbar-width: none;
-}
-.top-resources::-webkit-scrollbar { display: none; }
-
-.res-pill {
-  background: rgba(0, 0, 0, 0.5);
-  border: 1px solid var(--cyan-dim);
-  border-radius: 20px; padding: 4px 10px;
-  display: flex; align-items: center; gap: 6px;
-  font-size: 12px; font-weight: 700; white-space: nowrap;
-}
-.res-icon { color: #FFD700; } /* Warna koin/resource */
-
-/* --- 2. MAIN GRID (3 KOLOM) --- */
-#mainContent {
-  padding: 80px 10px 90px 10px;
-}
-
-.building-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr); /* PERMINTAAN ANDA: 3 KOLOM */
-  gap: 10px;
-}
-
-/* --- 3. KARTU BANGUNAN (CYBER CARD) --- */
-.cyber-card {
-  background: var(--bg-card);
-  border: 1px solid var(--cyan-dim);
-  border-radius: 12px;
-  padding: 10px;
-  display: flex; flex-direction: column; align-items: center; text-align: center;
-  position: relative;
-  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
-  transition: all 0.3s ease;
-  animation: floatCard 4s ease-in-out infinite; /* Animasi Melayang */
-}
-
-/* Delay agar melayangnya tidak bersamaan */
-.cyber-card:nth-child(even) { animation-delay: 1s; }
-.cyber-card:nth-child(3n) { animation-delay: 2s; }
-
-@keyframes floatCard {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-3px); }
-}
-
-.cyber-card:active {
-  transform: scale(0.95);
-  border-color: var(--cyan);
-  box-shadow: 0 0 15px var(--cyan-dim) inset;
-}
-
-/* Sudut neon ala Lovable */
-.cyber-card::before, .cyber-card::after {
-  content: ''; position: absolute; width: 10px; height: 10px;
-  border: 2px solid transparent; pointer-events: none;
-}
-.cyber-card::before { top: 0; left: 0; border-top-color: var(--cyan); border-left-color: var(--cyan); border-radius: 12px 0 0 0; }
-.cyber-card::after { bottom: 0; right: 0; border-bottom-color: var(--cyan); border-right-color: var(--cyan); border-radius: 0 0 12px 0; }
-
-.card-icon {
-  font-size: 28px; margin: 8px 0;
-  filter: drop-shadow(0 0 8px var(--magenta));
-  animation: pulseIcon 2s infinite alternate;
-}
-
-@keyframes pulseIcon {
-  from { filter: drop-shadow(0 0 5px var(--magenta)); }
-  to { filter: drop-shadow(0 0 15px var(--magenta)); }
-}
-
-.card-title {
-  font-family: 'Orbitron', sans-serif;
-  color: var(--text-main); font-size: 11px;
-  margin-bottom: 2px; text-transform: uppercase;
-}
-.card-level {
-  color: var(--cyan); font-size: 9px; margin-bottom: 8px; font-weight: bold;
-}
-
-/* --- 4. TOMBOL ACTION MAGENTA/CYAN --- */
-.cyber-btn {
-  width: 100%;
-  background: rgba(0, 255, 255, 0.05);
-  border: 1px solid var(--cyan);
-  color: var(--cyan);
-  padding: 6px 0;
-  border-radius: 6px;
-  font-family: 'Orbitron', sans-serif;
-  font-size: 10px; font-weight: bold;
-  text-transform: uppercase;
-  margin-top: auto;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.cyber-btn.magenta-btn {
-  border-color: var(--magenta); color: var(--magenta); background: rgba(255, 0, 255, 0.05);
-}
-.cyber-btn.magenta-btn:active { background: var(--magenta); color: var(--bg-main); box-shadow: 0 0 15px var(--magenta); }
-
-.cyber-btn:active { background: var(--cyan); color: var(--bg-main); box-shadow: 0 0 15px var(--cyan); }
-
-/* --- 5. BOTTOM NAV (5 TABS) --- */
-.bottom-nav-glass {
-  position: fixed;
-  bottom: 10px; left: 10px; right: 10px;
-  background: rgba(10, 15, 30, 0.8);
-  backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
-  border: 1px solid var(--cyan-dim);
-  border-radius: 16px;
-  display: flex; justify-content: space-around;
-  padding: 8px 5px; z-index: 1000;
-  box-shadow: 0 -5px 20px rgba(0,0,0,0.5);
-}
-
-.nav-tab {
-  display: flex; flex-direction: column; align-items: center;
-  background: none; border: none; color: #666;
-  font-family: 'Rajdhani', sans-serif; font-size: 10px; font-weight: 700;
-  text-transform: uppercase; gap: 4px; transition: all 0.3s;
-}
-
-.nav-tab.active {
-  color: var(--cyan); text-shadow: 0 0 8px var(--cyan);
-}
-.nav-tab.active .nav-icon {
-  background: var(--cyan-dim); border-radius: 8px; padding: 4px 12px;
-}
-/* ==========================================
-   TEMA CYBERCORE: FREE-FLOATING ISOMETRIC & TECH TREE
-   ========================================== */
-@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@500;700&display=swap');
-
-/* Wadah Utama Peta */
-.base-map-iso {
-  position: relative;
-  width: 100%;
-  padding-bottom: 20px;
-  border-radius: 16px;
-}
-
-/* Garis Tech Tree Penghubung (SVG) */
-.tech-tree-lines {
-  position: absolute;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
-  z-index: 1;
-  pointer-events: none;
-}
-
-.tech-tree-lines path {
-  stroke: rgba(0, 255, 255, 0.25);
-  stroke-width: 1.5;
-  fill: none;
-  vector-effect: non-scaling-stroke; /* Menjaga garis tetap tajam walau di-resize */
-  stroke-dasharray: 6, 6; /* Efek garis putus-putus ala Sci-fi */
-  animation: dataFlow 3s linear infinite; /* Garis mengalir */
-}
-
-@keyframes dataFlow {
-  to { stroke-dashoffset: -12; }
-}
-
-/* Sistem Baris Flexbox untuk Formasi Sarang Lebah */
-.base-grid-iso {
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-  position: relative;
-  z-index: 2;
-  padding: 15px 0;
-}
-
-.iso-row {
-  display: flex;
-  justify-content: center;
-  gap: 15px;
-  width: 100%;
-}
-
-/* Node Bangunan - 100% BEBAS KARTU */
-.iso-node-wrapper {
-  flex: 1;
-  max-width: 95px; /* Mengatur seberapa besar bangunannya */
-  display: flex;
-  justify-content: center;
-}
-
-.iso-node {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  cursor: pointer;
-  position: relative;
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-  transition: transform 0.2s ease;
-}
-
-.iso-node:active { transform: scale(0.92); }
-
-.iso-icon-wrapper {
-  position: relative;
-  width: 75px; height: 75px;
-  display: flex; justify-content: center; align-items: flex-end;
-  margin-bottom: 6px;
-}
-
-.iso-icon-wrapper.main-size {
-  width: 95px !important; height: 95px !important;
-}
-
-.iso-icon-wrapper img {
-  max-width: 100%; max-height: 100%;
-  object-fit: contain;
-  filter: drop-shadow(0 15px 15px rgba(0, 255, 255, 0.15));
-  transition: filter 0.3s;
-}
-
-.iso-node:hover .iso-icon-wrapper img {
-  filter: drop-shadow(0 15px 25px rgba(0, 255, 255, 0.4));
-}
-
-/* Label Kecil di Bawah Bangunan */
-.iso-label {
-  background: rgba(5, 10, 24, 0.85);
-  border: 1px solid var(--cyan-dim);
-  border-radius: 8px;
-  padding: 4px 10px;
-  text-align: center;
-  min-width: 70px;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.6);
-  z-index: 2;
-}
-
-.iso-name {
-  font-family: 'Rajdhani', sans-serif; font-weight: 700;
-  font-size: 11px; color: #fff; white-space: nowrap;
-}
-
-.iso-level {
-  font-family: 'Orbitron', sans-serif; font-size: 10px;
-  color: var(--cyan); margin-top: 2px; font-weight: bold;
-}
-
-/* =========================================
-   MODE TERKUNCI (HOLOGRAM BIRU REDUP) 
-   ========================================= */
-.iso-node.locked-hologram .iso-icon-wrapper img {
-  opacity: 0.5;
-  filter: grayscale(1) sepia(1) hue-rotate(180deg) brightness(0.8) drop-shadow(0 0 8px rgba(0, 255, 255, 0.4));
-}
-
-.iso-node.locked-hologram .iso-label {
-  border-color: rgba(255, 255, 255, 0.15);
-  background: rgba(5, 10, 24, 0.6);
-}
-.iso-node.locked-hologram .iso-name { color: #888; }
-.iso-req { color: #555; font-size: 9px; margin-top: 2px; }
-.iso-lock-icon { font-size: 11px; color: #aaa; margin-bottom: 2px; }
-
-/* =========================================
-   GIANT OPEN RADAR BUTTON 
-   ========================================= */
-.giant-btn-container {
-  display: flex; align-items: center; gap: 15px;
-  padding: 0 15px; margin-top: 10px;
-}
-.giant-btn-line {
-  flex: 1; border: none; border-top: 1px dashed rgba(0, 255, 255, 0.4);
-}
-.giant-action-btn {
-  background: linear-gradient(90deg, rgba(0,255,255,0.05), rgba(0,255,255,0.25), rgba(0,255,255,0.05));
-  border: 1px solid var(--cyan); border-radius: 20px;
-  padding: 12px 25px; display: flex; align-items: center; gap: 10px;
-  cursor: pointer; box-shadow: 0 0 20px rgba(0, 255, 255, 0.15);
-  transition: all 0.3s;
-}
-.giant-action-btn:active {
-  transform: scale(0.96); background: rgba(0, 255, 255, 0.3);
-  box-shadow: 0 0 30px rgba(0, 255, 255, 0.4);
-}
-.giant-action-text {
-  font-family: 'Orbitron', sans-serif; font-size: 16px;
-  font-weight: 700; color: var(--cyan); letter-spacing: 1px;
-}
-.giant-radar-icon {
-  font-size: 20px; color: var(--cyan);
-  animation: spinRadar 4s linear infinite;
-}
-@keyframes spinRadar { 100% { transform: rotate(360deg); } }
-/* WADAH PETA & GARIS PENGHUBUNG */
-.base-map-iso {
-  position: relative; width: 100%; padding-bottom: 20px; border-radius: 16px;
-  background: 
-    radial-gradient(circle at top, rgba(0, 255, 255, 0.08), transparent 60%),
-    linear-gradient(rgba(0, 255, 255, 0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 255, 255, 0.04) 1px, transparent 1px);
-  background-size: 100% 100%, 28px 28px, 28px 28px;
-}
-.tech-tree-lines { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
-.tech-tree-lines path { stroke: rgba(0, 255, 255, 0.25); stroke-width: 1.5; fill: none; stroke-dasharray: 6, 6; animation: dataFlow 3s linear infinite; }
-@keyframes dataFlow { to { stroke-dashoffset: -12; } }
 
 /* WADAH PETA ABSOLUT (Kunci agar tidak melar) */
 .base-map-iso {
-  position: relative; 
-  width: 100%; 
-  aspect-ratio: 4 / 5; /* Mengunci rasio bentuk peta agar selalu konsisten */
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 5;
   border-radius: 16px;
-  background: 
+  background:
     radial-gradient(circle at top, rgba(0, 255, 255, 0.08), transparent 60%),
     linear-gradient(rgba(0, 255, 255, 0.04) 1px, transparent 1px),
     linear-gradient(90deg, rgba(0, 255, 255, 0.04) 1px, transparent 1px);
@@ -4942,194 +4583,93 @@ body, html {
 /* GARIS SVG ABSOLUT */
 .tech-tree-lines { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
 .tech-tree-lines path { stroke: rgba(57, 243, 255, 0.4); stroke-width: 1.5; fill: none; stroke-dasharray: 6, 6; animation: dataFlow 3s linear infinite; }
+@keyframes dataFlow { to { stroke-dashoffset: -12; } }
 
-/* NODE BANGUNAN ABSOLUT (Dipaku di koordinat khusus) */
-.iso-node-wrapper { 
-  position: absolute; 
-  transform: translate(-50%, -50%); 
-  width: 85px; 
-  display: flex; justify-content: center; 
+/* NODE BANGUNAN ABSOLUT */
+.iso-node-wrapper {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 85px;
+  display: flex; justify-content: center;
   z-index: 2;
 }
 
-.iso-node { display: flex; flex-direction: column; align-items: center; cursor: pointer; position: relative; width: 100%; transition: transform 0.2s ease; }
+.iso-node { display: flex; flex-direction: column; align-items: center; cursor: pointer; position: relative; width: 100%; transition: transform 0.2s ease; background: transparent !important; border: none !important; box-shadow: none !important; }
 .iso-node:active { transform: scale(0.92); }
 
-.iso-icon-wrapper { 
-  position: relative; width: 75px; height: 75px; 
-  display: flex; justify-content: center; align-items: flex-end; 
+.iso-icon-wrapper {
+  position: relative; width: 75px; height: 75px;
+  display: flex; justify-content: center; align-items: flex-end;
 }
 .iso-icon-wrapper.main-size { width: 95px !important; height: 95px !important; }
 
-/* INI DIA DUDUKAN 3D (CINCIN NEON OVAL) YANG MEMBUATNYA TERTANAM */
+/* DUDUKAN 3D (CINCIN NEON OVAL) */
 .cyber-pedestal {
-  position: absolute; 
-  bottom: 2px; 
+  position: absolute;
+  bottom: 2px;
   left: 50%;
-  transform: translateX(-50%) rotateX(70deg); /* Memipihkan lingkaran menjadi oval 3D */
-  width: 58px; 
+  transform: translateX(-50%) rotateX(70deg);
+  width: 58px;
   height: 58px;
-  border-radius: 50%; 
+  border-radius: 50%;
   border: 2px solid rgba(57, 243, 255, 0.5);
   background: radial-gradient(circle, rgba(57, 243, 255, 0.2) 0%, transparent 60%);
-  box-shadow: 0 0 15px rgba(57, 243, 255, 0.5), inset 0 0 10px rgba(57, 243, 255, 0.4); 
+  box-shadow: 0 0 15px rgba(57, 243, 255, 0.5), inset 0 0 10px rgba(57, 243, 255, 0.4);
   z-index: 0;
 }
 .main-size .cyber-pedestal { width: 78px; height: 78px; bottom: 5px; }
 
-.iso-icon-wrapper img { 
+.iso-icon-wrapper img {
   max-width: 100%; max-height: 100%; object-fit: contain; position: relative; z-index: 1;
-  filter: drop-shadow(0 15px 10px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 5px rgba(57, 243, 255, 0.2)); 
+  filter: drop-shadow(0 15px 10px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 5px rgba(57, 243, 255, 0.2));
 }
 
 /* LABEL KECIL PRESISI */
-.iso-label { 
-  background: rgba(4, 9, 20, 0.9); 
-  border: 1px solid rgba(57, 243, 255, 0.2); 
-  border-radius: 6px; 
-  padding: 4px 6px; 
-  text-align: center; 
-  min-width: 55px; 
-  box-shadow: 0 4px 8px rgba(0,0,0,0.8); 
-  z-index: 2; 
-  transform: translateY(-2px); 
+.iso-label {
+  background: rgba(4, 9, 20, 0.9);
+  border: 1px solid rgba(57, 243, 255, 0.2);
+  border-radius: 6px;
+  padding: 4px 6px;
+  text-align: center;
+  min-width: 55px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.8);
+  z-index: 2;
+  transform: translateY(-2px);
 }
 
 .iso-name { font-family: 'Inter', sans-serif; font-weight: 700; font-size: 9px; color: #e9f2ff; white-space: nowrap; }
 
-.iso-level { 
-  display: inline-block; font-family: 'Inter', sans-serif; font-size: 7px; color: #39f3ff; 
+.iso-level {
+  display: inline-block; font-family: 'Inter', sans-serif; font-size: 7px; color: #39f3ff;
   margin-top: 4px; font-weight: 800; padding: 2px 6px; background: rgba(57, 243, 255, 0.1);
-  border: 1px solid rgba(57, 243, 255, 0.3); border-radius: 999px; 
+  border: 1px solid rgba(57, 243, 255, 0.3); border-radius: 999px;
 }
 
 /* HOLOGRAM TERKUNCI */
-.iso-node.locked-hologram .iso-icon-wrapper img { 
-  opacity: 0.6; 
-  filter: grayscale(1) sepia(1) hue-rotate(180deg) brightness(0.6) drop-shadow(0 0 6px rgba(57, 243, 255, 0.3)); 
+.iso-node.locked-hologram .iso-icon-wrapper img {
+  opacity: 0.6;
+  filter: grayscale(1) sepia(1) hue-rotate(180deg) brightness(0.6) drop-shadow(0 0 6px rgba(57, 243, 255, 0.3));
 }
-.iso-node.locked-hologram .cyber-pedestal { 
-  border-color: rgba(255, 255, 255, 0.15); background: rgba(255, 255, 255, 0.02); box-shadow: none; 
+.iso-node.locked-hologram .cyber-pedestal {
+  border-color: rgba(255, 255, 255, 0.15); background: rgba(255, 255, 255, 0.02); box-shadow: none;
 }
 .iso-node.locked-hologram .iso-label { border-color: rgba(255, 255, 255, 0.15); background: rgba(4, 9, 20, 0.7); }
 .iso-node.locked-hologram .iso-name { color: #8aa1bd; }
 .iso-req { color: #8aa1bd; font-size: 7px; margin-top: 3px; font-weight: 600;}
 
-/* KITA MUNCULKAN KEMBALI GEMBOKNYA! */
-.iso-lock-icon { 
-  display: block; 
-  font-size: 11px; 
-  color: #8aa1bd; 
-  margin-bottom: 2px; 
+/* GEMBOK MUNCUL (DIJAMIN!) */
+.iso-lock-icon {
+  display: block !important;
+  font-size: 11px;
+  color: #8aa1bd;
+  margin-bottom: 2px;
 }
-
-/* HOLOGRAM TERKUNCI */
-.iso-node.locked-hologram .iso-icon-wrapper img { opacity: 0.5; filter: grayscale(1) sepia(1) hue-rotate(180deg) brightness(0.8) drop-shadow(0 0 8px rgba(0, 255, 255, 0.4)); }
-.iso-node.locked-hologram .iso-label { border-color: rgba(255, 255, 255, 0.15); background: rgba(5, 10, 24, 0.6); }
-.iso-node.locked-hologram .iso-name { color: #888; }
-.iso-req { color: #555; font-size: 9px; margin-top: 2px; }
-.iso-lock-icon { font-size: 11px; color: #aaa; margin-bottom: 2px; }
 
 /* TOMBOL RAKSASA */
 .giant-btn-container { display: flex; align-items: center; gap: 15px; padding: 0 15px; margin-top: 10px; }
 .giant-btn-line { flex: 1; border: none; border-top: 1px dashed rgba(0, 255, 255, 0.4); }
-.giant-action-btn { background: linear-gradient(90deg, rgba(0,255,255,0.05), rgba(0,255,255,0.25), rgba(0,255,255,0.05)); border: 1px solid #00FFFF; border-radius: 20px; padding: 12px 25px; display: flex; align-items: center; gap: 10px; cursor: pointer; box-shadow: 0 0 20px rgba(0, 255, 255, 0.15); }
+.giant-action-btn { background: linear-gradient(90deg, rgba(0,255,255,0.05), rgba(0,255,255,0.25), rgba(0,255,255,0.05)); border: 1px solid #00FFFF; border-radius: 20px; padding: 12px 25px; display: flex; align-items: center; gap: 10px; cursor: pointer; box-shadow: 0 0 20px rgba(0, 255, 255, 0.15); transition: all 0.3s; }
+.giant-action-btn:active { transform: scale(0.96); background: rgba(0, 255, 255, 0.3); box-shadow: 0 0 30px rgba(0, 255, 255, 0.4); }
 .giant-action-text { font-family: 'Orbitron', sans-serif; font-size: 16px; font-weight: 700; color: #00FFFF; letter-spacing: 1px; }
 .giant-radar-icon { font-size: 20px; color: #00FFFF; animation: spinRadar 4s linear infinite; }
 @keyframes spinRadar { 100% { transform: rotate(360deg); } }
-/* NODE BANGUNAN (100% TANPA KARTU/BORDER) */
-.iso-node-wrapper { flex: 1; max-width: 95px; display: flex; justify-content: center; }
-.iso-node { display: flex; flex-direction: column; align-items: center; cursor: pointer; position: relative; background: transparent !important; border: none !important; box-shadow: none !important; transition: transform 0.2s ease; z-index: 2; }
-.iso-node:active { transform: scale(0.92); }
-
-.iso-icon-wrapper { 
-  position: relative; width: 75px; height: 75px; 
-  display: flex; justify-content: center; align-items: flex-end; 
-  margin-bottom: 0px; /* Merapatkan jarak antara bangunan dan label */
-}
-.iso-icon-wrapper.main-size { width: 95px !important; height: 95px !important; }
-
-/* INI ADALAH UBIN ISOMETRIK 3D YANG PRESISI (PENGGANTI CINCIN BUNDAR) */
-.cyber-pedestal {
-  position: absolute;
-  bottom: 8px; 
-  left: 50%;
-  /* Melipat dan memutar kotak menjadi Ubin Isometrik (Diamond) */
-  transform: translateX(-50%) rotateX(60deg) rotateZ(45deg); 
-  width: 48px;
-  height: 48px;
-  border: 1px solid rgba(57, 243, 255, 0.3);
-  border-radius: 8px; /* Tumpul di ujung agar elegan */
-  background: linear-gradient(135deg, rgba(57, 243, 255, 0.08), transparent);
-  box-shadow: 0 0 10px rgba(57, 243, 255, 0.2) inset, 0 15px 20px rgba(0,0,0,0.8);
-  z-index: 0;
-  transition: all 0.3s;
-}
-.main-size .cyber-pedestal { width: 62px; height: 62px; bottom: 10px; }
-
-/* GAMBAR BANGUNAN TERTANAM DI ATAS UBIN */
-.iso-icon-wrapper img { 
-  max-width: 100%; max-height: 100%; object-fit: contain; 
-  position: relative; z-index: 1;
-  filter: drop-shadow(0 15px 10px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 5px rgba(57, 243, 255, 0.2)); 
-  transition: transform 0.3s, filter 0.3s;
-}
-.iso-node:hover .iso-icon-wrapper img {
-  transform: translateY(-3px);
-  filter: drop-shadow(0 20px 15px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 10px rgba(57, 243, 255, 0.4));
-}
-
-/* LABEL KECIL PRESISI (MINIATUR AAA) */
-.iso-label { 
-  background: rgba(4, 9, 20, 0.9); 
-  border: 1px solid rgba(57, 243, 255, 0.2); 
-  border-radius: 6px; 
-  padding: 4px 6px; 
-  text-align: center; 
-  min-width: 55px; 
-  box-shadow: 0 4px 8px rgba(0,0,0,0.8); 
-  z-index: 2; 
-  transform: translateY(-6px); /* Ditarik ke atas agar menempel manis di bawah bangunan */
-}
-
-/* NAMA BANGUNAN (SANGAT KECIL) */
-.iso-name { 
-  font-family: 'Inter', sans-serif; 
-  font-weight: 700; 
-  font-size: 9px; /* Ukuran presisi miniatur */
-  color: #e9f2ff; 
-  white-space: nowrap; 
-}
-
-/* KAPSUL LEVEL (CYAN PILL) */
-.iso-level { 
-  display: inline-block;
-  font-family: 'Inter', sans-serif; 
-  font-size: 7px; /* Angka sangat kecil layaknya indikator sistem */
-  color: #39f3ff; 
-  margin-top: 4px; 
-  font-weight: 800; 
-  padding: 2px 6px;
-  background: rgba(57, 243, 255, 0.1);
-  border: 1px solid rgba(57, 243, 255, 0.3);
-  border-radius: 999px; /* Membentuk kapsul sempurna */
-}
-
-/* HOLOGRAM TERKUNCI */
-.iso-node.locked-hologram .iso-icon-wrapper img { 
-  opacity: 0.6; 
-  filter: grayscale(1) sepia(1) hue-rotate(180deg) brightness(0.6) drop-shadow(0 0 6px rgba(57, 243, 255, 0.3)); 
-  transform: none; 
-}
-.iso-node.locked-hologram .cyber-pedestal { 
-  border-color: rgba(255, 255, 255, 0.15); 
-  background: rgba(255, 255, 255, 0.02); 
-  box-shadow: none; 
-}
-.iso-node.locked-hologram .iso-label { 
-  border-color: rgba(255, 255, 255, 0.15); 
-  background: rgba(4, 9, 20, 0.7); 
-}
-.iso-node.locked-hologram .iso-name { color: #8aa1bd; }
-.iso-req { color: #8aa1bd; font-size: 7px; margin-top: 3px; font-weight: 600;}
-.iso-lock-icon { display: none; } /* Menyembunyikan gembok agar tidak merusak estetika kapsul mini */
