@@ -5025,3 +5025,109 @@ p, .muted, .info-box, small {
   border-right: 1px solid rgba(138, 161, 189, 0.3);
   border-bottom: 1px solid rgba(138, 161, 189, 0.3);
 }
+/* ==========================================
+   PREMIUM DASHBOARD TOPBAR (REFERENSI UI)
+   ========================================== */
+.premium-topbar {
+  background: transparent !important;
+  padding: 10px 12px 0 12px;
+  margin-bottom: 15px;
+  position: relative;
+  z-index: 50;
+}
+
+/* Bingkai Kaca Latar Belakang */
+.premium-topbar-inner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(8, 14, 30, 0.85); /* Warna biru gelap */
+  border: 1px solid rgba(0, 255, 255, 0.15);
+  border-radius: 12px;
+  padding: 10px;
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.8), inset 0 0 15px rgba(0, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+}
+
+/* --- AVATAR KIRI --- */
+.premium-avatar-btn {
+  background: transparent; border: none; padding: 0; cursor: pointer; flex-shrink: 0;
+}
+.premium-avatar-frame {
+  position: relative;
+  width: 58px; height: 58px;
+  border-radius: 8px;
+  background: #000;
+  border: 2px solid var(--cyan-dim);
+  box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+  overflow: hidden;
+}
+.premium-avatar-frame img { width: 100%; height: 100%; object-fit: cover; }
+
+/* --- INFO KANAN (NAMA & RESOURCE) --- */
+.premium-topbar-right {
+  flex: 1; display: flex; flex-direction: column; gap: 8px;
+}
+
+/* Nama & Title Row */
+.premium-commander-info {
+  display: flex; align-items: center; gap: 8px;
+}
+.premium-commander-name {
+  font-family: 'Orbitron', sans-serif !important;
+  font-weight: 700; font-size: 15px;
+  color: #ffffff;
+  letter-spacing: 0.5px;
+  text-shadow: 0 0 5px rgba(255,255,255,0.4);
+}
+.premium-commander-title {
+  background: rgba(0, 255, 255, 0.1);
+  border: 1px solid rgba(0, 255, 255, 0.3);
+  color: var(--cyan);
+  font-family: 'Inter', sans-serif !important;
+  font-size: 9px; font-weight: 700;
+  padding: 2px 8px; border-radius: 999px; text-transform: uppercase;
+}
+
+/* Resource Baris & Kapsul */
+.premium-resource-row {
+  display: flex; align-items: center; gap: 10px; justify-content: space-between;
+}
+.premium-resource-list {
+  display: flex; flex: 1; justify-content: space-between;
+  background: rgba(0, 0, 0, 0.5); /* Latar kapsul gelap */
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px; /* Membentuk kapsul panjang */
+  padding: 4px 12px;
+}
+.premium-resource-chip {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+.chip-top {
+  display: flex; align-items: center; gap: 4px; margin-bottom: 2px;
+}
+.chip-top img { width: 12px; height: 12px; filter: drop-shadow(0 0 3px rgba(255,255,255,0.5)); }
+.chip-top b {
+  font-family: 'Orbitron', sans-serif !important;
+  font-size: 11px; color: #fff;
+}
+.premium-resource-chip small {
+  font-family: 'Inter', sans-serif !important;
+  font-size: 7px; color: #8aa1bd; text-transform: uppercase; letter-spacing: 0.5px;
+}
+
+/* --- TOMBOL SETTINGS --- */
+.premium-settings-btn {
+  background: rgba(0, 0, 0, 0.5) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 50%; /* Bulat sempurna */
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  color: #8aa1bd; cursor: pointer; flex-shrink: 0; transition: all 0.2s;
+}
+.premium-settings-btn:hover {
+  color: var(--cyan); border-color: var(--cyan-dim) !important;
+  background: rgba(0, 255, 255, 0.05) !important;
+  box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+}
