@@ -2322,7 +2322,7 @@ function renderBaseBuildings() {
       <div class="iso-node-wrapper" style="left: ${pos.x}%; top: ${pos.y}%;">
         <div class="iso-node ${isLocked ? 'locked-hologram' : ''}" onclick="openBuilding('${id}')">
           <div class="iso-icon-wrapper ${id === 'main_lab' ? 'main-size' : ''}">
-            <div class="cyber-pedestal"></div>
+            <img src="assets/pedestal.png" class="cyber-pedestal" alt="pedestal">
             <img src="${b.asset}" alt="${b.name}">
           </div>
           <div class="iso-label">${labelHtml}</div>
