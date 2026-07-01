@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Orbitron:wght@500;600;700;800;900&family=Rajdhani:wght@600;700&display=swap');
 :root {
   --bg: #060912;
   --panel: #0d1324;
@@ -4926,7 +4927,7 @@ body, html {
   color: #8aa1bd !important;
 }
 /* ==========================================
-   BADGE LEVEL POJOK KIRI ATAS (REFERENSI UI)
+   BADGE LEVEL POJOK KIRI ATAS & TYPOGRAPHY PREMIUM
    ========================================== */
 .card-level-badge {
   position: absolute;
@@ -4934,16 +4935,58 @@ body, html {
   left: -1px;
   background: rgba(0, 255, 255, 0.1);
   color: var(--cyan);
-  font-family: 'Orbitron', sans-serif;
-  font-size: 9px;
-  font-weight: 700;
+  
+  /* --- FONT PREMIUM TERPASANG --- */
+  font-family: 'Orbitron', sans-serif !important;
+  font-weight: 800 !important; /* ExtraBold */
+  font-size: 9px !important;
+  letter-spacing: 0.5px;
+  
   padding: 3px 6px;
-  border-top-left-radius: 12px; /* Menyesuaikan lengkungan kartu */
+  border-top-left-radius: 12px;
   border-bottom-right-radius: 8px;
   border-right: 1px solid var(--cyan-dim);
   border-bottom: 1px solid var(--cyan-dim);
   backdrop-filter: blur(4px);
   z-index: 5;
+}
+
+/* Supaya badge ikut redup jika terkunci */
+.cyber-card.locked-building .card-level-badge,
+.cyber-card.needs-build-building .card-level-badge {
+  color: #8aa1bd;
+  background: rgba(138, 161, 189, 0.1);
+  border-right: 1px solid rgba(138, 161, 189, 0.3);
+  border-bottom: 1px solid rgba(138, 161, 189, 0.3);
+}
+
+/* --- FONT NAMA BANGUNAN: Rajdhani Bold --- */
+.card-title {
+  font-family: 'Rajdhani', sans-serif !important;
+  font-weight: 700 !important;
+  font-size: 13px !important;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+/* --- FONT TOMBOL: Orbitron SemiBold --- */
+button, .cyber-btn {
+  font-family: 'Orbitron', sans-serif !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.5px;
+}
+
+/* --- FONT ANGKA RESOURCE: Orbitron Medium --- */
+.status-chip b, .top-resource-inline b {
+  font-family: 'Orbitron', sans-serif !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.5px;
+}
+
+/* --- FONT DESKRIPSI (TEKS PANJANG): Inter --- */
+p, .muted, .info-box, small {
+  font-family: 'Inter', sans-serif !important;
+  font-weight: 500;
 }
 
 /* Supaya badge level ikut meredup menjadi abu-abu jika belum dibangun/terkunci */
