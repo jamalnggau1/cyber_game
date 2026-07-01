@@ -5075,11 +5075,11 @@ body, html {
 /* 3. DUDUKAN (Besar, Kuat, Menopang dari Bawah) */
 .cyber-pedestal {
   position: absolute; 
-  bottom: -22px !important; 
+  bottom: -26px !important; /* Ditarik sedikit lebih ke bawah karena ukurannya membesar */
   left: 50%;
   transform: translateX(-50%); 
-  width: 155px !important;  
-  height: 95px !important; 
+  width: 175px !important;  /* Diperbesar agar kakinya pas (dari sebelumnya 155px) */
+  height: 105px !important; /* Tingginya disesuaikan agar tidak gepeng */
   max-width: none !important; 
   max-height: none !important;
   background-image: url('assets/pedestal.png') !important; 
@@ -5091,7 +5091,13 @@ body, html {
   background-color: transparent !important; 
   box-shadow: none !important;
 }
-.main-size .cyber-pedestal { width: 195px !important; height: 120px !important; bottom: -28px !important; }
+
+/* Ukuran Dudukan Khusus untuk Main Lab */
+.main-size .cyber-pedestal { 
+  width: 215px !important;  /* Diperbesar ekstra untuk lab utama */
+  height: 130px !important; 
+  bottom: -32px !important; 
+}
 
 /* 4. GAMBAR BANGUNAN (Bersandar pada Wadah) */
 .iso-icon-wrapper img:not(.cyber-pedestal) { 
