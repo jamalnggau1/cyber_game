@@ -2280,68 +2280,92 @@ async function loadBuildings() {
 }
 
 function renderBaseBuildings() {
-  const baseGrid = el("baseGrid");
-  if (!baseGrid || !buildingsData) return;
+  const baseGridContainer = el("baseGrid");
+  if (!baseGridContainer || !buildingsData) return;
 
-  // === OBAT LAYOUT TERGENCET ===
-  // Kita bersihkan class bawaan yang merusak dan memaksanya menjadi blok penuh
-  baseGrid.className = ""; 
-  baseGrid.style.display = "block";
-  baseGrid.style.width = "100%";
+  // Hancurkan layout bawaan agar peta isometrik bisa bernafas lega
+  baseGridContainer.className = "";
+  baseGridContainer.style.display = "block";
+  baseGridContainer.style.width = "100%";
 
   const order = [
-    "radar_tower",
-    "unit_factory",
-    "main_lab",
-    "ai_core",
-    "research_lab",
-    "recovery_center",
-    "guild_gate"
+    "radar_tower", "main_lab", "unit_factory",
+    "ai_core", "research_lab", "recovery_center", "guild_gate"
   ];
+
+  // Mapping posisi presisi di CSS Grid Area (Formasi Berlian)
+  const gridAreas = {
+    radar_tower: "radar",
+    main_lab: "main",
+    unit_factory: "factory",
+    ai_core: "ai",
+    research_lab: "research",
+    recovery_center: "recovery",
+    guild_gate: "guild"
+  };
 
   const buildingCards = order.map(id => {
     const b = buildingsData.buildings[id];
     if (!b) return "";
 
-    const levelText = getBuildingStatusText(b);
-    const lockedClass = b.locked ? "locked-building" : (getBuildingLevel(b) <= 0 ? "needs-build-building" : "");
-
-    let actionText = "OPEN";
-    let btnClass = "cyber-btn"; 
+    const level = getBuildingLevel(b);
+    // Logika Otomatis: Jika level 0 atau terkunci, ubah wujud jadi Hologram Preview
+    const isLocked = b.locked || level <= 0; 
     
-    if (b.locked) {
-        actionText = "LOCKED";
-    } else if (getBuildingLevel(b) <= 0) {
-        actionText = "BUILD";
-        btnClass = "cyber-btn magenta-btn"; 
-    } else if (id === "radar_tower") {
-        actionText = "SCAN";
-        btnClass = "cyber-btn magenta-btn"; 
-    } else if (id === "unit_factory") {
-        actionText = "TRAIN";
+    let labelHtml = "";
+
+    if (isLocked) {
+      // Wujud Hologram (Preview)
+      const reqText = getBuildingRequirementText(id) || "Requires Upgrade";
+      labelHtml = `
+        <div class="iso-lock-icon">🔒</div>
+        <div class="iso-name">${b.name}</div>
+        <div class="iso-req">${reqText}</div>
+      `;
     } else {
-        actionText = "UPGRADE";
+      // Wujud Aktif
+      labelHtml = `
+        <div class="iso-name">${b.name}</div>
+        <div class="iso-level">Lv.${level}</div>
+      `;
     }
 
     return `
-      <div class="cyber-card ${lockedClass}" onclick="openBuilding('${id}')">
-        <img src="${b.asset}" alt="${b.name}" style="width: 52px; height: 52px; object-fit: contain; margin-bottom: 8px; filter: drop-shadow(0 0 10px var(--cyan-dim));">
-        <div class="card-title">${b.name}</div>
-        <div class="card-level">${levelText}</div>
-        <button class="${btnClass}" onclick="event.stopPropagation(); openBuilding('${id}')">
-          ${actionText}
-        </button>
+      <div style="grid-area: ${gridAreas[id]}; width: 100%;">
+        <div class="iso-node ${isLocked ? 'locked' : ''}" onclick="openBuilding('${id}')">
+          <div class="iso-icon-wrapper ${id === 'main_lab' ? 'main-size' : ''}">
+            <img src="${b.asset}" alt="${b.name}">
+          </div>
+          <div class="iso-label">
+            ${labelHtml}
+          </div>
+        </div>
       </div>
     `;
   }).join("");
 
-  // Memisahkan Kartu Misi dan Grid Bangunan agar tidak rebutan tempat
-  baseGrid.innerHTML = `
-    <div style="margin-bottom: 16px; width: 100%;">
+  // Tombol Raksasa Keren di Bawah (Pengganti Tombol Kecil)
+  const giantRadarBtn = `
+    <div class="giant-btn-container">
+      <hr class="giant-btn-line">
+      <button class="giant-action-btn" onclick="switchPage('radarPage')">
+        <span class="giant-radar-icon">◎</span>
+        <span class="giant-action-text">OPEN RADAR ❯</span>
+      </button>
+      <hr class="giant-btn-line">
+    </div>
+  `;
+
+  // Render Final ke Layar
+  baseGridContainer.innerHTML = `
+    <div style="margin-bottom: 20px; width: 100%;">
        ${renderBeginnerMissionCard()}
     </div>
-    <div class="building-grid">
-       ${buildingCards}
+    <div class="base-map-iso">
+      <div class="base-grid-iso">
+         ${buildingCards}
+      </div>
+      ${giantRadarBtn}
     </div>
   `;
 }
