@@ -5129,7 +5129,7 @@ body, html {
 
 /* 5. AI Core */
 .ai_core .cyber-pedestal {
-  width: 100px !important;
+  width: 200px !important;
   height: 100px !important;
   max-width: none !important;
   max-height: none !important;
