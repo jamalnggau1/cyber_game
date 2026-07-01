@@ -2063,6 +2063,15 @@ function statusIcon(name) {
   return `<img src="assets/icons/${name}.webp" alt="${name}" onerror="this.style.display='none'">`;
 }
 
+function renderStatusChip(icon, label, value, className = "") {
+  return `
+    <button class="status-chip icon-only-status ${className}" onclick="showResourceInfo('${label}')">
+      ${statusIcon(icon)}
+      <b>${value}</b>
+    </button>
+  `;
+}
+
 const RESOURCE_INFO = {
   Energy: "Energy dipakai untuk scan, attack, dan aktivitas operasi.",
   Credits: "Credits dipakai untuk speedup dan fitur convenience.",
@@ -2095,26 +2104,16 @@ function showResourceInfo(label) {
   }, 2200);
 }
 
-function renderPremiumStatusChip(icon, label, value) {
-  return `
-    <div class="premium-resource-chip" onclick="showResourceInfo('${label}')">
-      <div class="chip-top">
-        ${statusIcon(icon)}
-        <b>${compactNumber(value)}</b>
-      </div>
-      <small>${label}</small>
-    </div>
-  `;
-}
-
 function renderPlayerStatusHtml(p) {
   const r = getResourceBag();
-  // Sesuai urutan referensi gambar: Credit, Energi, Nano, Data
+
   return `
-    ${renderPremiumStatusChip("credits", "CREDIT", num(p.credits))}
-    ${renderPremiumStatusChip("energy", "ENERGI", num(p.energy))}
-    ${renderPremiumStatusChip("nano_parts", "NANO", num(r.nano_parts))}
-    ${renderPremiumStatusChip("data_shard", "DATA", num(r.data_shard))}
+    <div class="status-chip-grid">
+      ${renderStatusChip("credits", "Credits", num(p.credits))}
+      ${renderStatusChip("data_shard", "Data", num(r.data_shard))}
+      ${renderStatusChip("nano_parts", "Nano", num(r.nano_parts))}
+      ${renderStatusChip("nexus_core", "Nexus", num(r.nexus_core))}
+    </div>
   `;
 }
 
