@@ -5010,9 +5010,11 @@ body, html {
   transform: none; 
 }
 .iso-node.locked-hologram .cyber-pedestal { 
-  border-color: rgba(255, 255, 255, 0.15); 
-  background: rgba(255, 255, 255, 0.02); 
-  box-shadow: none; 
+  filter: grayscale(1) sepia(1) hue-rotate(180deg) brightness(0.4);
+  opacity: 0.6;
+  border: none !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
 }
 .iso-node.locked-hologram .iso-label { 
   border-color: rgba(255, 255, 255, 0.15); 
@@ -5063,23 +5065,41 @@ body, html {
 }
 .iso-icon-wrapper.main-size { width: 95px !important; height: 95px !important; }
 
-/* INI ADALAH UBIN ISOMETRIK 3D YANG PRESISI (PENGGANTI CINCIN BUNDAR) */
+/* ==========================================
+   DUDUKAN CUSTOM ASET DARI COMMANDER
+   ========================================== */
 .cyber-pedestal {
-  position: absolute;
-  bottom: 8px; 
+  position: absolute; 
+  bottom: -15px; /* Angka minus untuk menarik dudukan ke bawah bangunan */
   left: 50%;
-  /* Melipat dan memutar kotak menjadi Ubin Isometrik (Diamond) */
-  transform: translateX(-50%) rotateX(60deg) rotateZ(45deg); 
-  width: 48px;
-  height: 48px;
-  border: 1px solid rgba(57, 243, 255, 0.3);
-  border-radius: 8px; /* Tumpul di ujung agar elegan */
-  background: linear-gradient(135deg, rgba(57, 243, 255, 0.08), transparent);
-  box-shadow: 0 0 10px rgba(57, 243, 255, 0.2) inset, 0 15px 20px rgba(0,0,0,0.8);
-  z-index: 0;
+  
+  /* KITA HAPUS EFEK ROTASI 3D KARENA GAMBAR ANDA SUDAH 3D */
+  transform: translateX(-50%); 
+  
+  width: 95px;  /* Lebarkan agar pas menopang bangunan */
+  height: 60px; 
+  
+  /* PASTIKAN NAMA FILE DAN FOLDERNYA BENAR */
+  background-image: url('assets/pedestal.png'); 
+  background-size: contain;
+  background-position: center bottom;
+  background-repeat: no-repeat;
+  
+  z-index: 0; 
   transition: all 0.3s;
+  
+  /* Membuang efek ubin lama (border & warna) */
+  border: none !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
 }
-.main-size .cyber-pedestal { width: 62px; height: 62px; bottom: 10px; }
+
+/* Ukuran Dudukan Khusus untuk Main Lab (Lebih Besar) */
+.main-size .cyber-pedestal { 
+  width: 125px; 
+  height: 80px; 
+  bottom: -20px; 
+}
 
 /* GAMBAR BANGUNAN TERTANAM DI ATAS UBIN */
 .iso-icon-wrapper img { 
