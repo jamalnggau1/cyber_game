@@ -5045,16 +5045,13 @@ body, html {
 }
 .iso-icon-wrapper.main-size { width: 95px !important; height: 95px !important; }
 
-/* ==========================================
-   DUDUKAN CUSTOM ASET (KEMBALI KE VERSI SEMPURNA)
-   ========================================== */
 .cyber-pedestal {
   position: absolute; 
-  bottom: -22px; /* Dikembalikan ke -22px yang sudah pas */
+  bottom: -25px; /* Sedikit diturunkan karena dudukannya membesar */
   left: 50%;
   transform: translateX(-50%); 
-  width: 14000px;  /* Dikembalikan ke 140px yang proporsional */
-  height: 85px; 
+  width: 165px;  /* <-- Diperbesar secara wajar dari 140px */
+  height: 100px; /* <-- Diimbangi tingginya dari 85px */
   background-image: url('assets/pedestal.png') !important; 
   background-size: contain;
   background-position: center bottom;
